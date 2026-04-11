@@ -13,7 +13,8 @@ wheels/
 .claude/
 
 # Temp/preview images
-flowchart_preview.png
+flowchart_extracao_ptbr_temp.svg
+flowchart_extracao.svg
 *_temp.svg
 
 # Python version pin (local)
