@@ -27,7 +27,7 @@ UTILIZAÇÃO
 
 OPÇÕES
 ------
-  --output-dir DIR   Pasta de saída (default: <nome_csv>_new_<timestamp>/)
+  --output-dir DIR   Pasta de saída (default: <nome_csv>_s_<timestamp>_<modo>/)
   --delay SEG        Delay mínimo entre requests (default: 1.5)
   --jitter SEG       Variação aleatória máxima do delay (default: 0.5)
   --retries N        Tentativas em erro transitório (default: 3)
@@ -39,7 +39,7 @@ OPÇÕES
   --only-html        Usar apenas scraping HTML, sem ArticleMeta API
   --stats-report     Sem executar scraping: lê stats.json e imprime o relatório.
                      Procura em --output-dir (se informado) ou na pasta mais
-                     recente <nome_csv>_new_*/. CSV opcional se --output-dir dado.
+                     recente <nome_csv>_s_*/. CSV opcional se --output-dir dado.
   --log-level LEVEL  DEBUG | INFO | WARNING | ERROR (default: INFO)
   --collection COD   Colecção SciELO: scl=Brasil, arg=Argentina… (default: scl)
   --list-collections Listar todas as coleções SciELO disponíveis e sair
@@ -970,8 +970,14 @@ def main():
 
     ts        = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_name = input_path.stem
+    mode_str  = ("apenas-api" if args.only_api
+                 else "apenas-html" if args.only_html
+                 else "api+html")
+    mode_slug = ("api" if args.only_api
+                 else "html" if args.only_html
+                 else "api+html")
     out_dir   = (Path(args.output_dir) if args.output_dir
-                 else input_path.parent / f"{base_name}_new_{ts}")
+                 else input_path.parent / f"{base_name}_s_{ts}_{mode_slug}")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     log_path    = out_dir / "scraper.log"
@@ -979,10 +985,6 @@ def main():
     stats_path  = out_dir / "stats.json"
 
     logger = setup_logging(log_path, args.log_level)
-
-    mode_str = ("apenas-api" if args.only_api
-                else "apenas-html" if args.only_html
-                else "api+html")
 
     logger.info("=" * 62)
     logger.info(f"  SciELO Scraper  v{__version__}")

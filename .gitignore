@@ -17,5 +17,10 @@ flowchart_extracao_ptbr_temp.svg
 flowchart_extracao.svg
 *_temp.svg
 
+# Runs locais (fora de exemplos/)
+*_new_*/
+*_s_*/
+search_*.csv
+
 # Python version pin (local)
 .python-version
