@@ -46,6 +46,7 @@ OPÇÕES
   --collection COD   Colecção SciELO: scl=Brasil, arg=Argentina… (default: scl)
   --list-collections Listar todas as coleções SciELO disponíveis e sair
   --version          Mostrar versão e sair
+  -h, --help, -?     Mostrar esta mensagem de ajuda e sair
 
 EXEMPLOS
 --------
