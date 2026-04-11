@@ -148,7 +148,7 @@ class ColorFormatter(logging.Formatter):
         return f"{ts}  {c}{record.levelname:<8}{self.RESET}  {record.getMessage()}"
 
 
-def setup_logging(log_path: Path, level: str = "INFO") -> logging.Logger:
+def setup_logging(log_path: Path, level: str = "INFO", append: bool = False) -> logging.Logger:
     logger = logging.getLogger("scielo")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
     logger.handlers.clear()
@@ -157,7 +157,7 @@ def setup_logging(log_path: Path, level: str = "INFO") -> logging.Logger:
         ch.stream.reconfigure(encoding="utf-8", errors="replace")
     ch.setFormatter(ColorFormatter())
     logger.addHandler(ch)
-    fh = logging.FileHandler(log_path, encoding="utf-8")
+    fh = logging.FileHandler(log_path, mode="a" if append else "w", encoding="utf-8")
     fh.setFormatter(logging.Formatter(
         "%(asctime)s  %(levelname)-8s  %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -985,19 +985,54 @@ def main():
     mode_slug = ("api" if args.only_api
                  else "html" if args.only_html
                  else "api+html")
-    out_dir   = (Path(args.output_dir) if args.output_dir
-                 else input_path.parent / f"{base_name}_s_{ts}_{mode_slug}")
+
+    # ── Detectar pasta de resume antes de definir out_dir ────────────────────
+    resume_dir  = None
+    elapsed_prev = 0.0
+    if not args.no_resume:
+        candidates = sorted(
+            [d for d in input_path.parent.iterdir()
+             if d.is_dir() and d.name.startswith(base_name + "_s_")],
+            reverse=True,
+        )
+        for cand in candidates:
+            if (cand / "resultado.csv").exists():
+                resume_dir = cand
+                # Carregar tempo acumulado da execução anterior
+                prev_stats = cand / "stats.json"
+                if prev_stats.exists():
+                    try:
+                        with open(prev_stats, encoding="utf-8") as f:
+                            elapsed_prev = json.load(f).get("elapsed_seconds", 0.0)
+                    except Exception:
+                        pass
+                break
+
+    if args.output_dir:
+        out_dir = Path(args.output_dir)
+    elif resume_dir and not args.no_resume:
+        out_dir = resume_dir          # reutiliza pasta existente
+    else:
+        out_dir = input_path.parent / f"{base_name}_s_{ts}_{mode_slug}"
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     log_path    = out_dir / "scraper.log"
     result_path = out_dir / "resultado.csv"
     stats_path  = out_dir / "stats.json"
 
-    logger = setup_logging(log_path, args.log_level)
+    is_continued = resume_dir is not None and out_dir == resume_dir and not args.no_resume
+    logger = setup_logging(log_path, args.log_level, append=is_continued)
 
-    logger.info("=" * 62)
-    logger.info(f"  SciELO Scraper  v{__version__}")
-    logger.info("=" * 62)
+    if is_continued:
+        logger.info("═" * 62)
+        logger.info(f"  RETOMADA — {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info("═" * 62)
+    else:
+        logger.info("=" * 62)
+        logger.info(f"  SciELO Scraper  v{__version__}")
+        logger.info("=" * 62)
+
     logger.info(f"  CSV de entrada   : {input_path.name}")
     logger.info(f"  Colecção         : {args.collection}")
     logger.info(f"  Pasta de saída   : {out_dir}")
@@ -1013,25 +1048,15 @@ def main():
     if not ok:
         sys.exit(1)
 
-    # ── Resume ────────────────────────────────────────────────────────────────
+    # ── Resume — carregar artigos já concluídos ───────────────────────────────
     done: dict = {}
-    if not args.no_resume:
-        candidates = sorted(
-            [d for d in input_path.parent.iterdir()
-             if d.is_dir() and d.name.startswith(base_name + "_") and d != out_dir],
-            reverse=True,
-        )
-        for cand in candidates:
-            prev = cand / "resultado.csv"
-            if prev.exists():
-                logger.info(f"  Resultado anterior: {cand.name}")
-                done = load_done(prev, logger)
-                if done: break
-        if not done and result_path.exists():
-            done = load_done(result_path, logger)
+    if not args.no_resume and result_path.exists():
+        done = load_done(result_path, logger)
 
-    resume_mode = "RESUME" if done else "NEW"
+    resume_mode = "CONTINUED" if is_continued else ("RESUME" if done else "NEW")
     logger.info(f"  Modo execução    : {resume_mode}  ({len(done)} já concluídos)")
+    if is_continued:
+        logger.info(f"  Tempo anterior   : {humanize_seconds(elapsed_prev)}")
     logger.info("─" * 62)
 
     # Mapear PID → linha CSV (linha 2 = primeiro artigo, linha 1 = cabeçalho)
@@ -1135,7 +1160,7 @@ def main():
             run_processing()
 
     # ── Finalizar ─────────────────────────────────────────────────────────────
-    elapsed = time.time() - t_start
+    elapsed = time.time() - t_start + elapsed_prev  # tempo acumulado se retomada
     logger.info("─" * 62)
     save_csv(all_results, result_path, logger)
     logger.info(f"  CSV final: {result_path.name}  ({len(all_results)} linhas)")
