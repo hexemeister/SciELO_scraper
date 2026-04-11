@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scielo_search.py  v1.0
+scielo_search.py  v1.1
 ======================
 Baixa um CSV de artigos do SciELO Search (search.scielo.org) a partir de
 termos de busca e filtros de ano/coleção, pronto para alimentar o scielo_scraper.py.
@@ -14,7 +14,7 @@ A query gerada segue o padrão combinatório do SciELO Search:
 
 DEPENDÊNCIAS
 ------------
-  pip install requests pandas tqdm
+  uv pip install requests pandas tqdm
 
 UTILIZAÇÃO
 ----------
@@ -28,16 +28,19 @@ OPÇÕES
   --years Y1 Y2 ...   Anos a incluir. Pode ser lista (2020 2021) ou intervalo (2010-2022)
   --collection COD    Coleção SciELO (default: scl). Use --list-collections para ver opções
   --fields CAMPO      Campos de busca: ti (só título), ab (só resumo), ti+ab (ambos, default)
-  --output FILE       Nome do CSV de saída (default: search_<timestamp>.csv)
+  --output FILE       Nome do CSV de saída (default: sc_<timestamp>.csv)
   --no-truncate       Não adicionar $ automaticamente nos termos (usa o termo exato)
   --list-collections  Listar coleções disponíveis e sair
+  --show-params       Imprimir parâmetros da busca (params.json) e sair
   --log-level LEVEL   DEBUG | INFO | WARNING | ERROR (default: INFO)
   --version           Mostrar versão e sair
+  -h, --help, -?     Mostrar esta mensagem de ajuda e sair
 
 EXEMPLOS
 --------
   # Busca por dois termos em ti+ab, ano 2022, coleção Brasil
   python scielo_search.py --terms avalia educa --years 2022 --collection scl
+  # → sc_<timestamp>.csv  +  sc_<timestamp>_params.json
 
   # Truncamento explícito, intervalo de anos
   python scielo_search.py --terms "avalia$" "ensin$" --years 2001-2022
@@ -50,13 +53,17 @@ EXEMPLOS
 
   # Listar coleções disponíveis
   python scielo_search.py --list-collections
+
+  # Ver parâmetros da última busca
+  python scielo_search.py --show-params
 """
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import argparse
 import html as html_mod
 import io
+import json
 import logging
 import re
 import sys
@@ -319,7 +326,11 @@ def main():
         description=f"SciELO Search Downloader v{__version__}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
+        add_help=False,
     )
+    ap.add_argument("-h", "--help", "-?", action="help",
+        default=argparse.SUPPRESS,
+        help="Mostrar esta mensagem de ajuda e sair")
     ap.add_argument("--terms", nargs="+", metavar="TERMO",
         help="Termos de busca. $ é adicionado automaticamente ao final de cada termo "
              "(truncamento). Ex: 'avalia' vira 'avalia$'. Use --no-truncate para desativar.")
@@ -331,11 +342,13 @@ def main():
         choices=["ti", "ab", "ti+ab"],
         help="Campos de busca: ti, ab, ti+ab (default: ti+ab)")
     ap.add_argument("--output", default=None, metavar="FILE",
-        help="Arquivo CSV de saída (default: search_<timestamp>.csv)")
+        help="Arquivo CSV de saída (default: sc_<timestamp>.csv)")
     ap.add_argument("--no-truncate", action="store_true",
         help="Desativar truncamento automático — usa o termo exato sem $ no final")
     ap.add_argument("--list-collections", action="store_true",
         help="Listar coleções disponíveis e sair")
+    ap.add_argument("--show-params", action="store_true",
+        help="Imprimir parâmetros da busca (params.json) e sair")
     ap.add_argument("--timeout", type=float, default=120.0, metavar="SEG",
         help="Timeout HTTP em segundos (default: 120)")
     ap.add_argument("--log-level", default="INFO", metavar="LEVEL",
@@ -363,7 +376,7 @@ def main():
         ap.error(str(e))
 
     ts         = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path   = Path(args.output) if args.output else Path(f"search_{ts}.csv")
+    out_path   = Path(args.output) if args.output else Path(f"sc_{ts}.csv")
 
     # ── Sumário ───────────────────────────────────────────────────────────────
     logger.info("=" * 62)
@@ -386,6 +399,31 @@ def main():
         no_truncate=args.no_truncate,
     )
     url = build_url(query, args.collection)
+
+    # Parâmetros da busca (usados tanto em --show-params quanto ao salvar)
+    params_path = out_path.with_name(out_path.stem + "_params.json")
+    params_data = {
+        "timestamp":        datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "colecao":          args.collection,
+        "termos_originais": args.terms,
+        "truncamento":      not args.no_truncate,
+        "campos":           args.fields,
+        "anos":             years,
+        "total_resultados": None,   # preenchido após o download
+        "query_url":        url,
+    }
+
+    # ── --show-params ─────────────────────────────────────────────────────────
+    if args.show_params:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if params_path.exists():
+            with open(params_path, encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            data = params_data
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return
 
     logger.debug(f"  Query: {query}")
     logger.info(f"  URL  : {url[:120]}{'...' if len(url) > 120 else ''}")
@@ -428,6 +466,15 @@ def main():
     except Exception as e:
         logger.error(f"  ❌ Erro ao salvar CSV: {e}")
         sys.exit(1)
+
+    # ── Salvar _params.json ───────────────────────────────────────────────────
+    params_data["total_resultados"] = len(df)
+    try:
+        with open(params_path, "w", encoding="utf-8") as f:
+            json.dump(params_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"  📋 Parâmetros: {params_path}")
+    except Exception as e:
+        logger.warning(f"  ⚠️  Não foi possível salvar params.json: {e}")
 
     logger.info("=" * 62)
     logger.info(f"  Concluído ✅")

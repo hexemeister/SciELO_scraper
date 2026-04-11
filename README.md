@@ -42,7 +42,7 @@ python scielo_scraper.py lista.csv
 
 | Opção | Default | Descrição |
 |---|---|---|
-| `--output-dir DIR` | `<csv>_new_<timestamp>/` | Pasta de saída |
+| `--output-dir DIR` | `<csv>_s_<timestamp>_<modo>/` | Pasta de saída |
 | `--delay SEG` | `1.5` | Delay mínimo entre requests |
 | `--jitter SEG` | `0.5` | Variação aleatória máxima do delay |
 | `--retries N` | `3` | Tentativas em erro transitório |
@@ -56,7 +56,39 @@ python scielo_scraper.py lista.csv
 | `--list-collections` | — | Listar coleções SciELO disponíveis |
 | `--log-level LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `--collection COD` | `scl` | Coleção SciELO (ex: `scl`=Brasil, `arg`=Argentina) |
+| `--checkpoint N` | `25` | Salvar CSV a cada N artigos (0=só no final, 1=cada artigo) |
 | `--version` | — | Mostrar versão |
+| `-h`, `--help`, `-?` | — | Mostrar ajuda |
+
+## scielo_search.py — Busca de artigos
+
+Script para pesquisar artigos no SciELO Search e baixar os resultados como CSV, pronto para alimentar o `scielo_scraper.py`.
+
+### Uso básico
+
+```bash
+python scielo_search.py --terms avalia educa --years 2022-2025
+```
+
+Gera dois arquivos no diretório actual:
+
+- `sc_<timestamp>.csv` — lista de artigos com PIDs e metadados
+- `sc_<timestamp>_params.json` — parâmetros completos da busca usados
+
+### Opções
+
+| Opção | Descrição |
+|---|---|
+| `--terms TERMO...` | Termos de busca (um ou mais) |
+| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos de publicação |
+| `--collection COD` | Coleção SciELO (default: `scl` = Brasil) |
+| `--fields CAMPO...` | Campos onde pesquisar os termos |
+| `--no-truncate` | Desativar truncamento automático de termos |
+| `--show-params` | Exibir os parâmetros da busca antes de executar |
+| `--output ARQUIVO` | Nome do arquivo de saída (default: `sc_<timestamp>.csv`) |
+| `-h`, `--help`, `-?` | Mostrar ajuda |
+
+> O CSV gerado contém uma coluna `ID` com os PIDs SciELO e é directamente compatível com o `scielo_scraper.py`.
 
 ## Formato do CSV de entrada
 
@@ -72,7 +104,7 @@ O PID deve seguir o padrão `[A-Z]\d{4}-\d{3}[\dA-Z]\d{13}` (ex: `S1982-88372022
 
 ## Arquivos gerados
 
-Cada execução cria uma pasta `<nome_csv>_new_<timestamp>/` com:
+Cada execução cria uma pasta `<nome_csv>_s_<timestamp>_<modo>/` com:
 
 | Arquivo | Descrição |
 |---|---|
@@ -125,3 +157,15 @@ Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use
 | `tqdm` | Barra de progresso |
 | `wakepy` | Impede sleep do sistema durante execução longa |
 | `brotli` | Descompressão Brotli (obrigatório para o CDN do SciELO) |
+
+## Workflow típico
+
+```bash
+# 1. Buscar artigos
+python scielo_search.py --terms avalia educa --years 2022-2025
+# → gera sc_20260411_143022.csv + sc_20260411_143022_params.json
+
+# 2. Extrair metadados
+python scielo_scraper.py sc_20260411_143022.csv
+# → gera sc_20260411_143022_s_20260411_150312_api+html/
+```

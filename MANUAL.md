@@ -2,6 +2,7 @@
 
 ## Sumário
 
+0. [Buscando artigos com scielo_search.py](#0-buscando-artigos-com-scielo_searchpy)
 1. [Instalação](#1-instalação)
 2. [Preparando o CSV de entrada](#2-preparando-o-csv-de-entrada)
 3. [Rodando o script](#3-rodando-o-script)
@@ -12,6 +13,77 @@
 8. [Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
 9. [Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
 10. [Problemas comuns](#10-problemas-comuns)
+
+---
+
+## 0. Buscando artigos com scielo_search.py
+
+Antes de extrair dados com o scraper, é preciso ter uma lista de PIDs. O `scielo_search.py` faz isso automaticamente: ele consulta o SciELO Search e gera um CSV pronto para usar como entrada do scraper.
+
+### Uso básico
+
+```bash
+uv run python scielo_search.py --terms avalia educa --years 2022-2025
+```
+
+### Arquivos gerados
+
+A busca gera dois arquivos lado a lado:
+
+- `sc_20260411_143022.csv` — lista de artigos com PIDs e metadados básicos
+- `sc_20260411_143022_params.json` — registro completo dos parâmetros usados
+
+O `_params.json` tem esta estrutura:
+
+```json
+{
+  "terms": ["avalia", "educa"],
+  "years": "2022-2025",
+  "collection": "scl",
+  "fields": ["ti", "ab"],
+  "query_url": "https://search.scielo.org/?q=avalia+educa&lang=pt&count=100&...",
+  "total_results": 847
+}
+```
+
+### Consultar os parâmetros de uma busca anterior
+
+```bash
+uv run python scielo_search.py --show-params sc_20260411_143022_params.json
+```
+
+Imprime o JSON formatado no terminal, útil para documentar ou reproduzir a busca.
+
+### Termos exactos (sem truncamento)
+
+Por padrão os termos são truncados com `$` (ex: `avalia$` casa com "avaliação", "avaliativo", etc.). Para desactivar:
+
+```bash
+uv run python scielo_search.py --terms avaliação educação --no-truncate
+```
+
+### Outras coleções
+
+```bash
+uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg
+```
+
+### Ajuda
+
+```bash
+uv run python scielo_search.py --help
+uv run python scielo_search.py -?
+```
+
+### Fluxo completo: searcher → scraper
+
+```bash
+# 1. Gerar a lista de artigos
+uv run python scielo_search.py --terms avalia educa --years 2022-2025
+
+# 2. Extrair os dados completos (título, resumo, palavras-chave)
+uv run python scielo_scraper.py sc_20260411_143022.csv
+```
 
 ---
 
@@ -77,7 +149,7 @@ PIDs com `-scl` ou `-oai` no final são aceitos — o script remove o sufixo aut
 uv run python scielo_scraper.py minha_lista.csv
 ```
 
-O script cria automaticamente uma pasta de saída chamada `minha_lista_new_20240101_120000/` (com data e hora) contendo:
+O script cria automaticamente uma pasta de saída chamada `minha_lista_s_20240101_120000_api+html/` (com data, hora e modo) contendo:
 
 - `resultado.csv` — dados extraídos
 - `scraper.log` — log detalhado
@@ -97,6 +169,28 @@ O progresso aparece no terminal com barra (`tqdm`) e logs coloridos. Exemplo:
 ```
 
 O sistema é mantido acordado automaticamente durante a execução (via `wakepy`) — não precisa se preocupar com o computador entrar em modo de suspensão.
+
+### Checkpoint
+
+Por padrão o script salva o CSV a cada 25 artigos. Para alterar:
+
+```bash
+# Salvar a cada 50 artigos
+uv run python scielo_scraper.py minha_lista.csv --checkpoint 50
+
+# Salvar após cada artigo (mais seguro, um pouco mais lento)
+uv run python scielo_scraper.py minha_lista.csv --checkpoint 1
+
+# Salvar apenas no final
+uv run python scielo_scraper.py minha_lista.csv --checkpoint 0
+```
+
+### Ajuda
+
+```bash
+uv run python scielo_scraper.py --help
+uv run python scielo_scraper.py -?
+```
 
 ---
 
@@ -156,8 +250,15 @@ O script encontra automaticamente a execução anterior mais recente, carrega os
 
 ### Como funciona o resume
 
-- O script procura a pasta `minha_lista_new_*/` mais recente no mesmo diretório do CSV
-- Carrega apenas artigos com status `ok_completo` ou `ok_parcial`
+- O script procura a pasta `minha_lista_s_*/` mais recente no mesmo diretório do CSV
+- **Reutiliza a pasta existente** — nenhuma pasta nova é criada
+- O log é **anexado** à execução anterior, com um separador indicando a retomada:
+  ```
+  ══ RETOMADA ══
+  ```
+- As estatísticas finais acumulam o tempo total das duas execuções
+- O `stats.json` regista `"resume": "CONTINUED"` para identificar execuções retomadas
+- Artigos com status `ok_completo` ou `ok_parcial` não são reprocessados
 - Artigos com erro são reprocessados
 
 ### Forçar início do zero
@@ -176,7 +277,7 @@ uv run python scielo_scraper.py minha_lista.csv --no-resume
 uv run python scielo_scraper.py minha_lista.csv
 ```
 
-Usa a ArticleMeta API como fonte primária e o scraping HTML como fallback automático. Melhor resultado com menor tempo.
+Usa a ArticleMeta API como fonte primária e o scraping HTML como fallback automático. Melhor resultado com menor tempo. A pasta de saída terá o sufixo `_api+html`.
 
 ### Apenas API
 
@@ -184,7 +285,7 @@ Usa a ArticleMeta API como fonte primária e o scraping HTML como fallback autom
 uv run python scielo_scraper.py minha_lista.csv --only-api
 ```
 
-Mais rápido, mas perde artigos Ahead of Print (AoP) — a API não retorna dados para eles. Recomendado apenas para testes ou quando a cobertura de AoPs não for importante.
+Mais rápido, mas perde artigos Ahead of Print (AoP) — a API não retorna dados para eles. Recomendado apenas para testes ou quando a cobertura de AoPs não for importante. A pasta de saída terá o sufixo `_api`.
 
 ### Apenas HTML
 
@@ -192,15 +293,15 @@ Mais rápido, mas perde artigos Ahead of Print (AoP) — a API não retorna dado
 uv run python scielo_scraper.py minha_lista.csv --only-html
 ```
 
-Mais lento (~10 min a mais para 564 artigos), mas útil quando a API estiver fora do ar. Recupera praticamente os mesmos artigos que o modo padrão.
+Mais lento (~10 min a mais para 564 artigos), mas útil quando a API estiver fora do ar. Recupera praticamente os mesmos artigos que o modo padrão. A pasta de saída terá o sufixo `_html`.
 
 ### Comparativo
 
-| Estratégia | Cobertura | Tempo (564 artigos) | Quando usar |
-|---|---|---|---|
-| Padrão (api+html) | 99.6% | ~26 min | Sempre — melhor custo-benefício |
-| Apenas HTML | 99.5% | ~36 min | API fora do ar |
-| Apenas API | 93.8% | ~26 min | Testes rápidos sem AoPs |
+| Estratégia | Cobertura | Tempo (564 artigos) | Pasta gerada | Quando usar |
+|---|---|---|---|---|
+| Padrão (api+html) | 99.6% | ~26 min | `_s_..._api+html/` | Sempre — melhor custo-benefício |
+| Apenas HTML | 99.5% | ~36 min | `_s_..._html/` | API fora do ar |
+| Apenas API | 93.8% | ~26 min | `_s_..._api/` | Testes rápidos sem AoPs |
 
 ---
 
@@ -318,7 +419,7 @@ uv run python scielo_scraper.py lista.csv --timeout 40
 
 ### Execução interrompida no meio
 
-Use `--resume` para continuar de onde parou — os artigos já processados com sucesso não são reprocessados.
+Use `--resume` para continuar de onde parou — os artigos já processados com sucesso não são reprocessados, e a pasta existente é reutilizada.
 
 ### Artigo com `ok_parcial` — falta resumo ou palavras-chave
 
