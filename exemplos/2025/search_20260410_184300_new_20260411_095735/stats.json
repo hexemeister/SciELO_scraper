@@ -1,0 +1,50 @@
+{
+  "versao_script": "2.4",
+  "timestamp": "2026-04-11T10:30:58.724312",
+  "modo": {
+    "extracao": "apenas-html",
+    "resume": "NEW",
+    "workers": 1,
+    "collection": "scl"
+  },
+  "total": 602,
+  "ok_completo": 596,
+  "ok_completo_pct": "99.0%",
+  "ok_parcial": 3,
+  "ok_parcial_pct": "0.5%",
+  "sucesso_total": 599,
+  "sucesso_total_pct": "99.5%",
+  "nada_encontrado": 0,
+  "nada_encontrado_pct": "0.0%",
+  "erro_extracao": 3,
+  "erro_extracao_pct": "0.5%",
+  "erro_pid_invalido": 0,
+  "erro_pid_pct": "0.0%",
+  "elapsed_seconds": 2002.76,
+  "elapsed_humanizado": "33m 22s",
+  "avg_per_article_s": 3.33,
+  "por_status": {
+    "ok_completo": {
+      "n": 596,
+      "pct": "99.0%"
+    },
+    "ok_parcial": {
+      "n": 3,
+      "pct": "0.5%"
+    },
+    "erro_extracao": {
+      "n": 3,
+      "pct": "0.5%"
+    }
+  },
+  "por_fonte_extracao": {
+    "html_fallback": {
+      "n": 599,
+      "pct": "99.5%"
+    },
+    "sem_fonte": {
+      "n": 3,
+      "pct": "0.5%"
+    }
+  }
+}
