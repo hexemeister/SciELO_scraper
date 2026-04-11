@@ -33,6 +33,8 @@ OPÇÕES
   --retries N        Tentativas em erro transitório (default: 3)
   --timeout SEG      Timeout HTTP em segundos (default: 20)
   --workers N        Threads paralelas, 1=sequencial (default: 1, máx: 4)
+  --checkpoint N     Salvar CSV a cada N artigos (default: 25). Use 1 para
+                     salvar após cada artigo, 0 para salvar apenas no final.
   --resume           Retomar execução anterior (salta artigos já com sucesso)
   --no-resume        Ignorar resultados anteriores e recomeçar do zero
   --only-api         Usar apenas ArticleMeta API, sem fallback HTML
@@ -850,7 +852,10 @@ def main():
         description=f"SciELO Scraper v{__version__}",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
+        add_help=False,
     )
+    ap.add_argument("-h", "--help", "-?", action="help",
+        help="Mostrar esta mensagem de ajuda e sair")
     ap.add_argument("input_csv", nargs="?", default=None,
         help="CSV com coluna 'ID' (PIDs SciELO)")
     ap.add_argument("--output-dir",   default=None,   metavar="DIR",
@@ -860,6 +865,9 @@ def main():
     ap.add_argument("--retries",      type=int,   default=3,    metavar="N")
     ap.add_argument("--timeout",      type=float, default=20.0, metavar="SEG")
     ap.add_argument("--workers",      type=int,   default=1,    metavar="N")
+    ap.add_argument("--checkpoint",   type=int,   default=25,   metavar="N",
+        help="Salvar CSV a cada N artigos processados (default: 25). "
+             "Use 1 para salvar após cada artigo, 0 para salvar apenas no final.")
     ap.add_argument("--resume",       action="store_true")
     ap.add_argument("--no-resume",    action="store_true")
     ap.add_argument("--only-api",     action="store_true",
@@ -1081,7 +1089,7 @@ def main():
                 res = run_one(row)
                 all_results.append(res)
                 logger.info(f"  Progresso: {i}/{len(to_process)}")
-                if i % 25 == 0:
+                if args.checkpoint and i % args.checkpoint == 0:
                     save_csv(all_results, result_path, logger)
                     logger.info(f"  💾 Checkpoint: {i} artigos guardados")
         else:
@@ -1096,7 +1104,7 @@ def main():
                     logger.info(f"  Progresso: {done_n}/{len(to_process)}")
                 except Exception as e:
                     logger.error(f"  Worker erro artigo {i}: {type(e).__name__}: {e}")
-                if done_n % 25 == 0:
+                if args.checkpoint and done_n % args.checkpoint == 0:
                     save_csv(all_results, result_path, logger)
                     logger.info(f"  💾 Checkpoint: {done_n} artigos guardados")
 
