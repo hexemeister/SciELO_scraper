@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-teste_pipeline.py  v1.1
+teste_pipeline.py  v1.2
 =======================
 Executa o pipeline completo de teste: busca → extração (3 estratégias) →
 análise de discrepância → cópia para diretório de exemplos.
@@ -18,6 +18,7 @@ OPÇÕES
   --collection COD      Coleção SciELO (default: scl)
   --output-dir DIR      Diretório de destino (default: exemplos/<ano>/)
   --skip-search         Reutilizar o CSV mais recente sc_* em vez de buscar
+  --per-year            Rodar pipeline separado por ano (um CSV e destino por ano)
   --skip-scrape         Reutilizar runs existentes (só gera análise e copia)
   --dry-run             Mostra o que faria sem executar nada
   -h, --help, -?        Mostrar esta mensagem de ajuda e sair
@@ -30,9 +31,10 @@ EXEMPLOS
   python teste_pipeline.py --year 2022 --collection arg --output-dir exemplos/arg_2022
   python teste_pipeline.py --year 2023 --skip-search   # reutiliza CSV existente
   python teste_pipeline.py --year 2023 --dry-run       # simula sem executar
+  python teste_pipeline.py --year 2022 2023 2024 --per-year  # um CSV por ano
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import argparse
 import json
@@ -311,66 +313,19 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
     )
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Pipeline de um único ano/conjunto ────────────────────────────────────────
 
-def main():
-    ap = argparse.ArgumentParser(
-        description=f"Pipeline de teste SciELO v{__version__}",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-        add_help=False,
-    )
-    ap.add_argument("-h", "--help", "-?", action="help",
-        help="Mostrar esta mensagem e sair")
-    ap.add_argument("--year", nargs="+", required=True, metavar="ANO",
-        help="Anos a buscar. Ex: 2022  ou  2022 2023  ou  2020-2024")
-    ap.add_argument("--terms", nargs="+", default=["avalia", "educa"], metavar="TERMO",
-        help="Termos de busca (default: avalia educa)")
-    ap.add_argument("--collection", default="scl", metavar="COD",
-        help="Colecao SciELO (default: scl)")
-    ap.add_argument("--output-dir", default=None, metavar="DIR",
-        help="Diretorio de destino (default: exemplos/<ano>/)")
-    ap.add_argument("--skip-search", action="store_true",
-        help="Reutilizar o CSV sc_* mais recente em vez de buscar")
-    ap.add_argument("--skip-scrape", action="store_true",
-        help="Reutilizar runs existentes (so gera analise e copia)")
-    ap.add_argument("--dry-run", action="store_true",
-        help="Mostra o que faria sem executar nada")
-    ap.add_argument("--version", action="version", version=f"v{__version__}")
-    args = ap.parse_args()
+def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
+                 collection: str, dest: Path, python: str,
+                 skip_search: bool, skip_scrape: bool, dry: bool):
+    """Executa search → 3×scrape → análise → cópia para dest."""
 
-    try:
-        years = parse_years(args.year)
-    except ValueError as e:
-        ap.error(str(e))
-
-    anos_label = (
-        f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
-    )
-    dest = Path(args.output_dir) if args.output_dir else HERE / "exemplos" / anos_label
-    python = sys.executable
-    dry    = args.dry_run
-
-    print()
-    log(f"Pipeline de teste — {anos_label}", "STEP")
-    log(f"Termos     : {args.terms}")
-    log(f"Colecao    : {args.collection}")
-    log(f"Destino    : {dest}")
-    if dry:
-        log("Modo dry-run — nenhum comando sera executado", "WARN")
-    print()
-
-    # ── Dependências ──────────────────────────────────────────────────────────
-    log("── Verificando dependencias ──────────────────────────────────", "STEP")
-    ensure_deps(dry)
-    print()
-
-    t_total = time.time()
+    anos_label = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
 
     # ── 1. Busca ──────────────────────────────────────────────────────────────
     csv_path = None
 
-    if args.skip_search or args.skip_scrape:
+    if skip_search or skip_scrape:
         csv_path = latest("sc_*.csv")
         if csv_path:
             log(f"Reutilizando CSV existente: {csv_path.name}")
@@ -379,16 +334,13 @@ def main():
 
     if csv_path is None:
         log("── ETAPA 1/5: Busca ──────────────────────────────────────────", "STEP")
-        years_args = []
-        for y in args.year:   # passa os raw args para o searcher interpretar
-            years_args += ["--years", y] if len(args.year) == 1 else []
-        cmd = (
+        rc = run(
             [python, "scielo_search.py",
-             "--terms", *args.terms,
-             "--collection", args.collection]
-            + ["--years"] + args.year
+             "--terms", *terms,
+             "--collection", collection,
+             "--years", *raw_years],
+            dry,
         )
-        rc = run(cmd, dry)
         if rc != 0:
             log("Busca falhou — abortando", "ERROR")
             sys.exit(rc)
@@ -405,12 +357,12 @@ def main():
 
     # ── 2-4. Scraping (3 estratégias) ─────────────────────────────────────────
     run_dirs: dict[str, Path] = {}
-    stem = csv_path.stem  # computado uma vez
+    stem = csv_path.stem
 
     for i, est in enumerate(ESTRATEGIAS, start=2):
         log(f"── ETAPA {i}/5: Scraping {est['modo']} ─────────────────────────────", "STEP")
 
-        if args.skip_scrape:
+        if skip_scrape:
             found = latest(f"{stem}_s_*_{est['slug']}")
             if found:
                 run_dirs[est["label"]] = found
@@ -438,7 +390,7 @@ def main():
     log("── ETAPA 5/5: Analise de discrepancia ───────────────────────────", "STEP")
 
     analise_md = (
-        gerar_analise(run_dirs, years, args.terms)
+        gerar_analise(run_dirs, years, terms)
         if not dry
         else f"# Analise de Discrepancia — {anos_label}\n\n(dry-run)\n"
     )
@@ -460,14 +412,12 @@ def main():
     if not dry:
         dest.mkdir(parents=True, exist_ok=True)
 
-        # CSV de busca + params
         params = csv_path.with_name(csv_path.stem + "_params.json")
         for f in [csv_path, params]:
             if f.exists():
                 shutil.copy2(f, dest / f.name)
                 log(f"  Copiado: {f.name}")
 
-        # Pastas de scraping
         for est in ESTRATEGIAS:
             path = run_dirs.get(est["label"])
             if path and path.exists():
@@ -477,18 +427,115 @@ def main():
                 shutil.copytree(path, target)
                 log(f"  Copiado: {path.name}/")
 
-        # Análise
         shutil.copy2(analise_path, dest / analise_path.name)
         log(f"  Copiado: {analise_path.name}")
     else:
         log(f"  (dry-run) copiaria CSV, params.json, 3 pastas e analise para {dest}")
 
-    # ── Resumo final ──────────────────────────────────────────────────────────
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def main():
+    ap = argparse.ArgumentParser(
+        description=f"Pipeline de teste SciELO v{__version__}",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+        add_help=False,
+    )
+    ap.add_argument("-h", "--help", "-?", action="help",
+        help="Mostrar esta mensagem e sair")
+    ap.add_argument("--year", nargs="+", required=True, metavar="ANO",
+        help="Anos a buscar. Ex: 2022  ou  2022 2023  ou  2020-2024")
+    ap.add_argument("--terms", nargs="+", default=["avalia", "educa"], metavar="TERMO",
+        help="Termos de busca (default: avalia educa)")
+    ap.add_argument("--collection", default="scl", metavar="COD",
+        help="Colecao SciELO (default: scl)")
+    ap.add_argument("--output-dir", default=None, metavar="DIR",
+        help="Diretorio de destino (default: exemplos/<ano>/)")
+    ap.add_argument("--per-year", action="store_true",
+        help="Rodar pipeline separado por ano (um CSV e destino por ano)")
+    ap.add_argument("--skip-search", action="store_true",
+        help="Reutilizar o CSV sc_* mais recente em vez de buscar")
+    ap.add_argument("--skip-scrape", action="store_true",
+        help="Reutilizar runs existentes (so gera analise e copia)")
+    ap.add_argument("--dry-run", action="store_true",
+        help="Mostra o que faria sem executar nada")
+    ap.add_argument("--version", action="version", version=f"v{__version__}")
+    args = ap.parse_args()
+
+    try:
+        years = parse_years(args.year)
+    except ValueError as e:
+        ap.error(str(e))
+
+    python = sys.executable
+    dry    = args.dry_run
+
+    anos_label = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
+
+    print()
+    log(f"Pipeline de teste — {anos_label}", "STEP")
+    log(f"Termos     : {args.terms}")
+    log(f"Colecao    : {args.collection}")
+    log(f"Por ano    : {'sim' if args.per_year else 'nao'}")
+    if dry:
+        log("Modo dry-run — nenhum comando sera executado", "WARN")
+    print()
+
+    log("── Verificando dependencias ──────────────────────────────────", "STEP")
+    ensure_deps(dry)
+    print()
+
+    t_total = time.time()
+
+    if args.per_year:
+        # Um pipeline completo por ano
+        for year in years:
+            dest = (
+                Path(args.output_dir) / str(year)
+                if args.output_dir
+                else HERE / "exemplos" / str(year)
+            )
+            log(f"{'='*62}", "STEP")
+            log(f"  ANO: {year}  →  {dest}", "STEP")
+            log(f"{'='*62}", "STEP")
+            print()
+            run_pipeline(
+                years=[year],
+                raw_years=[str(year)],
+                terms=args.terms,
+                collection=args.collection,
+                dest=dest,
+                python=python,
+                skip_search=args.skip_search,
+                skip_scrape=args.skip_scrape,
+                dry=dry,
+            )
+    else:
+        # Pipeline único com todos os anos juntos
+        dest = (
+            Path(args.output_dir)
+            if args.output_dir
+            else HERE / "exemplos" / anos_label
+        )
+        log(f"Destino    : {dest}")
+        print()
+        run_pipeline(
+            years=years,
+            raw_years=args.year,
+            terms=args.terms,
+            collection=args.collection,
+            dest=dest,
+            python=python,
+            skip_search=args.skip_search,
+            skip_scrape=args.skip_scrape,
+            dry=dry,
+        )
+
     elapsed = time.time() - t_total
     print()
     log("=" * 58, "STEP")
     log(f"Pipeline concluido em {humanize(elapsed)}")
-    log(f"Resultados em: {dest}")
     log("=" * 58, "STEP")
     print()
 
