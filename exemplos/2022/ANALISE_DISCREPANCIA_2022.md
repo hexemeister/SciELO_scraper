@@ -25,10 +25,10 @@ S1414-462X  2022  005  024201
 
 O fluxo de indexação na SciELO tem dois momentos distintos:
 
-| Momento | Disponível em HTML? | Disponível na API? |
-|---|---|---|
-| Publicação AoP | Sim (URL canónica activa) | **Não** |
-| Atribuição ao fascículo regular | Sim | Sim |
+| Momento                         | Disponível em HTML?       | Disponível na API? |
+| ------------------------------- | ------------------------- | ------------------ |
+| Publicação AoP                  | Sim (URL canónica activa) | **Não**            |
+| Atribuição ao fascículo regular | Sim                       | Sim                |
 
 Quando o script foi executado, os 28 artigos AoP já tinham URL canónica funcional em `scielo.br` mas ainda não tinham sido processados pelo pipeline ISIS/ArticleMeta. Por isso a API devolvia `null` para todos os campos PT.
 
@@ -40,13 +40,14 @@ Quando o script foi executado, os 28 artigos AoP já tinham URL canónica funcio
 
 Para os 28 AoPs, a API devolvia uma resposta válida (HTTP 200, JSON com chave `"article"`) mas com todos os campos PT a `None`. O HTML da página tinha os três campos:
 
-| Campo | Fonte HTML usada |
-|---|---|
-| Título | `<meta name="citation_title">` |
-| Resumo | `<meta name="citation_abstract">` ou `<div data-anchor="Resumo"><p>` |
-| Palavras-chave | `<meta name="citation_keywords">` ou `.keywords span` |
+| Campo          | Fonte HTML usada                                                     |
+| -------------- | -------------------------------------------------------------------- |
+| Título         | `<meta name="citation_title">`                                       |
+| Resumo         | `<meta name="citation_abstract">` ou `<div data-anchor="Resumo"><p>` |
+| Palavras-chave | `<meta name="citation_keywords">` ou `.keywords span`                |
 
 Exemplo concreto — `S1414-462X2022005024201` (AoP confirmado):
+
 - **API:** sem dados PT (retorna `None` para titulo/resumo/palavras_chave)
 - **HTML legacy** (`?script=sci_arttext&pid=...&lang=pt`): redireccionou para URL canónica; `is_article_page()` = True; todos os três campos extraídos via meta tags
 
@@ -86,10 +87,10 @@ Retorna 404 em todas as URLs tentadas (legacy, og:url) e não está indexado na 
 
 ## 5. Conclusão — quando usar cada estratégia
 
-| Estratégia | Cobre AoPs? | Tempo | Recomendado quando |
-|---|---|---|---|
-| `--only-api` | Não | ~26 min | Teste rápido; corpus sem AoPs |
-| `--only-html` | Sim | ~36 min | API fora do ar |
-| Padrão (api+html) | Sim | ~26 min | Sempre — melhor custo-benefício |
+| Estratégia        | Cobre AoPs? | Tempo   | Recomendado quando              |
+| ----------------- | ----------- | ------- | ------------------------------- |
+| `--only-api`      | Não         | ~26 min | Teste rápido; corpus sem AoPs   |
+| `--only-html`     | Sim         | ~36 min | API fora do ar                  |
+| Padrão (api+html) | Sim         | ~26 min | Sempre — melhor custo-benefício |
 
 A estratégia padrão é o equilíbrio óptimo: usa a API para ~94% dos artigos (mais rápida e mais limpa) e activa o HTML apenas para os ~6% em que a API falha ou retorna dados incompletos. O HTML funciona como rede de segurança para a janela temporal entre a publicação AoP e a indexação completa no pipeline ISIS.
