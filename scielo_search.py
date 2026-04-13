@@ -364,6 +364,20 @@ def main():
         list_collections(logger)
         return
 
+    # ── --show-params (independente de --terms/--years) ───────────────────────
+    if args.show_params:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        # Procura o _params.json mais recente no diretório atual
+        candidates = sorted(Path(".").glob("sc_*_params.json"), reverse=True)
+        if candidates:
+            with open(candidates[0], encoding="utf-8") as f:
+                data = json.load(f)
+            print(json.dumps(data, ensure_ascii=False, indent=2))
+        else:
+            print("Nenhum arquivo _params.json encontrado no diretório atual.")
+        return
+
     # ── Validações ────────────────────────────────────────────────────────────
     if not args.terms:
         ap.error("--terms é obrigatório. Ex: --terms avalia educa")
@@ -400,7 +414,7 @@ def main():
     )
     url = build_url(query, args.collection)
 
-    # Parâmetros da busca (usados tanto em --show-params quanto ao salvar)
+    # Parâmetros da busca (salvos após o download)
     params_path = out_path.with_name(out_path.stem + "_params.json")
     params_data = {
         "timestamp":        datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
@@ -412,18 +426,6 @@ def main():
         "total_resultados": None,   # preenchido após o download
         "query_url":        url,
     }
-
-    # ── --show-params ─────────────────────────────────────────────────────────
-    if args.show_params:
-        if hasattr(sys.stdout, "reconfigure"):
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        if params_path.exists():
-            with open(params_path, encoding="utf-8") as f:
-                data = json.load(f)
-        else:
-            data = params_data
-        print(json.dumps(data, ensure_ascii=False, indent=2))
-        return
 
     logger.debug(f"  Query: {query}")
     logger.info(f"  URL  : {url[:120]}{'...' if len(url) > 120 else ''}")
