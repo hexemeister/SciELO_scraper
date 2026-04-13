@@ -21,6 +21,8 @@ flowchart_extracao.svg
 *_new_*/
 *_s_*/
 search_*.csv
+sc_*.csv
+sc_*_params.json
 
 # Python version pin (local)
 .python-version
