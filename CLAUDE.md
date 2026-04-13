@@ -58,6 +58,23 @@ uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
 
 > `brotli` é obrigatório — o CDN do SciELO usa compressão Brotli.
 
+## Skills disponíveis (.claude/skills/)
+
+### Customizadas (projeto)
+| Skill | Quando usar |
+|---|---|
+| `scielo-analysis` | Analisar `resultado.csv` e `stats.json`, comparar modos, gerar gráficos |
+| `scielo-communication` | Redigir metodologia, resultados, análise de discrepância |
+| `scielo-methodology` | Decidir termos de busca, modo de extração, interpretar cobertura |
+
+### K-Dense (genéricas)
+`statistical-analysis`, `exploratory-data-analysis`, `matplotlib`, `seaborn`, `scientific-writing`, `literature-review`, `hypothesis-generation`
+
+## Repositório
+
+- GitHub: https://github.com/hexemeister/SciELO_scraper
+- Branch principal: `master`
+
 ## O que NÃO alterar sem contexto
 
 - Lógica de extração HTML: funções `fetch_*`, `extract_*`, `is_article_page` em `scielo_scraper.py`
