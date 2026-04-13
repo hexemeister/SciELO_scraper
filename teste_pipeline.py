@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-teste_pipeline.py  v1.2
+teste_pipeline.py  v1.3
 =======================
 Executa o pipeline completo de teste: busca → extração (3 estratégias) →
 análise de discrepância → cópia para diretório de exemplos.
@@ -23,6 +23,11 @@ OPÇÕES
   --dry-run             Mostra o que faria sem executar nada
   -h, --help, -?        Mostrar esta mensagem de ajuda e sair
 
+NOTAS
+-----
+  - O scraper é sempre chamado com --no-resume (cada estratégia começa do zero).
+  - Após copiar para exemplos/<ano>/, os originais no diretório raiz são removidos.
+
 EXEMPLOS
 --------
   python teste_pipeline.py --year 2023
@@ -34,7 +39,7 @@ EXEMPLOS
   python teste_pipeline.py --year 2022 2023 2024 --per-year  # um CSV por ano
 """
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 import argparse
 import json
@@ -184,7 +189,7 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
                 all_dfs[modo] = pd.read_csv(rfile).set_index("PID_limpo")
 
     if not all_stats:
-        return "Nenhum stats.json encontrado — analise nao gerada.\n"
+        return "Nenhum stats.json encontrado — análise não gerada.\n"
 
     def pct(n: int) -> str:
         return f"{n/total*100:.1f}%" if total else "0%"
@@ -245,7 +250,7 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
         else:
             secoes.append(
                 "## 2. Artigos corrigidos pelo fallback HTML\n\n"
-                "Nenhum artigo foi corrigido pelo fallback HTML nesta execucao."
+                "Nenhum artigo foi corrigido pelo fallback HTML nesta execução."
             )
 
         # Secção 3: HTML-only falhou
@@ -263,7 +268,7 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
         else:
             secoes.append(
                 "## 3. Artigos que o HTML-only falhou mas a API recuperou\n\n"
-                "Nenhum caso nesta execucao."
+                "Nenhum caso nesta execução."
             )
 
         # Secção 4: sempre parcial
@@ -273,16 +278,16 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
                 for pid in sorted(always_partial)
             ]
             secoes.append(
-                f"## 4. Artigos persistentemente nao-completos ({len(always_partial)})\n\n"
-                "Estes artigos nao atingiram `ok_completo` em nenhuma estrategia — "
-                "a limitacao e da fonte, nao do scraper.\n\n"
-                "| PID | Titulo (PT) |\n"
+                f"## 4. Artigos persistentemente incompletos ({len(always_partial)})\n\n"
+                "Estes artigos não atingiram `ok_completo` em nenhuma estratégia — "
+                "a limitação é da fonte, não do scraper.\n\n"
+                "| PID | Título (PT) |\n"
                 "|---|---|\n" + "\n".join(rows)
             )
         else:
             secoes.append(
-                "## 4. Artigos persistentemente nao-completos\n\n"
-                "Nenhum artigo ficou sem `ok_completo` em todas as estrategias."
+                "## 4. Artigos persistentemente incompletos\n\n"
+                "Nenhum artigo ficou sem `ok_completo` em todas as estratégias."
             )
 
     # Secção 5: tempo
@@ -293,7 +298,7 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
     ]
     secoes.append(
         "## 5. Desempenho temporal\n\n"
-        "| Modo | Tempo total | Media/artigo |\n"
+        "| Modo | Tempo total | Média/artigo |\n"
         "|---|---|---|\n" + "\n".join(linhas_tempo)
     )
 
@@ -301,7 +306,7 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
     ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     return (
-        f"# Analise de Discrepancia — {anos_str}\n\n"
+        f"# Análise de Discrepância — {anos_str}\n\n"
         f"**Corpus:** {total} artigos SciELO Brasil ({anos_str}), termos: {termos_str}\n"
         f"**Gerado em:** {ts_now}\n\n"
         "---\n\n"
@@ -348,7 +353,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
         if not dry:
             csv_path = latest("sc_*.csv")
             if not csv_path:
-                log("CSV de saida nao encontrado apos busca", "ERROR")
+                log("CSV de saída não encontrado após busca", "ERROR")
                 sys.exit(1)
             log(f"CSV gerado: {csv_path.name}")
         else:
@@ -369,9 +374,9 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
                 log(f"Reutilizando: {found.name}")
                 print()
                 continue
-            log(f"Pasta nao encontrada para {est['slug']} — executando scraping", "WARN")
+            log(f"Pasta não encontrada para {est['slug']} — executando scraping", "WARN")
 
-        rc = run([python, "scielo_scraper.py", str(csv_path)] + est["flags"], dry)
+        rc = run([python, "scielo_scraper.py", str(csv_path), "--no-resume"] + est["flags"], dry)
         if rc != 0:
             log(f"Scraping {est['modo']} falhou (codigo {rc}) — continuando", "WARN")
 
@@ -381,7 +386,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
                 run_dirs[est["label"]] = found
                 log(f"Pasta gerada: {found.name}")
             else:
-                log(f"Pasta de resultado nao encontrada para {est['slug']}", "WARN")
+                log(f"Pasta de resultado não encontrada para {est['slug']}", "WARN")
         else:
             run_dirs[est["label"]] = HERE / f"{stem}_s_DRY_{est['slug']}"
         print()
@@ -392,7 +397,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
     analise_md = (
         gerar_analise(run_dirs, years, terms)
         if not dry
-        else f"# Analise de Discrepancia — {anos_label}\n\n(dry-run)\n"
+        else f"# Análise de Discrepância — {anos_label}\n\n(dry-run)\n"
     )
 
     analise_path = HERE / f"ANALISE_DISCREPANCIA_{anos_label}.md"
@@ -429,8 +434,24 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
 
         shutil.copy2(analise_path, dest / analise_path.name)
         log(f"  Copiado: {analise_path.name}")
+
+        # ── Limpar originais do diretório raiz ─────────────────────────────────
+        log("Limpando originais do diretorio raiz...")
+        for f in [csv_path, params]:
+            if f.exists():
+                f.unlink()
+                log(f"  Removido: {f.name}")
+        for est_item in ESTRATEGIAS:
+            path = run_dirs.get(est_item["label"])
+            if path and path.exists():
+                shutil.rmtree(path)
+                log(f"  Removido: {path.name}/")
+        if analise_path.exists():
+            analise_path.unlink()
+            log(f"  Removido: {analise_path.name}")
     else:
         log(f"  (dry-run) copiaria CSV, params.json, 3 pastas e analise para {dest}")
+        log(f"  (dry-run) removeria os originais do diretorio raiz")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -457,7 +478,7 @@ def main():
     ap.add_argument("--skip-search", action="store_true",
         help="Reutilizar o CSV sc_* mais recente em vez de buscar")
     ap.add_argument("--skip-scrape", action="store_true",
-        help="Reutilizar runs existentes (so gera analise e copia)")
+        help="Reutilizar runs existentes (só gera análise e copia)")
     ap.add_argument("--dry-run", action="store_true",
         help="Mostra o que faria sem executar nada")
     ap.add_argument("--version", action="version", version=f"v{__version__}")

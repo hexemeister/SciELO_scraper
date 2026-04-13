@@ -5,17 +5,17 @@ scielo_scraper.py  v2.4
 Extrai título, resumo e palavras-chave em português de artigos SciELO
 a partir de um CSV com PIDs, usando duas fontes por ordem de prioridade:
 
-  1. ArticleMeta REST API (ISIS-JSON)   →  extracção directa e estruturada
+  1. ArticleMeta REST API (ISIS-JSON)   →  extração direta e estruturada
   2. Fallback HTML scraping (scielo.br) →  multi-estratégia:
-       a) Acede a URL legacy e segue o redirect (automático via requests)
+       a) Acessa a URL legacy e segue o redirect (automático via requests)
        b) Extrai meta tags: name=citation_* E property=og:*
        c) Extrai dados do corpo HTML (h1.article-title, div[data-anchor=Resumo]…)
        d) Se língua ≠ pt: segue link "Texto (Português)" e repete b)+c)
-       e) Artigos AoP (PID com "005"): se a URL legacy devolveu a home do
+       e) Artigos AoP (PID com "005"): se a URL legacy retornou a home do
           periódico (sem dados), tenta a og:url da página
 
-  Mesmo quando a API devolve dados parciais (ex: só resumo), o fallback HTML
-  é activado para tentar preencher os campos ainda em falta.
+  Mesmo quando a API retorna dados parciais (ex: só resumo), o fallback HTML
+  é ativado para tentar preencher os campos ainda ausentes.
 
   DEPENDÊNCIAS
   ------------
@@ -43,7 +43,7 @@ OPÇÕES
                      Procura em --output-dir (se informado) ou na pasta mais
                      recente <nome_csv>_s_*/. CSV opcional se --output-dir dado.
   --log-level LEVEL  DEBUG | INFO | WARNING | ERROR (default: INFO)
-  --collection COD   Colecção SciELO: scl=Brasil, arg=Argentina… (default: scl)
+  --collection COD   Coleção SciELO: scl=Brasil, arg=Argentina… (default: scl)
   --list-collections Listar todas as coleções SciELO disponíveis e sair
   --version          Mostrar versão e sair
   -h, --help, -?     Mostrar esta mensagem de ajuda e sair
@@ -191,7 +191,7 @@ def ua() -> str:
 
 
 def http_get(url, session, timeout, params=None, logger=None, label=""):
-    """GET com log da URL completa (após params). Lança excepção em erro HTTP."""
+    """GET com log da URL completa (após params). Lança exceção em erro HTTP."""
     full_url = requests.Request("GET", url, params=params).prepare().url
     if logger and label:
         logger.info(f"    🌐 [{label}]: {full_url}")
@@ -416,14 +416,14 @@ def fetch_html(pid, session, timeout, logger, need_t, need_r, need_k):
     """
     Estratégia de scraping HTML em múltiplas etapas.
 
-    Etapa 1: acede URL legacy (?script=sci_arttext&pid=PID&lang=pt).
-             requests segue redirects automaticamente → final URL pode já ser
-             a URL canónica nova do SciELO (/j/<journal>/a/<hash>/?lang=pt).
-    Etapa 2: se a página acedida É um artigo → extrai dados (meta + body).
-             Loga por campo: fonte exacta (meta_tags ou html_body) e URL.
+    Etapa 1: acessa a URL legacy (?script=sci_arttext&pid=PID&lang=pt).
+             requests segue redirects automaticamente → URL final pode já ser
+             a URL canônica nova do SciELO (/j/<journal>/a/<hash>/?lang=pt).
+    Etapa 2: se a página acessada É um artigo → extrai dados (meta + body).
+             Loga por campo: fonte exata (meta_tags ou html_body) e URL.
     Etapa 3: se língua ≠ pt → segue link "Texto (Português)" e repete.
-    Etapa 4: apenas para AoP sem dados ainda: se a URL legacy devolveu a home
-             do periódico, tenta aceder directamente à og:url da página.
+    Etapa 4: apenas para AoP sem dados ainda: se a URL legacy retornou a home
+             do periódico, tenta acessar diretamente a og:url da página.
 
     Nota: requer o pacote 'brotli' instalado para descomprimir respostas
     Content-Encoding: br do servidor SciELO (CDN BunnyCDN/Varnish).
@@ -436,7 +436,7 @@ def fetch_html(pid, session, timeout, logger, need_t, need_r, need_k):
     result     = {"titulo": None, "resumo": None, "palavras_chave": None, "url_pt": url_legacy}
 
     def try_page(url: str, label: str):
-        """Acede a URL, devolve (meta, body, soup, final_url)."""
+        """Acessa a URL, retorna (meta, body, soup, final_url)."""
         logger.info(f"    🌐 [{label}]: {url}")
         urls_tried.append(url)
         resp = http_get(url, session, timeout, logger=None)
@@ -494,7 +494,7 @@ def fetch_html(pid, session, timeout, logger, need_t, need_r, need_k):
     try:
         meta_1, body_1, soup_1, final_url_1 = try_page(url_legacy, "pag1_legacy")
     except Exception as e:
-        logger.warning(f"    ❌ Erro ao aceder URL legacy [{pid}]: {type(e).__name__}: {e}")
+        logger.warning(f"    ❌ Erro ao acessar URL legacy [{pid}]: {type(e).__name__}: {e}")
         return None
 
     lang_orig     = meta_1.get("lang", "").lower()
@@ -503,15 +503,15 @@ def fetch_html(pid, session, timeout, logger, need_t, need_r, need_k):
 
     if redirected:
         logger.info(f"    🔀 Redirect → {final_url_1}")
-        urls_tried[-1] = final_url_1   # substituir URL registada pela final
+        urls_tried[-1] = final_url_1   # substituir URL registrada pela final
 
     if page_is_art:
-        # ── A página acedida (redirect ou não) É um artigo → extrair dados ──
+        # ── A página acessada (redirect ou não) É um artigo → extrair dados ──
         apply_missing(meta_1, body_1, "pag1", final_url_1 if redirected else url_legacy)
         result["url_pt"] = final_url_1 if redirected else url_legacy
     else:
         # ── A página não é um artigo (ex: home do periódico ou 404) ──────────
-        logger.info(f"    ✗ Página acedida não é um artigo (home do periódico ou 404)")
+        logger.info(f"    ✗ Página acessada não é um artigo (home do periódico ou 404)")
 
         # Etapa 4 (AoP): tentar og:url da página
         if is_aop(pid) and still_missing():
@@ -622,7 +622,7 @@ def process_article(row, csv_line, session, collection, delay, jitter, timeout,
             code = e.response.status_code if e.response is not None else "?"
             logger.warning(f"  ❌ ArticleMeta HTTP {code}: {e}")
         except requests.exceptions.ConnectionError:
-            logger.warning(f"  ❌ ArticleMeta: sem ligação (ConnectionError)")
+            logger.warning(f"  ❌ ArticleMeta: sem conexão (ConnectionError)")
         except requests.exceptions.Timeout:
             logger.warning(f"  ❌ ArticleMeta: timeout")
         except Exception as e:
@@ -733,7 +733,7 @@ def save_csv(rows: list, path: Path, logger):
                 df.drop(columns=[b], inplace=True)
         df[final].to_csv(path, index=False, encoding="utf-8-sig")
     except Exception as e:
-        logger.error(f"Erro ao guardar CSV: {e}")
+        logger.error(f"Erro ao salvar CSV: {e}")
 
 
 def load_done(result_path: Path, logger) -> dict:
@@ -831,7 +831,7 @@ def format_stats_report(stats: dict) -> str:
     for k, v in pairs:
         L.append(f"    {k:<32}: {v}")
     L.append("─" * 62)
-    L.append("  Por fonte de extracção:")
+    L.append("  Por fonte de extração:")
     for k, v in stats["por_fonte_extracao"].items():
         L.append(f"    {k:<40}: {v['n']}  ({v['pct']})")
     L.append("─" * 62)
@@ -975,7 +975,7 @@ def main():
 
     input_path = Path(args.input_csv).resolve()
     if not input_path.exists():
-        sys.exit(f"❌  Ficheiro não encontrado: {input_path}")
+        sys.exit(f"❌  Arquivo não encontrado: {input_path}")
 
     ts        = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_name = input_path.stem
@@ -1034,9 +1034,9 @@ def main():
         logger.info("=" * 62)
 
     logger.info(f"  CSV de entrada   : {input_path.name}")
-    logger.info(f"  Colecção         : {args.collection}")
+    logger.info(f"  Coleção          : {args.collection}")
     logger.info(f"  Pasta de saída   : {out_dir}")
-    logger.info(f"  Modo extracção   : {mode_str}")
+    logger.info(f"  Modo extração    : {mode_str}")
     logger.info(f"  Delay / Jitter   : {args.delay}s ± {args.jitter}s")
     logger.info(f"  Timeout          : {args.timeout}s")
     logger.info(f"  Workers          : {args.workers}")
@@ -1117,7 +1117,7 @@ def main():
                 logger.info(f"  Progresso: {i}/{len(to_process)}")
                 if args.checkpoint and i % args.checkpoint == 0:
                     save_csv(all_results, result_path, logger)
-                    logger.info(f"  💾 Checkpoint: {i} artigos guardados")
+                    logger.info(f"  💾 Checkpoint: {i} artigos salvos")
         else:
             futures = {executor.submit(run_one, row): i
                        for i, row in enumerate(to_process, 1)}
@@ -1132,7 +1132,7 @@ def main():
                     logger.error(f"  Worker erro artigo {i}: {type(e).__name__}: {e}")
                 if args.checkpoint and done_n % args.checkpoint == 0:
                     save_csv(all_results, result_path, logger)
-                    logger.info(f"  💾 Checkpoint: {done_n} artigos guardados")
+                    logger.info(f"  💾 Checkpoint: {done_n} artigos salvos")
 
     if args.workers > 1:
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
@@ -1175,7 +1175,7 @@ def main():
     with open(stats_path, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
 
-    logger.info(f"  Ficheiros em: {out_dir}")
+    logger.info(f"  Arquivos em: {out_dir}")
     logger.info(f"    📄 resultado.csv  |  📋 scraper.log  |  📊 stats.json")
     logger.info("=" * 62)
     logger.info(f"  Concluído ✅  (v{__version__})")
