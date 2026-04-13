@@ -75,6 +75,27 @@ uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
 - GitHub: https://github.com/hexemeister/SciELO_scraper
 - Branch principal: `master`
 
+## Fluxo de sessão recomendado
+
+**Iniciar sessão:**
+```bash
+cd C:\Users\hexem\dev\python\SciELO_scraper
+claude          # nova sessão (CLAUDE.md carregado automaticamente)
+# ou
+claude /resume  # retomar sessão anterior com histórico completo
+```
+
+**Durante a sessão:**
+- Uma tarefa por sessão — scraper, busca, pipeline, docs — não misturar
+- Commitar ao terminar cada tarefa antes de encerrar
+
+**Encerrar sessão:**
+```
+/compact   → compacta o histórico (resumo incluso na próxima sessão)
+```
+
+**Lembrete ao Claude:** ao final de qualquer tarefa concluída, sugerir `/compact` antes de encerrar.
+
 ## O que NÃO alterar sem contexto
 
 - Lógica de extração HTML: funções `fetch_*`, `extract_*`, `is_article_page` em `scielo_scraper.py`
