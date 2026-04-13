@@ -31,7 +31,9 @@ OPÇÕES
   --output FILE       Nome do CSV de saída (default: sc_<timestamp>.csv)
   --no-truncate       Não adicionar $ automaticamente nos termos (usa o termo exato)
   --list-collections  Listar coleções disponíveis e sair
-  --show-params       Imprimir parâmetros da busca (params.json) e sair
+  --show-params [ARQ] Imprimir parâmetros da busca e sair. Sem ARQ: usa o
+                      _params.json mais recente no diretório atual. Com ARQ:
+                      lê o arquivo indicado (caminho relativo ou absoluto)
   --log-level LEVEL   DEBUG | INFO | WARNING | ERROR (default: INFO)
   --version           Mostrar versão e sair
   -h, --help, -?     Mostrar esta mensagem de ajuda e sair
@@ -54,8 +56,11 @@ EXEMPLOS
   # Listar coleções disponíveis
   python scielo_search.py --list-collections
 
-  # Ver parâmetros da última busca
+  # Ver parâmetros da última busca (diretório atual)
   python scielo_search.py --show-params
+
+  # Ver parâmetros de uma busca específica (outro diretório)
+  python scielo_search.py --show-params exemplos/2024/sc_20260413_092345_params.json
 """
 
 __version__ = "1.1"
@@ -347,8 +352,9 @@ def main():
         help="Desativar truncamento automático — usa o termo exato sem $ no final")
     ap.add_argument("--list-collections", action="store_true",
         help="Listar coleções disponíveis e sair")
-    ap.add_argument("--show-params", action="store_true",
-        help="Imprimir parâmetros da busca (params.json) e sair")
+    ap.add_argument("--show-params", nargs="?", const=True, metavar="ARQ",
+        help="Imprimir parâmetros da busca e sair. Sem ARQ: usa o _params.json "
+             "mais recente no diretório atual. Com ARQ: lê o arquivo indicado")
     ap.add_argument("--timeout", type=float, default=120.0, metavar="SEG",
         help="Timeout HTTP em segundos (default: 120)")
     ap.add_argument("--log-level", default="INFO", metavar="LEVEL",
@@ -365,17 +371,25 @@ def main():
         return
 
     # ── --show-params (independente de --terms/--years) ───────────────────────
-    if args.show_params:
+    if args.show_params is not None:
         if hasattr(sys.stdout, "reconfigure"):
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        # Procura o _params.json mais recente no diretório atual
-        candidates = sorted(Path(".").glob("sc_*_params.json"), reverse=True)
-        if candidates:
-            with open(candidates[0], encoding="utf-8") as f:
-                data = json.load(f)
-            print(json.dumps(data, ensure_ascii=False, indent=2))
+        if isinstance(args.show_params, str):
+            # Arquivo explícito passado pelo usuário
+            target = Path(args.show_params)
+            if not target.exists():
+                print(f"Arquivo não encontrado: {target}")
+                return
         else:
-            print("Nenhum arquivo _params.json encontrado no diretório atual.")
+            # Sem argumento: usa o _params.json mais recente no diretório atual
+            candidates = sorted(Path(".").glob("sc_*_params.json"), reverse=True)
+            if not candidates:
+                print("Nenhum arquivo _params.json encontrado no diretório atual.")
+                return
+            target = candidates[0]
+        with open(target, encoding="utf-8") as f:
+            data = json.load(f)
+        print(json.dumps(data, ensure_ascii=False, indent=2))
         return
 
     # ── Validações ────────────────────────────────────────────────────────────
