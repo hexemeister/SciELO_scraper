@@ -8,7 +8,7 @@ metadata:
 
 # scielo-analysis
 
-Skill para análise de dados gerados pelo SciELO Scraper v2.4. Sabe o formato exato dos arquivos e como interpretá-los.
+Skill para análise de dados gerados pelo SciELO Scraper v2.4. Conhece o formato exato dos arquivos e como interpretá-los.
 
 ## Quando usar
 
@@ -38,7 +38,7 @@ Colunas adicionadas pelo scraper:
 - `Palavras_Chave_PT` — Keywords separadas por `;`
 - `status` — `ok_completo` | `ok_parcial` | `nada_encontrado` | `erro_extracao` | `erro_pid_invalido`
 - `fonte_extracao` — fontes usadas (ex: `articlemeta_isis[T] | articlemeta_isis[R] | articlemeta_isis[K]`)
-- `url_acedida` — URLs acessadas durante scraping
+- `url_acedida` — URLs acessadas durante o scraping
 
 ### stats.json
 
@@ -100,7 +100,7 @@ df_stats = pd.DataFrame(dados)
 ### Análise de fontes de extração
 
 ```python
-# Expandir fonte_extracao (campo pipe-separado)
+# Expandir fonte_extracao (campo separado por pipe)
 fontes = df["fonte_extracao"].str.split(" | ").explode()
 print(fontes.value_counts())
 
@@ -135,4 +135,4 @@ uv pip install pandas matplotlib seaborn
 - Sempre verificar encoding: CSVs do scraper são UTF-8 com BOM (`encoding="utf-8-sig"`)
 - Colunas com aspas extras (artefato do Windows CSV): usar `df.columns = df.columns.str.strip('"')`
 - Para análise de palavras-chave: `df["Palavras_Chave_PT"].str.split(";").explode().str.strip()`
-- Artigos AoP têm `005` nas posições 14-16 do PID — tratá-los separadamente pois a API não os indexa
+- Artigos AoP têm `005` nas posições 14-16 do PID — tratá-los separadamente, pois a API não os indexa

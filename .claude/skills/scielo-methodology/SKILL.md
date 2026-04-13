@@ -16,7 +16,7 @@ Skill para raciocínio metodológico no contexto do SciELO Scraper. Ajuda a toma
 - Escolher o modo de extração adequado para o objetivo
 - Interpretar taxa de erro e formular hipóteses sobre causas
 - Avaliar cobertura de um corpus
-- Design de experimentos de benchmarking do scraper
+- Desenhar experimentos de benchmarking do scraper
 - Decidir como tratar artigos AoP ou bilíngues
 
 ## Decisões de design de busca
@@ -34,18 +34,18 @@ Skill para raciocínio metodológico no contexto do SciELO Scraper. Ajuda a toma
 
 - `ti` (título) + `ab` (resumo): padrão, boa cobertura
 - Só `ti`: corpus mais restrito, maior precisão
-- `ti` + `ab` + `kw` (palavras-chave): máximo recall
+- `ti` + `ab` + `kw` (palavras-chave): recall máximo
 
 ### Período temporal
 
 - Artigos do ano corrente podem estar incompletos no índice
 - AoPs são mais frequentes no ano mais recente
-- Para corpora históricos (>3 anos): taxa de AoP tende a ser menor
+- Para corpora históricos (>3 anos): a taxa de AoP tende a ser menor
 
 ## Seleção de modo de extração
 
 ```
-Objetivo: máxima cobertura, tempo não crítico
+Objetivo: cobertura máxima, tempo não crítico
 → Modo padrão (api+html)
 
 Objetivo: teste rápido, artigos AoP não importam
@@ -55,7 +55,7 @@ Objetivo: API fora do ar, ou validação independente
 → --only-html
 
 Objetivo: corpora grandes (>1000 artigos)
-→ api+html com --workers 2 (cuidado: risco de bloqueio)
+→ api+html com --workers 2 (atenção: risco de bloqueio)
 ```
 
 ## Interpretação de cobertura
@@ -76,7 +76,7 @@ Objetivo: corpora grandes (>1000 artigos)
 | Erros concentrados num período | Artigos AoP daquele ano | `df[df.PID_limpo.str[14:17]=="005"]` |
 | Erros concentrados numa revista | Migração de domínio ou ISSN | Verificar URL manualmente |
 | Erros aleatórios, baixa taxa | Instabilidade do servidor | Reprocessar com `--resume` |
-| Erros >10% modo API | Coleção tem muitos AoP | Usar modo padrão |
+| Erros >10% no modo API | Coleção tem muitos AoP | Usar modo padrão |
 | `ok_parcial` alto | Artigos em inglês sem PT | Verificar `Language(s)` no CSV |
 
 ### Artigos ok_parcial — o que falta tipicamente
@@ -90,7 +90,7 @@ Objetivo: corpora grandes (>1000 artigos)
 ### Quando formular hipóteses sobre falhas
 
 1. **Taxa de erro > 2%**: investigar padrão nos PIDs com erro
-2. **Tempo médio/artigo > 5s**: possível throttling pelo servidor
+2. **Tempo médio por artigo > 5s**: possível throttling pelo servidor
 3. **ok_parcial concentrado em um campo**: problema sistemático de extração
 4. **Discrepância entre modos > 3%**: revisar lógica de fallback
 
@@ -100,7 +100,7 @@ Objetivo: corpora grandes (>1000 artigos)
 1. Identificar artigos que diferem entre modos
 2. Classificar por tipo: AoP, bilíngue, editorial, etc.
 3. Verificar manualmente 3-5 casos representativos
-4. Formular hipótese sobre causa raiz
+4. Formular hipótese sobre a causa raiz
 5. Propor ajuste no scraper ou na busca
 ```
 
@@ -114,15 +114,15 @@ Objetivo: corpora grandes (>1000 artigos)
 
 ### Artigos bilíngues
 
-Artigos PT+EN tipicamente têm resumo em ambos os idiomas. Se o scraper retorna só EN:
+Artigos PT+EN tipicamente têm resumo em ambos os idiomas. Se o scraper retornar só EN:
 - Verificar se a página PT está acessível
-- Verificar coluna `Language(s)` no CSV de entrada
-- Usar `--only-html` que segue o link "Texto (Português)" explicitamente
+- Verificar a coluna `Language(s)` no CSV de entrada
+- Usar `--only-html`, que segue o link "Texto (Português)" explicitamente
 
 ## Boas práticas
 
 - Documentar sempre: termos, anos, coleção, modo, data da coleta, versão do script
-- Guardar o `_params.json` junto com o CSV de busca — reprodutibilidade
+- Guardar o `_params.json` junto com o CSV de busca — garante reprodutibilidade
 - Para corpora de pesquisa: usar checkpoint baixo (`--checkpoint 1`) e `--resume` disponível
 - Validar manualmente uma amostra de ~20 artigos antes de usar o corpus
 - Comparar ao menos dois modos para corpora críticos

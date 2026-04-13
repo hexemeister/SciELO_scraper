@@ -26,7 +26,7 @@
                                       │
           ┌───────────────────────────▼──────────────────────────────────────┐
           │                  FASE 1 — ArticleMeta API                        │
-          │                  (saltada se --only-html)                        │
+          │                  (ignorada se --only-html)                       │
           │                                                                  │
           │  GET articlemeta.scielo.org/api/v1/article                       │
           │      ?code={pid}&collection={col}&format=json                    │
@@ -59,7 +59,7 @@
                                    │                      │
           ┌────────────────────────▼─────────────────────▼────────────────────┐
           │               FASE 2 — Fallback HTML                              │
-          │               (saltada se --only-api                              │
+          │               (ignorada se --only-api                             │
           │                OU se todos os campos já preenchidos)              │
           │                                                                   │
           │   Campos necessários: need_t / need_r / need_k                    │
@@ -70,7 +70,7 @@
           │                                                                  │
           │  scielo.br?script=sci_arttext&pid={pid}&lang=pt                  │
           │  → requests segue redirect automático                            │
-          │    (pode chegar à URL canónica /j/.../a/.../                    │
+          │    (pode chegar à URL canônica /j/.../a/.../                    │
           └───────────────────────────┬──────────────────────────────────────┘
                                       │
                     ┌─────────────────▼──────────────────┐
@@ -126,7 +126,7 @@
                                        │
                     ┌──────────────────▼────────────────────────────────────┐
                     │  ETAPA 3 — Língua da página ≠ PT?                     │
-                    │  (e ainda faltam campos)                              │
+                    │  (e ainda há campos ausentes)                         │
                     │                                                       │
                     │  lang_orig (meta dc.language / citation_language)    │
                     └──────┬───────────────────────────┬────────────────────┘
@@ -166,29 +166,29 @@
 
 | Condição | Ação |
 |---|---|
-| `--only-html` | Salta Fase 1 completamente |
-| `--only-api` | Salta Fase 2 completamente |
+| `--only-html` | Ignora a Fase 1 completamente |
+| `--only-api` | Ignora a Fase 2 completamente |
 | API retorna 0 campos PT | HTML fallback ativado para T+R+K |
-| API retorna 1–2 campos PT | HTML fallback ativado apenas para os campos em falta |
+| API retorna 1–2 campos PT | HTML fallback ativado apenas para os campos ausentes |
 | API retorna T+R+K completos | HTML fallback não é ativado |
-| Página HTML não é artigo (`is_article_page = False`) | Salta extração, vai para Etapa 4 (se AoP) |
+| Página HTML não é artigo (`is_article_page = False`) | Ignora a extração, vai para Etapa 4 (se AoP) |
 | AoP + página home ≠ artigo | Tenta `og:url` da página home |
-| Língua da página ≠ `pt` e faltam campos | Segue link "Texto (Português)" |
+| Língua da página ≠ `pt` e há campos ausentes | Segue link "Texto (Português)" |
 
 ---
 
 ## Prioridade dentro do HTML (apply_missing)
 
-Para cada campo em falta, tenta por esta ordem:
+Para cada campo ausente, tenta por esta ordem:
 
 1. **Meta tags** (`meta[name="citation_title"]`, `meta[name="citation_abstract"]`, `meta[name="citation_keywords"]`)
 2. **Corpo HTML** (`h1.article-title`, `div[data-anchor=Resumo] p`, `.keywords span`)
 
-A primeira fonte que tiver valor vence — as restantes não são tentadas para esse campo.
+A primeira fonte que tiver valor prevalece — as demais não são tentadas para esse campo.
 
 ---
 
-## Fontes registadas em `fonte_extracao`
+## Fontes registradas em `fonte_extracao`
 
 | Valor | O que significa |
 |---|---|

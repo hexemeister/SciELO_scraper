@@ -8,7 +8,7 @@ metadata:
 
 # scielo-communication
 
-Skill para comunicação científica no contexto do SciELO Scraper. Sabe o vocabulário, limitações e resultados típicos do projeto para redigir textos precisos.
+Skill para comunicação científica no contexto do SciELO Scraper. Conhece o vocabulário, as limitações e os resultados típicos do projeto para redigir textos precisos.
 
 ## Quando usar
 
@@ -24,8 +24,8 @@ Skill para comunicação científica no contexto do SciELO Scraper. Sabe o vocab
 |---|---|
 | PID SciELO | Identificador único de artigo no formato `S` + ISSN + ano + sequência |
 | ArticleMeta API | API REST do SciELO para acesso estruturado a metadados via ISIS-JSON |
-| Artigo AoP | Artigo Ahead of Print, disponível antes de paginação final; PID com `005` nas posições 14-16 |
-| Fallback HTML | Estratégia secundária de extração por scraping da página HTML quando API não retorna dados |
+| Artigo AoP | Artigo Ahead of Print, disponível antes da paginação final; PID com `005` nas posições 14-16 |
+| Fallback HTML | Estratégia secundária de extração por scraping da página HTML quando a API não retorna dados |
 | Coleção SCL | Coleção brasileira do SciELO (`scielo.br`), com ~552.000 documentos |
 | ok_completo | Extração com sucesso de título, resumo e palavras-chave em português |
 | ok_parcial | Extração parcial — pelo menos um campo obtido |
@@ -95,5 +95,5 @@ Para incluir na seção de limitações:
 - Sempre reportar a versão do script (v2.4) e a data da coleta
 - Citar o modo de extração usado (`api+html`, `apenas-api` ou `apenas-html`)
 - Reportar total, ok_completo (%), ok_parcial (%), erro (%) e tempo de execução
-- Separar análise de artigos AoP dos regulares quando relevante
+- Separar a análise de artigos AoP dos regulares quando relevante
 - Usar termos em português nos textos: "extração completa", "extração parcial", "erro de extração"

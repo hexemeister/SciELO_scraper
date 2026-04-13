@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `teste_pipeline.py` | Pipeline completo de teste | `--year` | `exemplos/<ano>/` |
+| `teste_pipeline.py` | Pipeline completo de teste (v1.3) | `--year` | `exemplos/<ano>/` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
 ## Convenções obrigatórias
@@ -22,6 +22,15 @@
 - Pasta de scraping: `<stem>_s_<timestamp>_<modo>/`
   - `<modo>`: `api+html` (padrão) | `api` | `html`
 - Exemplos de runs: `exemplos/<ano>/`
+
+## Comportamento do teste_pipeline.py (v1.3)
+
+- **Estratégias testadas:** padrão (`api+html`), apenas-api, apenas-html — sempre em sequência completa
+- **`--no-resume` implícito:** o scraper é sempre chamado com `--no-resume`; cada estratégia começa do zero
+- **Limpeza automática:** após copiar tudo para `exemplos/<ano>/`, os originais no diretório raiz são removidos (CSV, `_params.json`, 3 pastas de scraping, `ANALISE_DISCREPANCIA_*.md`)
+- **`-?`:** equivalente a `-h` / `--help`
+- **`--dry-run`:** mostra os comandos sem executar, inclusive a limpeza que seria feita
+- **`--skip-scrape`:** reutiliza pastas existentes — não aplica `--no-resume` (skip não reexecuta o scraper)
 
 ## Comportamento do scraper (scielo_scraper.py v2.4)
 

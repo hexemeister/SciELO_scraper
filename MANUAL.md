@@ -54,9 +54,9 @@ uv run python scielo_search.py --show-params sc_20260411_143022_params.json
 
 Imprime o JSON formatado no terminal, útil para documentar ou reproduzir a busca.
 
-### Termos exactos (sem truncamento)
+### Termos exatos (sem truncamento)
 
-Por padrão os termos são truncados com `$` (ex: `avalia$` casa com "avaliação", "avaliativo", etc.). Para desactivar:
+Por padrão os termos são truncados com `$` (ex: `avalia$` casa com "avaliação", "avaliativo", etc.). Para desativar:
 
 ```bash
 uv run python scielo_search.py --terms avaliação educação --no-truncate
@@ -257,7 +257,7 @@ O script encontra automaticamente a execução anterior mais recente, carrega os
   ══ RETOMADA ══
   ```
 - As estatísticas finais acumulam o tempo total das duas execuções
-- O `stats.json` regista `"resume": "CONTINUED"` para identificar execuções retomadas
+- O `stats.json` registra `"resume": "CONTINUED"` para identificar execuções retomadas
 - Artigos com status `ok_completo` ou `ok_parcial` não são reprocessados
 - Artigos com erro são reprocessados
 

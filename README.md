@@ -70,7 +70,7 @@ Script para pesquisar artigos no SciELO Search e baixar os resultados como CSV, 
 python scielo_search.py --terms avalia educa --years 2022-2025
 ```
 
-Gera dois arquivos no diretório actual:
+Gera dois arquivos no diretório atual:
 
 - `sc_<timestamp>.csv` — lista de artigos com PIDs e metadados
 - `sc_<timestamp>_params.json` — parâmetros completos da busca usados
@@ -88,7 +88,7 @@ Gera dois arquivos no diretório actual:
 | `--output ARQUIVO` | Nome do arquivo de saída (default: `sc_<timestamp>.csv`) |
 | `-h`, `--help`, `-?` | Mostrar ajuda |
 
-> O CSV gerado contém uma coluna `ID` com os PIDs SciELO e é directamente compatível com o `scielo_scraper.py`.
+> O CSV gerado contém uma coluna `ID` com os PIDs SciELO e é diretamente compatível com o `scielo_scraper.py`.
 
 ## Formato do CSV de entrada
 
