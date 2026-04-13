@@ -9,8 +9,9 @@ wheels/
 # Virtual environments
 .venv
 
-# Claude Code internal
-.claude/
+# Claude Code internal (exceto skills customizadas)
+.claude/*
+!.claude/skills
 
 # Temp/preview images
 flowchart_extracao_ptbr_temp.svg
