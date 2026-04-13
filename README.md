@@ -84,7 +84,7 @@ Gera dois arquivos no diretório atual:
 | `--collection COD` | Coleção SciELO (default: `scl` = Brasil) |
 | `--fields CAMPO...` | Campos onde pesquisar os termos |
 | `--no-truncate` | Desativar truncamento automático de termos |
-| `--show-params` | Exibir os parâmetros da busca antes de executar |
+| `--show-params [ARQ]` | Exibir parâmetros da última busca (ou de `ARQ` explícito) e sair |
 | `--output ARQUIVO` | Nome do arquivo de saída (default: `sc_<timestamp>.csv`) |
 | `-h`, `--help`, `-?` | Mostrar ajuda |
 
@@ -129,15 +129,21 @@ Mantém todas as colunas do CSV de entrada e adiciona:
 
 ## Comparativo de estratégias
 
-Resultado em 564 artigos do SciELO Brasil (2022):
+Resultados em três anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
-| Estratégia | ok_completo | ok_parcial | erro | Tempo |
-|---|---|---|---|---|
-| `--only-api` | 93.8% | 1.1% | 5.1% | ~26 min |
-| `--only-html` | 99.5% | 0.2% | 0.4% | ~36 min |
-| padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~26 min** |
+| Ano | n | Estratégia | ok_completo | ok_parcial | erro | Tempo |
+|---|---|---|---|---|---|---|
+| 2022 | 564 | `--only-api` | 93.8% | 1.1% | 5.1% | ~26 min |
+| 2022 | 564 | `--only-html` | 99.5% | 0.2% | 0.4% | ~36 min |
+| 2022 | 564 | padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~26 min** |
+| 2024 | 553 | `--only-api` | 98.9% | 0.9% | 0.2% | ~26 min |
+| 2024 | 553 | `--only-html` | 99.3% | 0.2% | 0.5% | ~30 min |
+| 2024 | 553 | padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~27 min** |
+| 2025 | 602 | `--only-api` | 99.2% | 0.8% | 0.0% | ~27 min |
+| 2025 | 602 | `--only-html` | 99.0% | 0.5% | 0.5% | ~33 min |
+| 2025 | 602 | padrão (api+html) | **99.8%** | 0.2% | **0.0%** | **~27 min** |
 
-A estratégia padrão é a mais eficiente: usa a API para ~94% dos artigos (rápido) e aciona o HTML apenas quando necessário.
+A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~94–100% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo equivalente ao modo apenas-api.
 
 ## Coleções disponíveis
 

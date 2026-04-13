@@ -23,6 +23,12 @@
   - `<modo>`: `api+html` (padrão) | `api` | `html`
 - Exemplos de runs: `exemplos/<ano>/`
 
+## Comportamento do scielo_search.py
+
+- **`--show-params [ARQ]`:** sem `ARQ`, lê o `_params.json` mais recente no diretório atual via glob; com `ARQ`, lê o arquivo indicado (relativo ou absoluto) — independente de `--terms`/`--years`
+- **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
+- **`--list-collections`:** lista as 36 coleções SciELO e sai
+
 ## Comportamento do teste_pipeline.py (v1.3)
 
 - **Estratégias testadas:** padrão (`api+html`), apenas-api, apenas-html — sempre em sequência completa

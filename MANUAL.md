@@ -37,19 +37,25 @@ O `_params.json` tem esta estrutura:
 
 ```json
 {
-  "terms": ["avalia", "educa"],
-  "years": "2022-2025",
-  "collection": "scl",
-  "fields": ["ti", "ab"],
-  "query_url": "https://search.scielo.org/?q=avalia+educa&lang=pt&count=100&...",
-  "total_results": 847
+  "timestamp": "2026-04-11T14:30:22",
+  "colecao": "scl",
+  "termos_originais": ["avalia", "educa"],
+  "truncamento": true,
+  "campos": "ti+ab",
+  "anos": [2022, 2023, 2024, 2025],
+  "total_resultados": 847,
+  "query_url": "https://search.scielo.org/?q=..."
 }
 ```
 
 ### Consultar os parâmetros de uma busca anterior
 
 ```bash
-uv run python scielo_search.py --show-params sc_20260411_143022_params.json
+# Última busca no diretório atual
+uv run python scielo_search.py --show-params
+
+# Busca específica (outro diretório)
+uv run python scielo_search.py --show-params exemplos/2024/sc_20260413_092345_params.json
 ```
 
 Imprime o JSON formatado no terminal, útil para documentar ou reproduzir a busca.
@@ -297,11 +303,15 @@ Mais lento (~10 min a mais para 564 artigos), mas útil quando a API estiver for
 
 ### Comparativo
 
-| Estratégia | Cobertura | Tempo (564 artigos) | Pasta gerada | Quando usar |
+Resultados observados em três anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
+
+| Estratégia | ok_completo | Tempo médio | Pasta gerada | Quando usar |
 |---|---|---|---|---|
-| Padrão (api+html) | 99.6% | ~26 min | `_s_..._api+html/` | Sempre — melhor custo-benefício |
-| Apenas HTML | 99.5% | ~36 min | `_s_..._html/` | API fora do ar |
-| Apenas API | 93.8% | ~26 min | `_s_..._api/` | Testes rápidos sem AoPs |
+| Padrão (api+html) | 99.6–99.8% | ~26–27 min | `_s_..._api+html/` | Sempre — melhor custo-benefício |
+| Apenas HTML | 99.0–99.5% | ~30–36 min | `_s_..._html/` | API fora do ar |
+| Apenas API | 93.8–99.2% | ~26–27 min | `_s_..._api/` | Testes rápidos sem AoPs |
+
+> O modo apenas-api é significativamente mais limitado em anos com muitos artigos AoP: em 2022 apresentou 5.1% de erros (vs. 0.2% do padrão), pois artigos Ahead of Print não estão indexados na API.
 
 ---
 
