@@ -6,7 +6,8 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `teste_pipeline.py` | Pipeline completo de teste (v1.3) | `--year` | `exemplos/<ano>/` |
+| `teste_pipeline.py` | Pipeline completo de teste (v1.4) | `--year` | `exemplos/<ano>/` |
+| `gerar_graficos.py` | Gera gráficos comparativos das execuções | `--base`, `--years`, `--output` | `grafico_status.png`, `grafico_fontes.png`, `grafico_tempo.png` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
 ## Convenções obrigatórias
@@ -29,7 +30,7 @@
 - **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
 - **`--list-collections`:** lista as 36 coleções SciELO e sai
 
-## Comportamento do teste_pipeline.py (v1.3)
+## Comportamento do teste_pipeline.py (v1.4)
 
 - **Estratégias testadas:** padrão (`api+html`), apenas-api, apenas-html — sempre em sequência completa
 - **`--no-resume` implícito:** o scraper é sempre chamado com `--no-resume`; cada estratégia começa do zero
@@ -37,6 +38,8 @@
 - **`-?`:** equivalente a `-h` / `--help`
 - **`--dry-run`:** mostra os comandos sem executar, inclusive a limpeza que seria feita
 - **`--skip-scrape`:** reutiliza pastas existentes — não aplica `--no-resume` (skip não reexecuta o scraper)
+- **`--stats-report [DIR]`:** gera relatório Markdown consolidado de todos os `stats.json` em `exemplos/` (ou `DIR`); funciona sem `--year` — modo standalone
+- **`--per-year`:** executa o pipeline para cada ano encontrado em `exemplos/`, com barra de progresso global e ETA estimado por histórico de execuções anteriores
 
 ## Comportamento do scraper (scielo_scraper.py v2.4)
 

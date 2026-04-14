@@ -99,6 +99,9 @@ df_stats = pd.DataFrame(dados)
 
 ### Análise de fontes de extração
 
+Duas abordagens possíveis:
+
+**Via `resultado.csv`** (nível de artigo — detalhe fino):
 ```python
 # Expandir fonte_extracao (campo separado por pipe)
 fontes = df["fonte_extracao"].str.split(" | ").explode()
@@ -109,7 +112,47 @@ df["via_api"] = df["fonte_extracao"].str.contains("articlemeta_isis")
 df["via_html"] = df["fonte_extracao"].str.contains("pag|html|meta_tags")
 ```
 
-### Visualizações típicas
+**Via `stats.json → por_fonte_extracao`** (nível de execução — fonte canônica para gráficos):
+```python
+import json
+
+with open("stats.json") as f:
+    stats = json.load(f)
+
+# Estrutura: {chave: {"n": int, "pct": "X.X%"}} ou {chave: int}
+pfe = stats["por_fonte_extracao"]
+# Chaves possíveis: "articlemeta_isis", "api+html_fallback", "html_fallback", "sem_fonte"
+for chave, val in pfe.items():
+    n = val["n"] if isinstance(val, dict) else val
+    print(f"{chave}: {n}")
+```
+
+Labels canônicos para exibição (usados em `gerar_graficos.py`):
+| Chave em `stats.json` | Label de display |
+|---|---|
+| `articlemeta_isis` | ArticleMeta API |
+| `api+html_fallback` | Fallback API+HTML |
+| `html_fallback` | Fallback HTML |
+| `sem_fonte` | Falha de acesso (erro HTTP) |
+
+### Gráficos comparativos automáticos
+
+`gerar_graficos.py` gera 3 PNGs a partir das pastas `exemplos/<ano>/`:
+
+```bash
+uv run python gerar_graficos.py                      # todos os anos em exemplos/
+uv run python gerar_graficos.py --years 2022 2024    # anos específicos
+uv run python gerar_graficos.py --output graficos/   # pasta de saída
+uv run python gerar_graficos.py --no-sources         # pular gráfico de fontes
+uv run python gerar_graficos.py --no-status --no-time  # só gráfico de fontes
+```
+
+Gráficos gerados:
+- `grafico_status.png` — distribuição de status por modo e ano
+- `grafico_fontes.png` — fontes de extração no modo `api+html` por ano
+- `grafico_tempo.png` — tempo total por modo e ano
+
+### Visualizações manuais típicas
 
 ```python
 import matplotlib.pyplot as plt

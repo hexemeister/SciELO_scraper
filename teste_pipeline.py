@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-teste_pipeline.py  v1.3
+teste_pipeline.py  v1.4
 =======================
 Executa o pipeline completo de teste: busca → extração (3 estratégias) →
 análise de discrepância → cópia para diretório de exemplos.
@@ -21,6 +21,7 @@ OPÇÕES
   --per-year            Rodar pipeline separado por ano (um CSV e destino por ano)
   --skip-scrape         Reutilizar runs existentes (só gera análise e copia)
   --dry-run             Mostra o que faria sem executar nada
+  --stats-report [DIR]  Gera relatório consolidado dos stats.json em DIR (default: exemplos/)
   -h, --help, -?        Mostrar esta mensagem de ajuda e sair
 
 NOTAS
@@ -37,9 +38,11 @@ EXEMPLOS
   python teste_pipeline.py --year 2023 --skip-search   # reutiliza CSV existente
   python teste_pipeline.py --year 2023 --dry-run       # simula sem executar
   python teste_pipeline.py --year 2022 2023 2024 --per-year  # um CSV por ano
+  python teste_pipeline.py --stats-report               # consolida exemplos/ e imprime
+  python teste_pipeline.py --stats-report exemplos/     # idem com pasta explícita
 """
 
-__version__ = "1.3"
+__version__ = "1.4"
 
 import argparse
 import json
@@ -74,7 +77,13 @@ ESTRATEGIAS = [
     {"label": "apenas-html","modo": "apenas-html","slug": "html",     "flags": ["--only-html"]},
 ]
 
-STATUS_KEYS = ("ok_completo", "ok_parcial", "erro_extracao")
+STATUS_KEYS = ("ok_completo", "ok_parcial", "nada_encontrado", "erro_extracao", "erro_pid_invalido")
+
+MODO_SUFIXO = {
+    "api+html": re.compile(r"_api\+html$"),
+    "api":      re.compile(r"_api$"),
+    "html":     re.compile(r"_html$"),
+}
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
@@ -122,6 +131,251 @@ def parse_years(raw: list[str]) -> list[int]:
         else:
             raise ValueError(f"Ano invalido: '{item}'. Use YYYY ou YYYY-YYYY.")
     return sorted(years)
+
+
+# ── Progresso global ──────────────────────────────────────────────────────────
+
+class GlobalProgress:
+    """
+    Rastreia progresso global do pipeline multi-ano.
+
+    Etapas por ano (--per-year): busca + 3 scrapings + análise = 5
+    """
+
+    ETAPAS_POR_ANO = 5  # busca + api+html + api + html + análise
+
+    def __init__(self, anos: list[int], base: Path | None = None):
+        self.anos        = anos
+        self.n_anos      = len(anos)
+        self.total_etapas = self.n_anos * self.ETAPAS_POR_ANO
+        self.etapa_atual  = 0
+        self.t_inicio     = time.time()
+
+        # Taxa histórica: artigos/segundo, por modo (para estimativa de ETA)
+        self._taxas: dict[str, list[float]] = {"api+html": [], "api": [], "html": []}
+        if base and base.is_dir():
+            self._carregar_taxas_historicas(base)
+
+    def _carregar_taxas_historicas(self, base: Path):
+        """Lê stats.json existentes para calcular taxa média artigos/segundo."""
+        for ano_dir in sorted(base.iterdir()):
+            if not (ano_dir.is_dir() and ano_dir.name.isdigit()):
+                continue
+            for modo, padrao in MODO_SUFIXO.items():
+                candidatas = [
+                    p for p in ano_dir.iterdir()
+                    if p.is_dir() and padrao.search(p.name) and "_s_" in p.name
+                ]
+                if not candidatas:
+                    continue
+                pasta = sorted(candidatas)[-1]
+                sfile = pasta / "stats.json"
+                if not sfile.exists():
+                    continue
+                try:
+                    with open(sfile, encoding="utf-8") as f:
+                        st = json.load(f)
+                    total   = st.get("total", 0)
+                    elapsed = st.get("elapsed_seconds", 0)
+                    if total > 0 and elapsed > 0:
+                        self._taxas[modo].append(total / elapsed)
+                except Exception:
+                    pass
+
+    def taxa_media(self, modo: str) -> float | None:
+        """Artigos/segundo médio para o modo, ou None se não há histórico."""
+        vals = self._taxas.get(modo, [])
+        return sum(vals) / len(vals) if vals else None
+
+    def avancar(self):
+        self.etapa_atual += 1
+
+    def eta_str(self, etapas_restantes: int | None = None) -> str:
+        """ETA global estimado, baseado no ritmo atual de etapas."""
+        decorrido = time.time() - self.t_inicio
+        if self.etapa_atual == 0 or decorrido < 1:
+            return "calculando..."
+        taxa = self.etapa_atual / decorrido          # etapas/segundo
+        restantes = etapas_restantes if etapas_restantes is not None \
+                    else (self.total_etapas - self.etapa_atual)
+        if restantes <= 0:
+            return "quase pronto"
+        segundos = restantes / taxa
+        return humanize(int(segundos))
+
+    def eta_scraping_str(self, modo: str, n_artigos: int) -> str:
+        """ETA estimado para um scraping de n_artigos no modo dado."""
+        taxa = self.taxa_media(modo)
+        if taxa is None or n_artigos == 0:
+            return "sem histórico"
+        segundos = n_artigos / taxa
+        return humanize(int(segundos))
+
+    def barra(self) -> str:
+        """Linha de progresso global para exibir no início de cada etapa."""
+        pct = self.etapa_atual / self.total_etapas * 100 if self.total_etapas else 0
+        decorrido = humanize(int(time.time() - self.t_inicio))
+        eta = self.eta_str()
+        return (
+            f"[Global {self.etapa_atual}/{self.total_etapas} etapas"
+            f"  {pct:.0f}%"
+            f"  decorrido={decorrido}"
+            f"  ETA≈{eta}]"
+        )
+
+    def barra_ano(self, ano: int, etapa_no_ano: int) -> str:
+        """Linha de progresso dentro do ano atual."""
+        idx_ano = self.anos.index(ano) + 1
+        return (
+            f"[Ano {idx_ano}/{self.n_anos} ({ano})"
+            f"  etapa {etapa_no_ano}/{self.ETAPAS_POR_ANO}]"
+        )
+
+
+# ── Stats report ──────────────────────────────────────────────────────────────
+
+def _descobrir_pasta_modo(ano_dir: Path, modo: str) -> Path | None:
+    """Pasta de scraping mais recente para modo dentro de ano_dir."""
+    padrao = MODO_SUFIXO[modo]
+    candidatas = [
+        p for p in ano_dir.iterdir()
+        if p.is_dir() and padrao.search(p.name) and "_s_" in p.name
+    ]
+    return sorted(candidatas)[-1] if candidatas else None
+
+
+def gerar_stats_report(base: Path) -> str:
+    """
+    Varre base/<ano>/<pasta_modo>/stats.json e gera relatório consolidado.
+    Retorna texto Markdown pronto para imprimir.
+    """
+    modos = ["api+html", "api", "html"]
+    anos = sorted(
+        [p for p in base.iterdir() if p.is_dir() and p.name.isdigit()],
+        key=lambda p: int(p.name),
+    )
+    if not anos:
+        return f"Nenhuma pasta de ano encontrada em '{base}'.\n"
+
+    linhas: list[str] = []
+    linhas.append(f"# Relatório de Stats — {base.resolve()}")
+    linhas.append(f"Gerado em: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+    # Acumuladores globais
+    glob_total        = 0
+    glob_ok_c         = 0
+    glob_ok_p         = 0
+    glob_nada         = 0
+    glob_erro         = 0
+    glob_elapsed: dict[str, float] = {"api+html": 0.0, "api": 0.0, "html": 0.0}
+    glob_elapsed_total = 0.0   # soma dos 3 modos (tempo real de execução)
+
+    for ano_dir in anos:
+        ano = int(ano_dir.name)
+        linhas.append(f"## Ano {ano}\n")
+        linhas.append(
+            "| Modo | Total | ok_completo | ok_parcial | nada_encontrado"
+            " | erro_extracao | Tempo | Média/art |"
+        )
+        linhas.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+
+        ano_total = None  # usar total do primeiro modo encontrado
+
+        for modo in modos:
+            pasta = _descobrir_pasta_modo(ano_dir, modo)
+            if pasta is None:
+                linhas.append(f"| **{modo}** | — | — | — | — | — | — | — |")
+                continue
+            sfile = pasta / "stats.json"
+            if not sfile.exists():
+                linhas.append(f"| **{modo}** | sem stats.json | | | | | | |")
+                continue
+            try:
+                with open(sfile, encoding="utf-8") as f:
+                    st = json.load(f)
+            except Exception as e:
+                linhas.append(f"| **{modo}** | erro: {e} | | | | | | |")
+                continue
+
+            total   = st.get("total", 0)
+            ok_c    = st.get("ok_completo", 0)
+            ok_p    = st.get("ok_parcial", 0)
+            nada    = st.get("nada_encontrado", 0)
+            erro    = st.get("erro_extracao", 0)
+            elapsed = st.get("elapsed_seconds", 0.0)
+            tempo   = st.get("elapsed_humanizado", humanize(elapsed))
+            avg     = st.get("avg_per_article_s")
+            avg_str = f"{avg:.1f}s" if avg is not None else (
+                f"{elapsed/total:.1f}s" if total else "—"
+            )
+
+            def p(n): return f"{n} ({n/total*100:.1f}%)" if total else str(n)
+
+            linhas.append(
+                f"| **{modo}** | {total} | {p(ok_c)} | {p(ok_p)}"
+                f" | {p(nada)} | {p(erro)} | {tempo} | {avg_str} |"
+            )
+
+            # Acumula tempo por modo e total
+            glob_elapsed[modo]  += elapsed
+            glob_elapsed_total  += elapsed
+
+            # Acumula status e total usando api+html como referência
+            if modo == "api+html":
+                ano_total  = total
+                glob_ok_c += ok_c
+                glob_ok_p += ok_p
+                glob_nada += nada
+                glob_erro += erro
+
+        if ano_total is not None:
+            glob_total += ano_total
+
+        linhas.append("")  # linha em branco após tabela do ano
+
+        # Sub-tabela de fontes (apenas api+html, que é o modo completo)
+        pasta_padrao = _descobrir_pasta_modo(ano_dir, "api+html")
+        if pasta_padrao:
+            sfile = pasta_padrao / "stats.json"
+            if sfile.exists():
+                try:
+                    with open(sfile, encoding="utf-8") as f:
+                        st = json.load(f)
+                    por_fonte = st.get("por_fonte_extracao")
+                    if por_fonte:
+                        linhas.append("**Fontes de extração (api+html):**\n")
+                        linhas.append("| Fonte | n | % |")
+                        linhas.append("|---|---:|---:|")
+                        # Suporta {fonte: {n, pct}} e {fonte: int}
+                        def _n(v): return v["n"] if isinstance(v, dict) else v
+                        def _pct(v): return v.get("pct", "—") if isinstance(v, dict) else "—"
+                        for fonte, val in sorted(por_fonte.items(), key=lambda x: -_n(x[1])):
+                            linhas.append(f"| {fonte} | {_n(val)} | {_pct(val)} |")
+                        linhas.append("")
+                except Exception:
+                    pass
+
+    # ── Totais globais ─────────────────────────────────────────────────────────
+    linhas.append("---\n")
+    linhas.append("## Totais globais\n")
+    linhas.append("| Métrica | Valor |")
+    linhas.append("|---|---:|")
+    linhas.append(f"| Anos cobertos | {len(anos)} ({', '.join(d.name for d in anos)}) |")
+    linhas.append(f"| Total de artigos | {glob_total} |")
+    if glob_total:
+        linhas.append(f"| ok_completo (api+html) | {glob_ok_c} ({glob_ok_c/glob_total*100:.1f}%) |")
+        linhas.append(f"| ok_parcial (api+html) | {glob_ok_p} ({glob_ok_p/glob_total*100:.1f}%) |")
+        linhas.append(f"| nada_encontrado (api+html) | {glob_nada} ({glob_nada/glob_total*100:.1f}%) |")
+        linhas.append(f"| erro_extracao (api+html) | {glob_erro} ({glob_erro/glob_total*100:.1f}%) |")
+    linhas.append(f"| Tempo total execução (3 modos × {len(anos)} anos) | {humanize(int(glob_elapsed_total))} |")
+    linhas.append(f"| Tempo scraping api+html | {humanize(int(glob_elapsed['api+html']))} |")
+    linhas.append(f"| Tempo scraping api | {humanize(int(glob_elapsed['api']))} |")
+    linhas.append(f"| Tempo scraping html | {humanize(int(glob_elapsed['html']))} |")
+    if glob_total and glob_elapsed["api+html"]:
+        linhas.append(f"| Média/artigo (api+html) | {glob_elapsed['api+html']/glob_total:.1f}s |")
+    linhas.append("")
+
+    return "\n".join(linhas)
 
 
 # ── Dependências ──────────────────────────────────────────────────────────────
@@ -320,15 +574,34 @@ def gerar_analise(run_dirs: dict, years: list[int], terms: list[str]) -> str:
 
 # ── Pipeline de um único ano/conjunto ────────────────────────────────────────
 
+def _log_progresso(gp: "GlobalProgress | None", ano: int, etapa_no_ano: int):
+    """Imprime linha de progresso global + local antes de cada etapa."""
+    if gp is None or gp.n_anos <= 1:
+        return
+    print(f"  {gp.barra_ano(ano, etapa_no_ano)}  {gp.barra()}", flush=True)
+
+
+def _contar_artigos_csv(csv_path: Path) -> int:
+    """Conta linhas de dados no CSV (subtrai cabeçalho). Retorna 0 se falhar."""
+    try:
+        with open(csv_path, encoding="utf-8-sig") as f:
+            return max(0, sum(1 for _ in f) - 1)
+    except Exception:
+        return 0
+
+
 def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
                  collection: str, dest: Path, python: str,
-                 skip_search: bool, skip_scrape: bool, dry: bool):
+                 skip_search: bool, skip_scrape: bool, dry: bool,
+                 gp: "GlobalProgress | None" = None):
     """Executa search → 3×scrape → análise → cópia para dest."""
 
+    ano_ref   = years[0]   # ano de referência para o progresso
     anos_label = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
 
     # ── 1. Busca ──────────────────────────────────────────────────────────────
     csv_path = None
+    etapa_local = 1
 
     if skip_search or skip_scrape:
         csv_path = latest("sc_*.csv")
@@ -338,6 +611,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             log("Nenhum CSV sc_* encontrado — executando busca mesmo assim", "WARN")
 
     if csv_path is None:
+        _log_progresso(gp, ano_ref, etapa_local)
         log("── ETAPA 1/5: Busca ──────────────────────────────────────────", "STEP")
         rc = run(
             [python, "scielo_search.py",
@@ -346,6 +620,8 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
              "--years", *raw_years],
             dry,
         )
+        if gp:
+            gp.avancar()
         if rc != 0:
             log("Busca falhou — abortando", "ERROR")
             sys.exit(rc)
@@ -358,25 +634,43 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             log(f"CSV gerado: {csv_path.name}")
         else:
             csv_path = HERE / f"sc_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    else:
+        # skip: a etapa de busca não executa, mas avança o contador
+        if gp:
+            gp.avancar()
     print()
+
+    # Número de artigos (para estimativa de ETA do scraping)
+    n_artigos = _contar_artigos_csv(csv_path) if not dry else 0
 
     # ── 2-4. Scraping (3 estratégias) ─────────────────────────────────────────
     run_dirs: dict[str, Path] = {}
     stem = csv_path.stem
 
     for i, est in enumerate(ESTRATEGIAS, start=2):
-        log(f"── ETAPA {i}/5: Scraping {est['modo']} ─────────────────────────────", "STEP")
+        etapa_local = i
+        _log_progresso(gp, ano_ref, etapa_local)
+
+        eta_scr = ""
+        if gp and n_artigos:
+            eta_scr = f"  (ETA scraping≈{gp.eta_scraping_str(est['slug'], n_artigos)})"
+
+        log(f"── ETAPA {i}/5: Scraping {est['modo']}{eta_scr} ──────────────────", "STEP")
 
         if skip_scrape:
             found = latest(f"{stem}_s_*_{est['slug']}")
             if found:
                 run_dirs[est["label"]] = found
                 log(f"Reutilizando: {found.name}")
+                if gp:
+                    gp.avancar()
                 print()
                 continue
             log(f"Pasta não encontrada para {est['slug']} — executando scraping", "WARN")
 
         rc = run([python, "scielo_scraper.py", str(csv_path), "--no-resume"] + est["flags"], dry)
+        if gp:
+            gp.avancar()
         if rc != 0:
             log(f"Scraping {est['modo']} falhou (codigo {rc}) — continuando", "WARN")
 
@@ -392,6 +686,8 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
         print()
 
     # ── 5. Análise de discrepância ────────────────────────────────────────────
+    etapa_local = 5
+    _log_progresso(gp, ano_ref, etapa_local)
     log("── ETAPA 5/5: Analise de discrepancia ───────────────────────────", "STEP")
 
     analise_md = (
@@ -399,6 +695,8 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
         if not dry
         else f"# Análise de Discrepância — {anos_label}\n\n(dry-run)\n"
     )
+    if gp:
+        gp.avancar()
 
     analise_path = HERE / f"ANALISE_DISCREPANCIA_{anos_label}.md"
     if not dry:
@@ -465,7 +763,7 @@ def main():
     )
     ap.add_argument("-h", "--help", "-?", action="help",
         help="Mostrar esta mensagem e sair")
-    ap.add_argument("--year", nargs="+", required=True, metavar="ANO",
+    ap.add_argument("--year", nargs="*", metavar="ANO",
         help="Anos a buscar. Ex: 2022  ou  2022 2023  ou  2020-2024")
     ap.add_argument("--terms", nargs="+", default=["avalia", "educa"], metavar="TERMO",
         help="Termos de busca (default: avalia educa)")
@@ -481,8 +779,26 @@ def main():
         help="Reutilizar runs existentes (só gera análise e copia)")
     ap.add_argument("--dry-run", action="store_true",
         help="Mostra o que faria sem executar nada")
+    ap.add_argument(
+        "--stats-report", nargs="?", const="exemplos", metavar="DIR",
+        help="Gera relatório consolidado dos stats.json em DIR (default: exemplos/)",
+    )
     ap.add_argument("--version", action="version", version=f"v{__version__}")
     args = ap.parse_args()
+
+    # ── Modo --stats-report (não executa pipeline) ────────────────────────────
+    if args.stats_report is not None:
+        base = Path(args.stats_report)
+        if not base.is_dir():
+            print(f"Erro: pasta '{base}' não encontrada.", file=sys.stderr)
+            sys.exit(1)
+        relatorio = gerar_stats_report(base)
+        print(relatorio)
+        sys.exit(0)
+
+    # ── Modo pipeline — --year é obrigatório ─────────────────────────────────
+    if not args.year:
+        ap.error("--year é obrigatório (a menos que use --stats-report)")
 
     try:
         years = parse_years(args.year)
@@ -507,18 +823,34 @@ def main():
     ensure_deps(dry)
     print()
 
+    # Inicializar progresso global (só relevante em --per-year com múltiplos anos)
+    base_exemplos = Path(args.output_dir) if args.output_dir else HERE / "exemplos"
+    gp = GlobalProgress(years, base=base_exemplos) if args.per_year else None
+
     t_total = time.time()
 
     if args.per_year:
         # Um pipeline completo por ano
+        log(f"Total: {len(years)} ano(s) × {GlobalProgress.ETAPAS_POR_ANO} etapas"
+            f" = {len(years) * GlobalProgress.ETAPAS_POR_ANO} etapas", "INFO")
+        if gp and any(gp._taxas.values()):
+            for modo, vals in gp._taxas.items():
+                if vals:
+                    log(f"  Taxa hist. {modo}: {sum(vals)/len(vals):.2f} art/s"
+                        f" (de {len(vals)} run(s))")
+        print()
+
         for year in years:
             dest = (
                 Path(args.output_dir) / str(year)
                 if args.output_dir
                 else HERE / "exemplos" / str(year)
             )
+            idx_ano = years.index(year) + 1
             log(f"{'='*62}", "STEP")
-            log(f"  ANO: {year}  →  {dest}", "STEP")
+            log(f"  ANO {idx_ano}/{len(years)}: {year}  →  {dest}", "STEP")
+            if gp:
+                log(f"  {gp.barra()}", "STEP")
             log(f"{'='*62}", "STEP")
             print()
             run_pipeline(
@@ -531,6 +863,7 @@ def main():
                 skip_search=args.skip_search,
                 skip_scrape=args.skip_scrape,
                 dry=dry,
+                gp=gp,
             )
     else:
         # Pipeline único com todos os anos juntos
@@ -551,6 +884,7 @@ def main():
             skip_search=args.skip_search,
             skip_scrape=args.skip_scrape,
             dry=dry,
+            gp=None,   # sem progresso global no modo conjunto
         )
 
     elapsed = time.time() - t_total

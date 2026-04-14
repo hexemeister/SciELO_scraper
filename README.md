@@ -129,21 +129,24 @@ Mantém todas as colunas do CSV de entrada e adiciona:
 
 ## Comparativo de estratégias
 
-Resultados em três anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
+Resultados em quatro anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
 | Ano | n | Estratégia | ok_completo | ok_parcial | erro | Tempo |
 |---|---|---|---|---|---|---|
-| 2022 | 564 | `--only-api` | 93.8% | 1.1% | 5.1% | ~26 min |
-| 2022 | 564 | `--only-html` | 99.5% | 0.2% | 0.4% | ~36 min |
-| 2022 | 564 | padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~26 min** |
-| 2024 | 553 | `--only-api` | 98.9% | 0.9% | 0.2% | ~26 min |
-| 2024 | 553 | `--only-html` | 99.3% | 0.2% | 0.5% | ~30 min |
-| 2024 | 553 | padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~27 min** |
-| 2025 | 602 | `--only-api` | 99.2% | 0.8% | 0.0% | ~27 min |
-| 2025 | 602 | `--only-html` | 99.0% | 0.5% | 0.5% | ~33 min |
-| 2025 | 602 | padrão (api+html) | **99.8%** | 0.2% | **0.0%** | **~27 min** |
+| 2022 | 564 | `--only-api` | 98.6% | 1.1% | 0.4% | ~26 min |
+| 2022 | 564 | `--only-html` | 99.5% | 0.2% | 0.4% | ~37 min |
+| 2022 | 564 | padrão (api+html) | **99.8%** | 0.2% | **0.0%** | **~27 min** |
+| 2023 | 468 | `--only-api` | 98.9% | 1.1% | 0.0% | ~21 min |
+| 2023 | 468 | `--only-html` | 99.1% | 0.6% | 0.2% | ~39 min |
+| 2023 | 468 | padrão (api+html) | **99.4%** | 0.6% | **0.0%** | **~22 min** |
+| 2024 | 553 | `--only-api` | 98.9% | 0.9% | 0.2% | ~25 min |
+| 2024 | 553 | `--only-html` | 99.3% | 0.2% | 0.5% | ~35 min |
+| 2024 | 553 | padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~26 min** |
+| 2025 | 603 | `--only-api` | 99.2% | 0.8% | 0.0% | ~28 min |
+| 2025 | 603 | `--only-html` | 99.0% | 0.5% | 0.5% | ~43 min |
+| 2025 | 603 | padrão (api+html) | **99.8%** | 0.2% | **0.0%** | **~28 min** |
 
-A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~94–100% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo equivalente ao modo apenas-api.
+A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~99% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo equivalente ao modo apenas-api.
 
 ## Coleções disponíveis
 
@@ -168,10 +171,29 @@ Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use
 
 ```bash
 # 1. Buscar artigos
-python scielo_search.py --terms avalia educa --years 2022-2025
+uv run python scielo_search.py --terms avalia educa --years 2022-2025
 # → gera sc_20260411_143022.csv + sc_20260411_143022_params.json
 
 # 2. Extrair metadados
-python scielo_scraper.py sc_20260411_143022.csv
+uv run python scielo_scraper.py sc_20260411_143022.csv
 # → gera sc_20260411_143022_s_20260411_150312_api+html/
+
+# 3. (Opcional) Gerar gráficos comparativos entre anos
+uv run python gerar_graficos.py
+# → gera grafico_status.png, grafico_fontes.png, grafico_tempo.png
+```
+
+## gerar_graficos.py — Gráficos comparativos
+
+Gera três gráficos PNG a partir das pastas `exemplos/<ano>/` produzidas pelo `teste_pipeline.py`:
+
+- **`grafico_status.png`** — distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano
+- **`grafico_fontes.png`** — fontes de extração no modo `api+html` por ano, com tabela de n exatos
+- **`grafico_tempo.png`** — tempo total de scraping por modo e ano
+
+```bash
+uv run python gerar_graficos.py                      # lê exemplos/ no diretório atual
+uv run python gerar_graficos.py --years 2022 2024    # apenas esses anos
+uv run python gerar_graficos.py --output graficos/   # pasta de saída personalizada
+uv run python gerar_graficos.py -?                   # ajuda
 ```

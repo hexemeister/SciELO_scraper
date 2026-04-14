@@ -12,7 +12,9 @@
 7. [Outras coleções SciELO](#7-outras-coleções-scielo)
 8. [Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
 9. [Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
-10. [Problemas comuns](#10-problemas-comuns)
+10. [Gráficos comparativos com gerar_graficos.py](#10-gráficos-comparativos-com-gerar_graficospy)
+11. [Relatório consolidado com teste_pipeline.py --stats-report](#11-relatório-consolidado-com-teste_pipelinepy---stats-report)
+12. [Problemas comuns](#12-problemas-comuns)
 
 ---
 
@@ -409,7 +411,66 @@ uv run python scielo_scraper.py --stats-report --output-dir resultados/minha_pas
 
 ---
 
-## 10. Problemas comuns
+## 10. Gráficos comparativos com gerar_graficos.py
+
+O `gerar_graficos.py` lê as pastas `exemplos/<ano>/` geradas pelo `teste_pipeline.py` e produz três gráficos PNG prontos para publicação.
+
+### Uso básico
+
+```bash
+uv run python gerar_graficos.py
+```
+
+Lê automaticamente todos os anos presentes em `exemplos/` e salva os gráficos no diretório atual.
+
+### Gráficos gerados
+
+| Arquivo | O que mostra |
+|---|---|
+| `grafico_status.png` | Distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano. Barras cinzas para a categoria dominante; cores fortes para casos raros. Tabela inset com n exatos. |
+| `grafico_fontes.png` | Fontes de extração no modo `api+html` por ano: ArticleMeta API, Fallback API+HTML, Fallback HTML, Falha de acesso. Tabela com n exatos abaixo. |
+| `grafico_tempo.png` | Tempo total de scraping (em minutos) por modo e ano, para comparar custo entre estratégias. |
+
+### Opções
+
+```bash
+uv run python gerar_graficos.py --years 2022 2024       # apenas esses anos
+uv run python gerar_graficos.py --base outra/pasta      # pasta raiz alternativa
+uv run python gerar_graficos.py --output graficos/      # pasta de saída
+uv run python gerar_graficos.py --no-sources            # pular gráfico de fontes
+uv run python gerar_graficos.py --no-status --no-time   # apenas gráfico de fontes
+uv run python gerar_graficos.py -?                      # ajuda
+```
+
+---
+
+## 11. Relatório consolidado com teste_pipeline.py --stats-report
+
+Gera um relatório Markdown com as estatísticas de todas as execuções armazenadas em `exemplos/`, sem executar nenhum scraping.
+
+```bash
+# Relatório para exemplos/ no diretório atual (imprime no terminal)
+uv run python teste_pipeline.py --stats-report
+
+# Salvar em arquivo
+uv run python teste_pipeline.py --stats-report > stats.md
+
+# Usar pasta alternativa
+uv run python teste_pipeline.py --stats-report outra/pasta
+```
+
+O relatório inclui, por ano e por modo (`api+html`, `api`, `html`):
+- Total de artigos e distribuição de status com percentuais
+- Fontes de extração (`por_fonte_extracao`)
+- Tempo de execução e média por artigo
+
+E ao final, totais globais: artigos, tempo por estratégia, média geral.
+
+> `--stats-report` não requer `--year` — funciona de forma standalone.
+
+---
+
+## 12. Problemas comuns
 
 ### "PID inválido"
 
