@@ -1,7 +1,7 @@
-# Analise de Discrepancia — 2024
+# Análise de Discrepância — 2024
 
 **Corpus:** 553 artigos SciELO Brasil (2024), termos: avalia$, educa$
-**Gerado em:** 2026-04-13 10:47:25
+**Gerado em:** 2026-04-13 21:51:11
 
 ---
 
@@ -9,9 +9,9 @@
 
 | Modo | `ok_completo` | `ok_parcial` | `erro_extracao` | Sucesso total | Tempo |
 |---|---|---|---|---|---|
-| **padrão** | 551 (99.6%) | 1 (0.2%) | 1 (0.2%) | 552 (99.8%) | 26m 41s |
-| **apenas-api** | 547 (98.9%) | 5 (0.9%) | 1 (0.2%) | 552 (99.8%) | 26m 18s |
-| **apenas-html** | 549 (99.3%) | 1 (0.2%) | 3 (0.5%) | 550 (99.5%) | 30m 5s |
+| **padrão** | 551 (99.6%) | 1 (0.2%) | 1 (0.2%) | 552 (99.8%) | 25m 43s |
+| **apenas-api** | 547 (98.9%) | 5 (0.9%) | 1 (0.2%) | 552 (99.8%) | 25m 21s |
+| **apenas-html** | 549 (99.3%) | 1 (0.2%) | 3 (0.5%) | 550 (99.5%) | 34m 54s |
 
 ---
 
@@ -35,11 +35,11 @@
 
 ---
 
-## 4. Artigos persistentemente nao-completos (2)
+## 4. Artigos persistentemente incompletos (2)
 
-Estes artigos nao atingiram `ok_completo` em nenhuma estrategia — a limitacao e da fonte, nao do scraper.
+Estes artigos não atingiram `ok_completo` em nenhuma estratégia — a limitação é da fonte, não do scraper.
 
-| PID | Titulo (PT) |
+| PID | Título (PT) |
 |---|---|
 | `S0066-782X2024001200310` | nan |
 | `S0100-69912024000100912` | Comentários a “Reflexões acerca do contexto atual e da avali |
@@ -48,8 +48,8 @@ Estes artigos nao atingiram `ok_completo` em nenhuma estrategia — a limitacao 
 
 ## 5. Desempenho temporal
 
-| Modo | Tempo total | Media/artigo |
+| Modo | Tempo total | Média/artigo |
 |---|---|---|
-| padrão | 26m 41s | 2.9 s |
-| apenas-api | 26m 18s | 2.85 s |
-| apenas-html | 30m 5s | 3.26 s |
+| padrão | 25m 43s | 2.79 s |
+| apenas-api | 25m 21s | 2.75 s |
+| apenas-html | 34m 54s | 3.79 s |

@@ -13,10 +13,8 @@ wheels/
 .claude/*
 !.claude/skills
 
-# Temp/preview images
-flowchart_extracao_ptbr_temp.svg
-flowchart_extracao.svg
-*_temp.svg
+# Temp folder (local)
+temp
 
 # Runs locais (fora de exemplos/)
 *_new_*/
