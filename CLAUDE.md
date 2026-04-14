@@ -8,6 +8,7 @@
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
 | `teste_pipeline.py` | Pipeline completo de teste (v1.4) | `--year` | `exemplos/<ano>/` |
 | `gerar_graficos.py` | Gera gráficos comparativos das execuções | `--base`, `--years`, `--output` | `grafico_status.png`, `grafico_fontes.png`, `grafico_tempo.png` |
+| `enriquecedor_csv.py` | Cria CSV enriquecido a partir dos resultado.csv | `--base`, `--years`, `--terms`, `--mode` | `enriquecido_<ts>.csv` + `enriquecedor_<ts>.log` + `enriquecedor_<ts>_stats.json` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
 ## Convenções obrigatórias

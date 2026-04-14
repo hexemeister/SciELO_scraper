@@ -181,6 +181,10 @@ uv run python scielo_scraper.py sc_20260411_143022.csv
 # 3. (Opcional) Gerar gráficos comparativos entre anos
 uv run python gerar_graficos.py
 # → gera grafico_status.png, grafico_fontes.png, grafico_tempo.png
+
+# 4. (Opcional) Criar CSV enriquecido para análise
+uv run python enriquecedor_csv.py --years 2022 2023 2024 2025
+# → gera enriquecido_<ts>.csv com colunas derivadas (ISSN, is_aop, n_keywords, etc.)
 ```
 
 ## gerar_graficos.py — Gráficos comparativos
@@ -197,3 +201,30 @@ uv run python gerar_graficos.py --years 2022 2024    # apenas esses anos
 uv run python gerar_graficos.py --output graficos/   # pasta de saída personalizada
 uv run python gerar_graficos.py -?                   # ajuda
 ```
+
+## enriquecedor_csv.py — CSV enriquecido para análise
+
+Consolida os `resultado.csv` de um ou mais anos em um único arquivo CSV, adicionando colunas derivadas sem fazer nenhuma requisição à internet:
+
+| Coluna nova | Descrição |
+|---|---|
+| `ano_coleta` | Ano da pasta de exemplos |
+| `modo_extracao` | Modo usado na extração |
+| `tem_titulo_pt` / `tem_resumo_pt` / `tem_keywords_pt` | Presença de cada campo em PT |
+| `n_keywords_pt` | Nº de keywords (separadas por ";") |
+| `n_palavras_resumo` | Nº de palavras no resumo PT |
+| `fonte_simplificada` | Categoria legível da fonte de extração |
+| `termo_detectado` | Termos encontrados no título/resumo PT |
+| `is_aop` | Artigo ahead-of-print |
+| `ISSN` | ISSN extraído do PID (XXXX-YYYY) |
+| `ano_publicacao_num` | Ano de publicação como int |
+
+```bash
+uv run python enriquecedor_csv.py                          # todos os anos, termos padrão
+uv run python enriquecedor_csv.py --years 2022 2024        # apenas esses anos
+uv run python enriquecedor_csv.py --terms avalia educa     # termos personalizados
+uv run python enriquecedor_csv.py --output analise.csv     # nome de saída
+uv run python enriquecedor_csv.py -?                       # ajuda
+```
+
+Gera também `enriquecedor_<ts>.log` e `enriquecedor_<ts>_stats.json` com estatísticas por ano e globais.

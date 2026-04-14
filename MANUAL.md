@@ -14,7 +14,8 @@
 9. [Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
 10. [Gráficos comparativos com gerar_graficos.py](#10-gráficos-comparativos-com-gerar_graficospy)
 11. [Relatório consolidado com teste_pipeline.py --stats-report](#11-relatório-consolidado-com-teste_pipelinepy---stats-report)
-12. [Problemas comuns](#12-problemas-comuns)
+12. [CSV enriquecido com enriquecedor_csv.py](#12-csv-enriquecido-com-enriquecedor_csvpy)
+13. [Problemas comuns](#13-problemas-comuns)
 
 ---
 
@@ -470,7 +471,82 @@ E ao final, totais globais: artigos, tempo por estratégia, média geral.
 
 ---
 
-## 12. Problemas comuns
+## 12. CSV enriquecido com enriquecedor_csv.py
+
+Cria um único CSV consolidado a partir dos `resultado.csv` gerados pelo scraper, adicionando colunas derivadas úteis para análise e filtragem — sem fazer nenhuma requisição à internet.
+
+### Uso básico
+
+```bash
+# Todos os anos disponíveis em exemplos/, modo api+html, termos padrão (avalia, educa)
+uv run python enriquecedor_csv.py
+
+# Apenas anos específicos
+uv run python enriquecedor_csv.py --years 2022 2024
+
+# Termos personalizados
+uv run python enriquecedor_csv.py --terms avalia educa fisica --years 2022 2023 2024 2025
+
+# Modo alternativo
+uv run python enriquecedor_csv.py --mode html
+
+# Saída nomeada
+uv run python enriquecedor_csv.py --output analise_avalia_educa.csv
+
+# Sem truncamento de termos (não adiciona $ ao final)
+uv run python enriquecedor_csv.py --no-truncate --terms avaliação educação
+```
+
+### Colunas adicionadas ao CSV original
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `ano_coleta` | int | Ano da pasta de exemplos (ex: 2022) |
+| `modo_extracao` | str | Modo usado: `api+html`, `api` ou `html` |
+| `tem_titulo_pt` | bool | Titulo_PT não-vazio |
+| `tem_resumo_pt` | bool | Resumo_PT não-vazio |
+| `tem_keywords_pt` | bool | Palavras_Chave_PT não-vazio |
+| `n_keywords_pt` | int | Nº de keywords (separadas por ";") |
+| `n_palavras_resumo` | int | Nº de palavras no Resumo_PT |
+| `fonte_simplificada` | str | Categoria legível da fonte de extração |
+| `termo_detectado` | str | Termos encontrados no título/resumo PT (separados por ";") |
+| `is_aop` | bool | Artigo ahead-of-print (PID com "005" nas pos 14-16) |
+| `ISSN` | str | ISSN extraído do PID (formato XXXX-YYYY) |
+| `ano_publicacao_num` | int | "Publication year" como número (NaN se inválido) |
+
+### Saídas geradas
+
+| Arquivo | Conteúdo |
+|---|---|
+| `enriquecido_<ts>.csv` | CSV consolidado com todas as colunas originais + novas |
+| `enriquecedor_<ts>.log` | Log detalhado da execução (terminal + arquivo) |
+| `enriquecedor_<ts>_stats.json` | Estatísticas completas por ano e globais, parâmetros, auditoria de fontes |
+
+### Estatísticas no log e no stats.json
+
+Por ano e, quando há mais de um ano, consolidadas globalmente:
+- Cobertura por status (`ok_completo`, `ok_parcial`, erros)
+- Presença de título, resumo e keywords em PT
+- Artigos AoP detectados
+- Distribuição de fontes de extração simplificadas
+- Frequência de cada termo detectado nos textos
+
+### Opções completas
+
+```bash
+uv run python enriquecedor_csv.py --years 2022 2024        # anos específicos
+uv run python enriquecedor_csv.py --terms avalia educa     # termos de detecção
+uv run python enriquecedor_csv.py --no-truncate            # não adicionar $ aos termos
+uv run python enriquecedor_csv.py --mode api               # modo alternativo
+uv run python enriquecedor_csv.py --base outra/pasta       # pasta base alternativa
+uv run python enriquecedor_csv.py --output saida.csv       # nome de saída
+uv run python enriquecedor_csv.py --log-level DEBUG        # log detalhado
+uv run python enriquecedor_csv.py -?                       # ajuda
+```
+
+---
+
+## 13. Problemas comuns
 
 ### "PID inválido"
 
