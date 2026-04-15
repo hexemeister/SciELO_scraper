@@ -182,9 +182,9 @@ uv run python scielo_scraper.py sc_20260411_143022.csv
 uv run python gerar_graficos.py
 # → gera grafico_status.png, grafico_fontes.png, grafico_tempo.png
 
-# 4. (Opcional) Criar CSV enriquecido para análise
-uv run python enriquecedor_csv.py --years 2022 2023 2024 2025
-# → gera enriquecido_<ts>.csv com colunas derivadas (ISSN, is_aop, n_keywords, etc.)
+# 4. (Opcional) Detectar termos por campo e gerar CSV auditável
+uv run python terms_matcher.py --years 2022 2023 2024 2025
+# → gera terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
 ```
 
 ## gerar_graficos.py — Gráficos comparativos
@@ -202,29 +202,27 @@ uv run python gerar_graficos.py --output graficos/   # pasta de saída personali
 uv run python gerar_graficos.py -?                   # ajuda
 ```
 
-## enriquecedor_csv.py — CSV enriquecido para análise
+## terms_matcher.py — Detecção de termos por campo
 
-Consolida os `resultado.csv` de um ou mais anos em um único arquivo CSV, adicionando colunas derivadas sem fazer nenhuma requisição à internet:
+Consolida os `resultado.csv` de um ou mais anos e detecta termos de busca em cada campo PT, gerando colunas booleanas auditáveis em planilha eletrônica:
 
-| Coluna nova | Descrição |
+| Coluna | Descrição |
 |---|---|
-| `ano_coleta` | Ano da pasta de exemplos |
-| `modo_extracao` | Modo usado na extração |
-| `tem_titulo_pt` / `tem_resumo_pt` / `tem_keywords_pt` | Presença de cada campo em PT |
-| `n_keywords_pt` | Nº de keywords (separadas por ";") |
-| `n_palavras_resumo` | Nº de palavras no resumo PT |
-| `fonte_simplificada` | Categoria legível da fonte de extração |
-| `termo_detectado` | Termos encontrados no título/resumo PT |
-| `is_aop` | Artigo ahead-of-print |
-| `ISSN` | ISSN extraído do PID (XXXX-YYYY) |
-| `ano_publicacao_num` | Ano de publicação como int |
+| `n_palavras_titulo` | Nº de palavras no Titulo_PT |
+| `n_palavras_resumo` | Nº de palavras no Resumo_PT |
+| `n_keywords_pt` | Nº de keywords separadas por ";" |
+| `<termo>_titulo` / `<termo>_resumo` / `<termo>_keywords` | Bool: termo encontrado no campo |
+| `criterio_ok` | Bool: todos os termos em pelo menos um dos `--required-fields` |
+
+> ⚠ **Atenção:** T termos × 3 campos = 3T colunas booleanas. Padrão (2 termos): 6 colunas.
 
 ```bash
-uv run python enriquecedor_csv.py                          # todos os anos, termos padrão
-uv run python enriquecedor_csv.py --years 2022 2024        # apenas esses anos
-uv run python enriquecedor_csv.py --terms avalia educa     # termos personalizados
-uv run python enriquecedor_csv.py --output analise.csv     # nome de saída
-uv run python enriquecedor_csv.py -?                       # ajuda
+uv run python terms_matcher.py                             # todos os anos, termos padrão
+uv run python terms_matcher.py --years 2022 2024           # apenas esses anos
+uv run python terms_matcher.py --terms avalia educa        # termos personalizados
+uv run python terms_matcher.py --required-fields titulo resumo keywords  # todos os campos
+uv run python terms_matcher.py --stats-report              # relatório do último run
+uv run python terms_matcher.py -?                          # ajuda
 ```
 
-Gera também `enriquecedor_<ts>.log` e `enriquecedor_<ts>_stats.json` com estatísticas por ano e globais.
+Gera também `terms_<ts>.log` e `terms_<ts>_stats.json` com estatísticas por ano e globais.
