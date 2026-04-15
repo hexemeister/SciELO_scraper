@@ -6,8 +6,8 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `teste_pipeline.py` | Pipeline completo de teste (v1.4) | `--year` | `exemplos/<ano>/` |
-| `gerar_graficos.py` | Gera gráficos comparativos das execuções | `--base`, `--years`, `--output` | `grafico_status.png`, `grafico_fontes.png`, `grafico_tempo.png` |
+| `run_pipeline.py` | Pipeline completo de teste (v1.4) | `--year` | `exemplos/<ano>/` |
+| `create_charts.py` | Gera gráficos comparativos das execuções | `--base`, `--years`, `--output`, `--timestamp` | `grafico_status[_<ts>].png`, `grafico_fontes[_<ts>].png`, `grafico_tempo[_<ts>].png` |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
@@ -31,7 +31,7 @@
 - **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
 - **`--list-collections`:** lista as 36 coleções SciELO e sai
 
-## Comportamento do teste_pipeline.py (v1.4)
+## Comportamento do run_pipeline.py (v1.4)
 
 - **Estratégias testadas:** padrão (`api+html`), apenas-api, apenas-html — sempre em sequência completa
 - **`--no-resume` implícito:** o scraper é sempre chamado com `--no-resume`; cada estratégia começa do zero

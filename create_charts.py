@@ -1,20 +1,22 @@
 """
-gerar_graficos.py — Gera gráficos comparativos das execuções do SciELO Scraper.
+create_charts.py — Gera gráficos comparativos das execuções do SciELO Scraper.
 
 Uso:
-    uv run python gerar_graficos.py                     # lê exemplos/ no diretório atual
-    uv run python gerar_graficos.py --base exemplos     # idem (explícito)
-    uv run python gerar_graficos.py --anos 2022 2024    # apenas esses anos
-    uv run python gerar_graficos.py --output graficos/  # pasta de saída personalizada
-    uv run python gerar_graficos.py --no-status         # pula gráfico de status
-    uv run python gerar_graficos.py --no-fontes         # pula gráfico de fontes
-    uv run python gerar_graficos.py --no-tempo          # pula gráfico de tempo
-    uv run python gerar_graficos.py -?                  # ajuda (equivalente a -h)
+    uv run python create_charts.py                      # lê exemplos/ no diretório atual
+    uv run python create_charts.py --base exemplos      # idem (explícito)
+    uv run python create_charts.py --years 2022 2024    # apenas esses anos
+    uv run python create_charts.py --output graficos/   # pasta de saída personalizada
+    uv run python create_charts.py --timestamp          # adiciona timestamp nos nomes dos PNGs
+    uv run python create_charts.py --no-status          # pula gráfico de status
+    uv run python create_charts.py --no-sources         # pula gráfico de fontes
+    uv run python create_charts.py --no-time            # pula gráfico de tempo
+    uv run python create_charts.py --dry-run            # mostra o que faria sem gravar nada
+    uv run python create_charts.py -?                   # ajuda (equivalente a -h)
 
 Gráficos gerados (salvo na pasta --output, default: diretório atual):
-    grafico_status.png  — distribuição de status por modo e ano
-    grafico_fontes.png  — fontes de extração por modo e ano
-    grafico_tempo.png   — tempo total por modo e ano
+    grafico_status[_<ts>].png  — distribuição de status por modo e ano
+    grafico_fontes[_<ts>].png  — fontes de extração por modo e ano
+    grafico_tempo[_<ts>].png   — tempo total por modo e ano
 """
 
 import argparse
@@ -111,7 +113,7 @@ MODO_LABEL = {
 }
 
 
-def grafico_status(dados: dict, output: Path):
+def grafico_status(dados: dict, output: Path, filename: str = "grafico_status.png"):
     """dados: {ano: {modo: stats_dict}}"""
     anos = sorted(dados)
     modos = ["api+html", "api", "html"]
@@ -250,7 +252,7 @@ def grafico_status(dados: dict, output: Path):
 
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.38)   # xticklabels (2 linhas) + tabela inset + legenda
-    dest = output / "grafico_status.png"
+    dest = output / filename
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
@@ -299,7 +301,7 @@ def _fontes_grafico(stats: dict) -> dict[str, tuple[int, float]]:
     return res
 
 
-def grafico_fontes(dados: dict, output: Path):
+def grafico_fontes(dados: dict, output: Path, filename: str = "grafico_fontes.png"):
     """
     Foco no modo api+html (padrão): barra 100% empilhada por ano.
     Cinza para ArticleMeta API (dominante); cores fortes para fallback e falha.
@@ -451,7 +453,7 @@ def grafico_fontes(dados: dict, output: Path):
     )
 
     plt.tight_layout()
-    dest = output / "grafico_fontes.png"
+    dest = output / filename
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
@@ -468,7 +470,7 @@ CORES_MODO = {
 }
 
 
-def grafico_tempo(dados: dict, output: Path):
+def grafico_tempo(dados: dict, output: Path, filename: str = "grafico_tempo.png"):
     """dados: {ano: {modo: stats_dict}}"""
     anos = sorted(dados)
     modos = ["api+html", "api", "html"]
@@ -512,7 +514,7 @@ def grafico_tempo(dados: dict, output: Path):
     ax.legend(title="Modo")
 
     plt.tight_layout()
-    dest = output / "grafico_tempo.png"
+    dest = output / filename
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
@@ -527,9 +529,11 @@ def main():
     if "-?" in sys.argv:
         sys.argv[sys.argv.index("-?")] = "--help"
 
+    from datetime import datetime
+
     parser = argparse.ArgumentParser(
         description="Gera gráficos comparativos das execuções do SciELO Scraper.",
-        epilog="Exemplo: uv run python gerar_graficos.py --years 2022 2024 2025",
+        epilog="Exemplo: uv run python create_charts.py --years 2022 2024 2025",
     )
     parser.add_argument(
         "--base", default="exemplos", metavar="DIR",
@@ -543,10 +547,19 @@ def main():
         "--output", default=".", metavar="DIR",
         help="Pasta de saída dos PNGs (default: diretório atual)",
     )
+    parser.add_argument("--timestamp",  action="store_true",
+                        help="Adicionar timestamp nos nomes dos PNGs (ex: grafico_status_20260415_173008.png)")
     parser.add_argument("--no-status",  action="store_true", help="Pular gráfico de status")
     parser.add_argument("--no-sources", action="store_true", help="Pular gráfico de fontes")
     parser.add_argument("--no-time",    action="store_true", help="Pular gráfico de tempo")
+    parser.add_argument("--dry-run",    action="store_true",
+                        help="Mostra o que faria sem gravar nenhum arquivo")
     args = parser.parse_args()
+
+    ts_suffix = f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}" if args.timestamp else ""
+
+    def png_name(base_name: str) -> str:
+        return f"{base_name}{ts_suffix}.png"
 
     base = Path(args.base)
     if not base.is_dir():
@@ -554,7 +567,6 @@ def main():
         sys.exit(1)
 
     output = Path(args.output)
-    output.mkdir(parents=True, exist_ok=True)
 
     anos = args.years if args.years else descobrir_anos(base)
     if not anos:
@@ -586,17 +598,34 @@ def main():
         print("Nenhum dado encontrado.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\nAnos encontrados: {sorted(stats_por_ano)}")
-    print(f"Salvando gráficos em: {output.resolve()}\n")
+    graficos_a_gerar = []
+    if not args.no_status:
+        graficos_a_gerar.append(png_name("grafico_status"))
+    if not args.no_sources:
+        graficos_a_gerar.append(png_name("grafico_fontes"))
+    if not args.no_time:
+        graficos_a_gerar.append(png_name("grafico_tempo"))
+
+    print(f"\nAnos encontrados : {sorted(stats_por_ano)}")
+    print(f"Pasta de saída   : {output.resolve()}")
+    print(f"Timestamp        : {'sim (' + ts_suffix.lstrip('_') + ')' if args.timestamp else 'não (nome fixo)'}")
+    print(f"Gráficos a gerar : {', '.join(graficos_a_gerar) if graficos_a_gerar else '(nenhum)'}")
+
+    if args.dry_run:
+        print("\n[dry-run] Nenhum arquivo gravado.")
+        return
+
+    output.mkdir(parents=True, exist_ok=True)
+    print()
 
     if not args.no_status:
-        grafico_status(stats_por_ano, output)
+        grafico_status(stats_por_ano, output, png_name("grafico_status"))
 
     if not args.no_sources:
-        grafico_fontes(stats_por_ano, output)
+        grafico_fontes(stats_por_ano, output, png_name("grafico_fontes"))
 
     if not args.no_time:
-        grafico_tempo(stats_por_ano, output)
+        grafico_tempo(stats_por_ano, output, png_name("grafico_tempo"))
 
     print("\nPronto.")
 

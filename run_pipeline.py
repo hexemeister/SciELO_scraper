@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-teste_pipeline.py  v1.4
-=======================
+run_pipeline.py  v1.4
+=====================
 Executa o pipeline completo de teste: busca → extração (3 estratégias) →
 análise de discrepância → cópia para diretório de exemplos.
 
@@ -9,7 +9,7 @@ Verifica e instala dependências automaticamente antes de começar.
 
 UTILIZAÇÃO
 ----------
-  python teste_pipeline.py --year ANO [opções]
+  python run_pipeline.py --year ANO [opções]
 
 OPÇÕES
 ------
@@ -31,15 +31,15 @@ NOTAS
 
 EXEMPLOS
 --------
-  python teste_pipeline.py --year 2023
-  python teste_pipeline.py --year 2022 2023 2024
-  python teste_pipeline.py --year 2020-2024
-  python teste_pipeline.py --year 2022 --collection arg --output-dir exemplos/arg_2022
-  python teste_pipeline.py --year 2023 --skip-search   # reutiliza CSV existente
-  python teste_pipeline.py --year 2023 --dry-run       # simula sem executar
-  python teste_pipeline.py --year 2022 2023 2024 --per-year  # um CSV por ano
-  python teste_pipeline.py --stats-report               # consolida exemplos/ e imprime
-  python teste_pipeline.py --stats-report exemplos/     # idem com pasta explícita
+  python run_pipeline.py --year 2023
+  python run_pipeline.py --year 2022 2023 2024
+  python run_pipeline.py --year 2020-2024
+  python run_pipeline.py --year 2022 --collection arg --output-dir exemplos/arg_2022
+  python run_pipeline.py --year 2023 --skip-search   # reutiliza CSV existente
+  python run_pipeline.py --year 2023 --dry-run       # simula sem executar
+  python run_pipeline.py --year 2022 2023 2024 --per-year  # um CSV por ano
+  python run_pipeline.py --stats-report               # consolida exemplos/ e imprime
+  python run_pipeline.py --stats-report exemplos/     # idem com pasta explícita
 """
 
 __version__ = "1.4"

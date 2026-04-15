@@ -36,6 +36,7 @@ UTILIZAÇÃO
   uv run python terms_matcher.py --mode api
   uv run python terms_matcher.py --no-truncate
   uv run python terms_matcher.py --output resultado.csv
+  uv run python terms_matcher.py --output-dir saida/
   uv run python terms_matcher.py -?
 
 CAMPOS DISPONÍVEIS PARA --required-fields
@@ -313,6 +314,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help=f"Modo de extração a usar (default: {MODO_DEFAULT})")
     parser.add_argument("--output", metavar="ARQ",
                         help="Arquivo CSV de saída (default: terms_<timestamp>.csv)")
+    parser.add_argument("--output-dir", metavar="DIR",
+                        help="Pasta de saída para CSV, log e stats (default: diretório atual)")
     parser.add_argument("--stats-report", nargs="?", const=True, metavar="ARQ",
                         help=(
                             "Imprime relatório do stats.json sem processar CSVs. "
@@ -405,11 +408,14 @@ def main():
         _cmd_stats_report(args.stats_report, args.log_level)
         return
 
-    ts         = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base       = Path(args.base)
-    log_path   = Path(f"terms_{ts}.log")
-    stats_path = Path(f"terms_{ts}_stats.json")
-    csv_out    = Path(args.output) if args.output else Path(f"terms_{ts}.csv")
+    ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base     = Path(args.base)
+    out_dir  = Path(args.output_dir) if args.output_dir else Path(".")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    log_path   = out_dir / f"terms_{ts}.log"
+    stats_path = out_dir / f"terms_{ts}_stats.json"
+    csv_out    = Path(args.output) if args.output else out_dir / f"terms_{ts}.csv"
 
     log = setup_logging(log_path, args.log_level)
 
@@ -429,6 +435,7 @@ def main():
     n_bool_cols = len(termos_deteccao) * len(CAMPOS_DISPONIVEIS)
 
     log.info(f"  Pasta base        : {base.resolve()}")
+    log.info(f"  Pasta de saída    : {out_dir.resolve()}")
     log.info(f"  Modo extração     : {args.mode}")
     log.info(f"  Termos            : {', '.join(termos_originais)}")
     log.info(f"  Termos (busca)    : {', '.join(termos_deteccao)}")

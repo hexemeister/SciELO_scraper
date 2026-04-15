@@ -12,10 +12,11 @@
 7. [Outras coleções SciELO](#7-outras-coleções-scielo)
 8. [Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
 9. [Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
-10. [Gráficos comparativos com gerar_graficos.py](#10-gráficos-comparativos-com-gerar_graficospy)
-11. [Relatório consolidado com teste_pipeline.py --stats-report](#11-relatório-consolidado-com-teste_pipelinepy---stats-report)
+10. [Gráficos comparativos com create_charts.py](#10-gráficos-comparativos-com-gerar_graficospy)
+11. [Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-teste_pipelinepy---stats-report)
 12. [Detecção de termos com terms_matcher.py](#12-detecção-de-termos-com-terms_matcherpy)
 13. [Problemas comuns](#13-problemas-comuns)
+14. [Dicionário de dados e termos](#14-dicionário-de-dados-e-termos)
 
 ---
 
@@ -412,14 +413,14 @@ uv run python scielo_scraper.py --stats-report --output-dir resultados/minha_pas
 
 ---
 
-## 10. Gráficos comparativos com gerar_graficos.py
+## 10. Gráficos comparativos com create_charts.py
 
-O `gerar_graficos.py` lê as pastas `exemplos/<ano>/` geradas pelo `teste_pipeline.py` e produz três gráficos PNG prontos para publicação.
+O `create_charts.py` lê as pastas `exemplos/<ano>/` geradas pelo `run_pipeline.py` e produz três gráficos PNG prontos para publicação.
 
 ### Uso básico
 
 ```bash
-uv run python gerar_graficos.py
+uv run python create_charts.py
 ```
 
 Lê automaticamente todos os anos presentes em `exemplos/` e salva os gráficos no diretório atual.
@@ -435,29 +436,29 @@ Lê automaticamente todos os anos presentes em `exemplos/` e salva os gráficos 
 ### Opções
 
 ```bash
-uv run python gerar_graficos.py --years 2022 2024       # apenas esses anos
-uv run python gerar_graficos.py --base outra/pasta      # pasta raiz alternativa
-uv run python gerar_graficos.py --output graficos/      # pasta de saída
-uv run python gerar_graficos.py --no-sources            # pular gráfico de fontes
-uv run python gerar_graficos.py --no-status --no-time   # apenas gráfico de fontes
-uv run python gerar_graficos.py -?                      # ajuda
+uv run python create_charts.py --years 2022 2024       # apenas esses anos
+uv run python create_charts.py --base outra/pasta      # pasta raiz alternativa
+uv run python create_charts.py --output graficos/      # pasta de saída
+uv run python create_charts.py --no-sources            # pular gráfico de fontes
+uv run python create_charts.py --no-status --no-time   # apenas gráfico de fontes
+uv run python create_charts.py -?                      # ajuda
 ```
 
 ---
 
-## 11. Relatório consolidado com teste_pipeline.py --stats-report
+## 11. Relatório consolidado com run_pipeline.py --stats-report
 
 Gera um relatório Markdown com as estatísticas de todas as execuções armazenadas em `exemplos/`, sem executar nenhum scraping.
 
 ```bash
 # Relatório para exemplos/ no diretório atual (imprime no terminal)
-uv run python teste_pipeline.py --stats-report
+uv run python run_pipeline.py --stats-report
 
 # Salvar em arquivo
-uv run python teste_pipeline.py --stats-report > stats.md
+uv run python run_pipeline.py --stats-report > stats.md
 
 # Usar pasta alternativa
-uv run python teste_pipeline.py --stats-report outra/pasta
+uv run python run_pipeline.py --stats-report outra/pasta
 ```
 
 O relatório inclui, por ano e por modo (`api+html`, `api`, `html`):
@@ -510,6 +511,7 @@ uv run python terms_matcher.py --stats-report terms_20260414_211522_stats.json
 | `criterio_ok` | bool | Todos os termos em pelo menos um dos `--required-fields` |
 
 > ⚠ **Atenção:** o nº de colunas booleanas cresce com T termos × 3 campos = 3T colunas. Padrão (2 termos): 6 colunas. Com 5 termos: 15 colunas. Considere isso ao abrir em planilhas.
+> As colunas booleanas cobrem sempre os 3 campos (titulo, resumo, keywords); o `criterio_ok` avalia apenas os `--required-fields` (padrão: titulo e keywords).
 
 ### Saídas geradas
 
@@ -585,3 +587,89 @@ Se aparecerem caracteres estranhos no terminal, defina a variável de ambiente a
 set PYTHONUTF8=1
 uv run python scielo_scraper.py lista.csv
 ```
+
+---
+
+## 14. Dicionário de dados e termos
+
+### Conceitos e terminologia
+
+| Termo | Definição |
+|---|---|
+| **PID** | Identificador único SciELO. Formato: `S` + ISSN (com hífen, 9 chars) + ano (4) + volume/fascículo (3) + sequência (5) + dígito verificador (1) + letra de coleção (1). Total: 23 caracteres. Ex: `S1982-88372022000300013`. |
+| **ISSN** | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`, já com hífen). |
+| **AoP** | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML. |
+| **Coleção** | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina, `prt` = Portugal). |
+| **ISIS-JSON** | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente. Contém os campos do artigo em múltiplos idiomas. |
+| **Truncamento** | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py`. No `terms_matcher.py`, o `$` é removido automaticamente para detecção por substring. |
+| **criterio_ok** | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos `--required-fields` (padrão: titulo ou keywords). |
+| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Cada termo deve aparecer em pelo menos um deles (não necessariamente o mesmo campo para todos os termos). Padrão: `titulo` e `keywords`. |
+| **fallback HTML** | Estratégia secundária de extração: quando a ArticleMeta API não retorna um campo, o scraper acessa a página HTML do artigo para tentar extraí-lo via meta tags ou corpo da página. |
+
+### Colunas do resultado.csv (scielo_scraper.py)
+
+| Coluna | Tipo | Origem | Descrição |
+|---|---|---|---|
+| `ID` | str | CSV entrada | PID bruto conforme fornecido |
+| `Title` | str | CSV entrada | Título conforme indexado no SciELO Search |
+| `Author(s)` | str | CSV entrada | Autores |
+| `Source` | str | CSV entrada | Abreviatura do periódico |
+| `Journal` | str | CSV entrada | Nome completo do periódico |
+| `Language(s)` | str | CSV entrada | Idioma(s) do artigo |
+| `Publication year` | int | CSV entrada | Ano de publicação |
+| `PID_limpo` | str | scraper | PID normalizado (sufixos removidos, validado pelo regex) |
+| `URL_PT` | str | scraper | URL da versão em português consultada |
+| `Titulo_PT` | str | scraper | Título em português extraído |
+| `Resumo_PT` | str | scraper | Resumo em português extraído |
+| `Palavras_Chave_PT` | str | scraper | Palavras-chave em português, separadas por `;` |
+| `status` | str | scraper | Status da extração (ver abaixo) |
+| `fonte_extracao` | str | scraper | Fonte(s) usadas por campo |
+| `url_acedida` | str | scraper | URL(s) efetivamente acessadas |
+
+### Colunas adicionadas pelo terms_matcher.py
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `n_palavras_titulo` | int | Nº de palavras em Titulo_PT |
+| `n_palavras_resumo` | int | Nº de palavras em Resumo_PT |
+| `n_keywords_pt` | int | Nº de keywords em Palavras_Chave_PT (separador `;`) |
+| `<termo>_titulo` | bool | Termo detectado em Titulo_PT (case-insensitive, substring) |
+| `<termo>_resumo` | bool | Termo detectado em Resumo_PT (case-insensitive, substring) |
+| `<termo>_keywords` | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
+| `criterio_ok` | bool | Todos os termos presentes em ≥1 campo required |
+
+### Status de extração
+
+| Status | Significado |
+|---|---|
+| `ok_completo` | Título + resumo + palavras-chave extraídos com sucesso |
+| `ok_parcial` | Pelo menos um campo extraído, mas não todos |
+| `nada_encontrado` | Página acessada, nenhum dado encontrado |
+| `erro_extracao` | Falha de acesso (ex: HTTP 404, timeout) |
+| `erro_pid_invalido` | PID fora do padrão esperado |
+
+### Fontes de extração (`fonte_extracao`)
+
+| Valor | Significado |
+|---|---|
+| `articlemeta_isis[T]` | Título via ArticleMeta API (ISIS-JSON) |
+| `articlemeta_isis[R]` | Resumo via ArticleMeta API |
+| `articlemeta_isis[K]` | Palavras-chave via ArticleMeta API |
+| `Titulo_PT←pag1_meta_tags` | Título via meta tags da URL legacy |
+| `Titulo_PT←pag1_html_body` | Título via corpo HTML da URL legacy |
+| `Resumo_PT←pag_pt_meta_tags` | Resumo via meta tags da versão PT |
+| `Resumo_PT←pag_pt_html_body` | Resumo via corpo HTML da versão PT |
+| `Palavras_Chave_PT←pag_pt_meta_tags` | Keywords via meta tags da versão PT |
+| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP) |
+
+### Nomenclatura de arquivos e pastas
+
+| Padrão | Exemplo | Gerado por |
+|---|---|---|
+| `sc_<ts>.csv` | `sc_20260411_143022.csv` | scielo_search.py |
+| `sc_<ts>_params.json` | `sc_20260411_143022_params.json` | scielo_search.py |
+| `<stem>_s_<ts>_<modo>/` | `sc_20260411_s_20260411_150312_api+html/` | scielo_scraper.py |
+| `exemplos/<ano>/` | `exemplos/2024/` | run_pipeline.py |
+| `terms_<ts>.csv` | `terms_20260415_161055.csv` | terms_matcher.py |
+| `terms_<ts>.log` | `terms_20260415_161055.log` | terms_matcher.py |
+| `terms_<ts>_stats.json` | `terms_20260415_161055_stats.json` | terms_matcher.py |

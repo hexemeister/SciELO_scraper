@@ -878,6 +878,8 @@ def main():
     ap.add_argument("--stats-report", action="store_true",
         help="Apenas imprimir stats.json formatado (não executa scraping). "
              "Requer --output-dir com stats.json existente.")
+    ap.add_argument("--dry-run", action="store_true",
+        help="Mostra CSV de entrada, pasta de saída e parâmetros sem fazer requisições nem gravar nada")
     ap.add_argument("--log-level",    default="INFO", metavar="LEVEL",
         choices=["DEBUG","INFO","WARNING","ERROR"])
     ap.add_argument("--collection",       default="scl",  metavar="COD")
@@ -1043,6 +1045,15 @@ def main():
     logger.info(f"  Log level        : {args.log_level}")
     logger.info(f"  wakepy           : {'disponível ✓' if HAS_WAKEPY else 'não instalado'}")
     logger.info(f"  API              : {ARTICLEMETA_URL}")
+
+    if args.dry_run:
+        logger.info("─" * 62)
+        logger.info("[dry-run] Nenhuma requisição feita. Nenhum arquivo gravado.")
+        logger.info(f"[dry-run] Leria     : {input_path}")
+        logger.info(f"[dry-run] Gravaria  : {out_dir}/resultado.csv")
+        logger.info(f"[dry-run] Gravaria  : {out_dir}/scraper.log")
+        logger.info(f"[dry-run] Gravaria  : {out_dir}/stats.json")
+        return
 
     ok, records = validate_csv(input_path, logger)
     if not ok:

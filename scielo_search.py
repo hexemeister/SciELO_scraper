@@ -34,6 +34,7 @@ OPÇÕES
   --show-params [ARQ] Imprimir parâmetros da busca e sair. Sem ARQ: usa o
                       _params.json mais recente no diretório atual. Com ARQ:
                       lê o arquivo indicado (caminho relativo ou absoluto)
+  --dry-run           Mostra o que faria (query, URL, saída) sem fazer requisições
   --log-level LEVEL   DEBUG | INFO | WARNING | ERROR (default: INFO)
   --version           Mostrar versão e sair
   -h, --help, -?     Mostrar esta mensagem de ajuda e sair
@@ -357,6 +358,8 @@ def main():
              "mais recente no diretório atual. Com ARQ: lê o arquivo indicado")
     ap.add_argument("--timeout", type=float, default=120.0, metavar="SEG",
         help="Timeout HTTP em segundos (default: 120)")
+    ap.add_argument("--dry-run", action="store_true",
+        help="Mostra query, URL e arquivos de saída sem fazer requisições nem gravar nada")
     ap.add_argument("--log-level", default="INFO", metavar="LEVEL",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     ap.add_argument("--version", action="version",
@@ -444,6 +447,12 @@ def main():
     logger.debug(f"  Query: {query}")
     logger.info(f"  URL  : {url[:120]}{'...' if len(url) > 120 else ''}")
     logger.info("─" * 62)
+
+    if args.dry_run:
+        logger.info("[dry-run] Nenhuma requisição feita. Nenhum arquivo gravado.")
+        logger.info(f"[dry-run] Gravaria: {out_path}")
+        logger.info(f"[dry-run] Gravaria: {params_path}")
+        return
 
     # ── Download ──────────────────────────────────────────────────────────────
     session = build_session()

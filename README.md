@@ -179,7 +179,7 @@ uv run python scielo_scraper.py sc_20260411_143022.csv
 # → gera sc_20260411_143022_s_20260411_150312_api+html/
 
 # 3. (Opcional) Gerar gráficos comparativos entre anos
-uv run python gerar_graficos.py
+uv run python create_charts.py
 # → gera grafico_status.png, grafico_fontes.png, grafico_tempo.png
 
 # 4. (Opcional) Detectar termos por campo e gerar CSV auditável
@@ -187,19 +187,19 @@ uv run python terms_matcher.py --years 2022 2023 2024 2025
 # → gera terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
 ```
 
-## gerar_graficos.py — Gráficos comparativos
+## create_charts.py — Gráficos comparativos
 
-Gera três gráficos PNG a partir das pastas `exemplos/<ano>/` produzidas pelo `teste_pipeline.py`:
+Gera três gráficos PNG a partir das pastas `exemplos/<ano>/` produzidas pelo `run_pipeline.py`:
 
 - **`grafico_status.png`** — distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano
 - **`grafico_fontes.png`** — fontes de extração no modo `api+html` por ano, com tabela de n exatos
 - **`grafico_tempo.png`** — tempo total de scraping por modo e ano
 
 ```bash
-uv run python gerar_graficos.py                      # lê exemplos/ no diretório atual
-uv run python gerar_graficos.py --years 2022 2024    # apenas esses anos
-uv run python gerar_graficos.py --output graficos/   # pasta de saída personalizada
-uv run python gerar_graficos.py -?                   # ajuda
+uv run python create_charts.py                      # lê exemplos/ no diretório atual
+uv run python create_charts.py --years 2022 2024    # apenas esses anos
+uv run python create_charts.py --output graficos/   # pasta de saída personalizada
+uv run python create_charts.py -?                   # ajuda
 ```
 
 ## terms_matcher.py — Detecção de termos por campo
@@ -215,6 +215,7 @@ Consolida os `resultado.csv` de um ou mais anos e detecta termos de busca em cad
 | `criterio_ok` | Bool: todos os termos em pelo menos um dos `--required-fields` |
 
 > ⚠ **Atenção:** T termos × 3 campos = 3T colunas booleanas. Padrão (2 termos): 6 colunas.
+> As colunas booleanas cobrem os 3 campos (titulo, resumo, keywords); o `criterio_ok` avalia apenas os `--required-fields` (padrão: titulo e keywords).
 
 ```bash
 uv run python terms_matcher.py                             # todos os anos, termos padrão
@@ -226,3 +227,72 @@ uv run python terms_matcher.py -?                          # ajuda
 ```
 
 Gera também `terms_<ts>.log` e `terms_<ts>_stats.json` com estatísticas por ano e globais.
+
+## Dicionário de dados e termos
+
+### Termos e conceitos
+
+| Termo | Definição |
+|---|---|
+| **PID** | Identificador único SciELO. Formato: `S` + ISSN (com hífen) + ano (4 dígitos) + volume/fascículo (3 dígitos) + sequência (5 dígitos). Ex: `S1982-88372022000300013`. Total: 23 caracteres. |
+| **ISSN** | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`). |
+| **AoP** | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML. |
+| **Coleção** | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina). |
+| **ISIS-JSON** | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente. |
+| **Truncamento** | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py` e removido automaticamente no `terms_matcher.py` para detecção por substring. |
+| **criterio_ok** | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos campos `--required-fields` (padrão: titulo ou keywords). |
+| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Por padrão: `titulo` e `keywords` (basta que cada termo apareça em pelo menos um deles). |
+
+### Colunas do resultado.csv (scraper)
+
+| Coluna | Tipo | Origem | Descrição |
+|---|---|---|---|
+| `ID` | str | CSV entrada | PID bruto conforme fornecido |
+| `Title` | str | CSV entrada | Título conforme indexado no SciELO Search |
+| `Author(s)` | str | CSV entrada | Autores |
+| `Source` | str | CSV entrada | Fonte/periódico |
+| `Journal` | str | CSV entrada | Periódico |
+| `Language(s)` | str | CSV entrada | Idioma(s) do artigo |
+| `Publication year` | int | CSV entrada | Ano de publicação |
+| `PID_limpo` | str | scraper | PID normalizado (sufixos removidos, validado) |
+| `URL_PT` | str | scraper | URL da versão em português consultada |
+| `Titulo_PT` | str | scraper | Título em português extraído |
+| `Resumo_PT` | str | scraper | Resumo em português extraído |
+| `Palavras_Chave_PT` | str | scraper | Palavras-chave em português, separadas por `;` |
+| `status` | str | scraper | Status da extração (ver tabela abaixo) |
+| `fonte_extracao` | str | scraper | Fonte(s) usadas por campo (ex: `articlemeta_isis[T]`) |
+| `url_acedida` | str | scraper | URL(s) acessadas durante o scraping |
+
+### Colunas adicionadas pelo terms_matcher.py
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `n_palavras_titulo` | int | Nº de palavras em Titulo_PT |
+| `n_palavras_resumo` | int | Nº de palavras em Resumo_PT |
+| `n_keywords_pt` | int | Nº de keywords em Palavras_Chave_PT (separador `;`) |
+| `<termo>_titulo` | bool | Termo detectado em Titulo_PT (case-insensitive, substring) |
+| `<termo>_resumo` | bool | Termo detectado em Resumo_PT (case-insensitive, substring) |
+| `<termo>_keywords` | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
+| `criterio_ok` | bool | Todos os termos presentes em ≥1 campo required |
+
+### Status de extração
+
+| Status | Significado |
+|---|---|
+| `ok_completo` | Título + resumo + palavras-chave extraídos |
+| `ok_parcial` | Pelo menos um campo extraído, mas não todos |
+| `nada_encontrado` | Página acessada, nenhum dado encontrado |
+| `erro_extracao` | Falha de acesso (ex: HTTP 404, timeout) |
+| `erro_pid_invalido` | PID fora do padrão esperado |
+
+### Fontes de extração (`fonte_extracao`)
+
+| Valor | Significado |
+|---|---|
+| `articlemeta_isis[T]` | Título via ArticleMeta API (ISIS-JSON) |
+| `articlemeta_isis[R]` | Resumo via ArticleMeta API |
+| `articlemeta_isis[K]` | Palavras-chave via ArticleMeta API |
+| `Titulo_PT←pag1_meta_tags` | Título via meta tags da URL legacy |
+| `Titulo_PT←pag1_html_body` | Título via corpo HTML da URL legacy |
+| `Resumo_PT←pag_pt_meta_tags` | Resumo via meta tags da versão PT |
+| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP) |
