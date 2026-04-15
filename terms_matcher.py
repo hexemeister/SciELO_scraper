@@ -29,14 +29,16 @@ COLUNAS GERADAS
 
 UTILIZAÇÃO
 ----------
-  uv run python terms_matcher.py                        # todos os anos, padrões
-  uv run python terms_matcher.py --years 2022 2024
+  uv run python terms_matcher.py                        # pasta *_s_*/ mais recente no dir atual
+  uv run python terms_matcher.py --base exemplos        # varre exemplos/<ano>/ (multi-ano)
+  uv run python terms_matcher.py --base exemplos --years 2022 2024
   uv run python terms_matcher.py --terms avalia educa   # default
   uv run python terms_matcher.py --required-fields titulo resumo keywords
   uv run python terms_matcher.py --mode api
   uv run python terms_matcher.py --no-truncate
   uv run python terms_matcher.py --output resultado.csv
   uv run python terms_matcher.py --output-dir saida/
+  uv run python terms_matcher.py --dry-run
   uv run python terms_matcher.py -?
 
 CAMPOS DISPONÍVEIS PARA --required-fields
@@ -144,6 +146,17 @@ def descobrir_pasta_modo(ano_dir: Path, modo: str) -> Path | None:
     candidatas = [
         p for p in ano_dir.iterdir()
         if p.is_dir() and padrao.search(p.name) and "_s_" in p.name
+    ]
+    return sorted(candidatas)[-1] if candidatas else None
+
+
+def descobrir_pasta_recente(cwd: Path, modo: str) -> Path | None:
+    """Retorna a pasta *_s_*_<modo>/ mais recente no diretório dado."""
+    padrao = MODO_SUFIXO[modo]
+    candidatas = [
+        p for p in cwd.iterdir()
+        if p.is_dir() and "_s_" in p.name and padrao.search(p.name)
+        and (p / "resultado.csv").exists()
     ]
     return sorted(candidatas)[-1] if candidatas else None
 
@@ -294,10 +307,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-h", "--help", "-?", action="help",
                         help="Mostrar esta mensagem e sair")
-    parser.add_argument("--base", metavar="DIR", default=BASE_DEFAULT,
-                        help=f"Pasta base com subpastas por ano (default: {BASE_DEFAULT})")
+    parser.add_argument("--base", metavar="DIR", default=None,
+                        help="Pasta base com subpastas por ano (ex: exemplos). "
+                             "Sem --base: usa a pasta *_s_*/ mais recente no diretório atual.")
     parser.add_argument("--years", nargs="+", type=int, metavar="ANO",
-                        help="Anos a incluir (default: todos encontrados em --base)")
+                        help="Anos a incluir — apenas com --base (ignorado no modo padrão)")
     parser.add_argument("--terms", nargs="+", metavar="TERMO", default=TERMOS_DEFAULT,
                         help=f"Termos a detectar — default: {' '.join(TERMOS_DEFAULT)}")
     parser.add_argument("--no-truncate", action="store_true",
@@ -322,6 +336,8 @@ def build_parser() -> argparse.ArgumentParser:
                             "Sem ARQ: lê o terms_*_stats.json mais recente no diretório atual. "
                             "Com ARQ: lê o arquivo indicado."
                         ))
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Mostra o que seria processado sem gravar nenhum arquivo")
     parser.add_argument("--log-level", metavar="LEVEL", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
                         help="Nível de log (default: INFO)")
@@ -355,10 +371,14 @@ def _cmd_stats_report(arg, log_level: str):
     print(f"{'=' * 62}")
 
     p = s.get("parametros", {})
-    print(f"\n  Termos          : {', '.join(p.get('termos_originais', []))}")
+    modo_exec = p.get('modo', '—')
+    anos_proc = p.get('anos_processados')
+    anos_str  = str(anos_proc) if anos_proc is not None else "— (arquivo único)"
+    print(f"\n  Modo execução   : {modo_exec}")
+    print(f"  Termos          : {', '.join(p.get('termos_originais', []))}")
     print(f"  Campos required : {', '.join(p.get('campos_required', []))}")
     print(f"  Modo extração   : {p.get('mode', '—')}")
-    print(f"  Anos processados: {p.get('anos_processados', '—')}")
+    print(f"  Anos processados: {anos_str}")
     print(f"  Truncamento     : {'ativo' if p.get('truncamento') else 'desativado'}")
     campos_bool = p.get('campos_bool', [])
     campos_req  = p.get('campos_required', [])
@@ -408,11 +428,83 @@ def main():
         _cmd_stats_report(args.stats_report, args.log_level)
         return
 
-    ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
-    base     = Path(args.base)
-    out_dir  = Path(args.output_dir) if args.output_dir else Path(".")
-    out_dir.mkdir(parents=True, exist_ok=True)
+    ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
+    cwd     = Path(".")
+    out_dir = Path(args.output_dir) if args.output_dir else cwd
 
+    # ── Determinar modo: arquivo único vs. multi-ano ──────────────────────────
+    modo_base = args.base is not None  # --base passado explicitamente
+
+    # Descoberta antecipada para dry-run e log
+    if modo_base:
+        base = Path(args.base)
+        if not base.is_dir():
+            print(f"❌  Pasta base não encontrada: {base}", file=sys.stderr)
+            sys.exit(1)
+        anos_disponiveis = descobrir_anos(base)
+        if not anos_disponiveis:
+            print(f"❌  Nenhuma subpasta de ano em: {base}", file=sys.stderr)
+            sys.exit(1)
+        if args.years:
+            anos = [a for a in sorted(set(args.years)) if a in anos_disponiveis]
+        else:
+            anos = anos_disponiveis
+        if not anos:
+            print("❌  Nenhum ano válido para processar.", file=sys.stderr)
+            sys.exit(1)
+        # Monta lista de (label, pasta, ano_dir) para processar
+        entradas = []
+        for ano in anos:
+            ano_dir = base / str(ano)
+            pasta   = descobrir_pasta_modo(ano_dir, args.mode)
+            entradas.append((str(ano), pasta, ano_dir))
+    else:
+        # Modo padrão: pasta *_s_*/ mais recente no diretório atual
+        pasta = descobrir_pasta_recente(cwd, args.mode)
+        if pasta is None:
+            print(f"❌  Nenhuma pasta *_s_*_{args.mode}/ com resultado.csv encontrada no diretório atual.\n"
+                  f"   Use --base para apontar para outra pasta.", file=sys.stderr)
+            sys.exit(1)
+        entradas = [(pasta.name, pasta, pasta)]
+        anos = []
+        base = cwd
+
+    # ── Termos ────────────────────────────────────────────────────────────────
+    termos_originais = list(args.terms)
+    termos_deteccao  = [t.rstrip("$") for t in termos_originais]
+    campos_required  = list(args.required_fields)
+    n_bool_cols      = len(termos_deteccao) * len(CAMPOS_DISPONIVEIS)
+
+    # ── Dry-run ───────────────────────────────────────────────────────────────
+    if args.dry_run:
+        print(f"\n{'=' * 62}")
+        print(f"  Terms Matcher  v{__version__}  [dry-run]")
+        print(f"{'=' * 62}")
+        print(f"  Modo            : {'multi-ano (--base)' if modo_base else 'arquivo único (padrão)'}")
+        if modo_base:
+            print(f"  Base            : {base.resolve()}")
+            print(f"  Anos            : {anos}")
+        print(f"  Modo extração   : {args.mode}")
+        print(f"  Termos          : {', '.join(termos_originais)}")
+        print(f"  Campos required : {', '.join(campos_required)}")
+        print(f"  Colunas bool    : {n_bool_cols}")
+        print(f"\n  Entradas a processar:")
+        for label, pasta_e, _ in entradas:
+            status = pasta_e.name if pasta_e else "não encontrada"
+            print(f"    [{label}] {status}")
+        csv_dry   = Path(args.output) if args.output else out_dir / f"terms_{ts}.csv"
+        log_dry   = out_dir / f"terms_{ts}.log"
+        stats_dry = out_dir / f"terms_{ts}_stats.json"
+        print(f"\n  Gravaria:")
+        print(f"    {csv_dry}")
+        print(f"    {log_dry}")
+        print(f"    {stats_dry}")
+        print(f"\n[dry-run] Nenhum arquivo gravado.")
+        print(f"{'=' * 62}\n")
+        return
+
+    # ── Setup de saída e logging ──────────────────────────────────────────────
+    out_dir.mkdir(parents=True, exist_ok=True)
     log_path   = out_dir / f"terms_{ts}.log"
     stats_path = out_dir / f"terms_{ts}_stats.json"
     csv_out    = Path(args.output) if args.output else out_dir / f"terms_{ts}.csv"
@@ -422,55 +514,21 @@ def main():
     log.info("=" * 62)
     log.info(f"  Terms Matcher  v{__version__}")
     log.info("=" * 62)
-
-    # ── Termos: remover $ para busca de substring
-    termos_originais = list(args.terms)
-    if args.no_truncate:
-        termos_deteccao = [t.rstrip("$") for t in termos_originais]
-    else:
-        # adiciona $ internamente para consistência com o projeto, remove para busca
-        termos_deteccao = [t.rstrip("$") for t in termos_originais]
-
-    campos_required = list(args.required_fields)
-    n_bool_cols = len(termos_deteccao) * len(CAMPOS_DISPONIVEIS)
-
-    log.info(f"  Pasta base        : {base.resolve()}")
-    log.info(f"  Pasta de saída    : {out_dir.resolve()}")
-    log.info(f"  Modo extração     : {args.mode}")
-    log.info(f"  Termos            : {', '.join(termos_originais)}")
-    log.info(f"  Termos (busca)    : {', '.join(termos_deteccao)}")
-    log.info(f"  Campos required   : {', '.join(campos_required)}")
-    log.info(f"  Colunas booleanas : {n_bool_cols}  ({len(termos_deteccao)} termos × {len(CAMPOS_DISPONIVEIS)} campos: titulo, resumo, keywords)")
-    log.info(f"  Critério (criterio_ok): todos os termos em ≥1 campo required")
-    log.info(f"  CSV de saída      : {csv_out}")
-    log.info(f"  Log               : {log_path}")
-    log.info(f"  Stats             : {stats_path}")
-    log.info("─" * 62)
-
-    if not base.is_dir():
-        log.error(f"Pasta base não encontrada: {base}")
-        sys.exit(1)
-
-    anos_disponiveis = descobrir_anos(base)
-    if not anos_disponiveis:
-        log.error(f"Nenhuma subpasta de ano encontrada em: {base}")
-        sys.exit(1)
-
-    if args.years:
-        anos = sorted(set(args.years))
-        nao_enc = [a for a in anos if a not in anos_disponiveis]
-        if nao_enc:
-            log.warning(f"Anos não encontrados em {base}: {nao_enc}")
-        anos = [a for a in anos if a in anos_disponiveis]
-    else:
-        anos = anos_disponiveis
-
-    if not anos:
-        log.error("Nenhum ano válido para processar.")
-        sys.exit(1)
-
-    log.info(f"  Anos disponíveis  : {anos_disponiveis}")
-    log.info(f"  Anos a processar  : {anos}")
+    log.info(f"  Modo            : {'multi-ano (--base)' if modo_base else 'arquivo único (padrão)'}")
+    if modo_base:
+        log.info(f"  Pasta base      : {base.resolve()}")
+    log.info(f"  Pasta de saída  : {out_dir.resolve()}")
+    log.info(f"  Modo extração   : {args.mode}")
+    log.info(f"  Termos          : {', '.join(termos_originais)}")
+    log.info(f"  Termos (busca)  : {', '.join(termos_deteccao)}")
+    log.info(f"  Campos required : {', '.join(campos_required)}")
+    log.info(f"  Colunas bool    : {n_bool_cols}  ({len(termos_deteccao)} termos × {len(CAMPOS_DISPONIVEIS)} campos: titulo, resumo, keywords)")
+    log.info(f"  Critério        : todos os termos em ≥1 campo required")
+    log.info(f"  CSV de saída    : {csv_out}")
+    log.info(f"  Log             : {log_path}")
+    log.info(f"  Stats           : {stats_path}")
+    if modo_base:
+        log.info(f"  Anos            : {anos}")
     log.info("─" * 62)
 
     t0        = time.time()
@@ -478,61 +536,62 @@ def main():
     auditoria = []
     stats_anos: dict = {}
 
-    for ano in anos:
-        ano_dir = base / str(ano)
-        pasta   = descobrir_pasta_modo(ano_dir, args.mode)
-
+    for label, pasta, ano_dir in entradas:
         if pasta is None:
-            log.warning(f"[{ano}] Pasta modo '{args.mode}' não encontrada — ignorado.")
-            auditoria.append({"ano": ano, "status": "pasta_ausente", "pasta": None, "linhas": 0})
+            log.warning(f"[{label}] Pasta modo '{args.mode}' não encontrada — ignorado.")
+            auditoria.append({"label": label, "status": "pasta_ausente", "pasta": None, "linhas": 0})
             continue
 
         csv_path = pasta / "resultado.csv"
         if not csv_path.exists():
-            log.warning(f"[{ano}] resultado.csv não encontrado em {pasta} — ignorado.")
-            auditoria.append({"ano": ano, "status": "csv_ausente", "pasta": str(pasta), "linhas": 0})
+            log.warning(f"[{label}] resultado.csv não encontrado em {pasta} — ignorado.")
+            auditoria.append({"label": label, "status": "csv_ausente", "pasta": str(pasta), "linhas": 0})
             continue
 
-        log.info(f"[{ano}] Carregando: {csv_path}")
+        log.info(f"[{label}] Carregando: {csv_path}")
         try:
             df_bruto = pd.read_csv(csv_path, dtype=str, encoding="utf-8")
         except UnicodeDecodeError:
             df_bruto = pd.read_csv(csv_path, dtype=str, encoding="latin-1")
         except Exception as e:
-            log.error(f"[{ano}] Erro ao ler CSV: {e}")
-            auditoria.append({"ano": ano, "status": "erro_leitura", "pasta": str(pasta), "linhas": 0, "erro": str(e)})
+            log.error(f"[{label}] Erro ao ler CSV: {e}")
+            auditoria.append({"label": label, "status": "erro_leitura", "pasta": str(pasta), "linhas": 0, "erro": str(e)})
             continue
 
         n = len(df_bruto)
-        log.info(f"[{ano}]   {n} linhas carregadas")
+        log.info(f"[{label}]   {n} linhas carregadas")
 
         df_enriq = enriquecer(df_bruto, termos_deteccao, campos_required)
         frames.append(df_enriq)
 
-        s = calcular_stats(df_enriq, termos_deteccao, campos_required, label=str(ano))
+        s = calcular_stats(df_enriq, termos_deteccao, campos_required, label=label)
         s["pasta_origem"]  = str(pasta)
         s["stats_scraper"] = carregar_stats(pasta)
-        s["params_busca"]  = carregar_params(ano_dir)
-        stats_anos[ano]    = s
+        s["params_busca"]  = carregar_params(ano_dir) if modo_base else {}
+        stats_anos[label]  = s
 
-        log.info(f"[{ano}]   criterio_ok: {s['criterio_ok']} ({s['criterio_ok_pct']})")
+        log.info(f"[{label}]   criterio_ok: {s['criterio_ok']} ({s['criterio_ok_pct']})")
         for t in termos_deteccao:
             partes = []
             for campo in CAMPOS_DISPONIVEIS:
                 info = s["por_termo"][t][campo]
                 partes.append(f"{campo}: {info['n']} ({info['pct']})")
-            log.info(f"[{ano}]   '{t}' → {' | '.join(partes)}")
+            log.info(f"[{label}]   '{t}' → {' | '.join(partes)}")
 
-        auditoria.append({"ano": ano, "status": "ok", "pasta": str(pasta), "linhas": n})
+        auditoria.append({"label": label, "status": "ok", "pasta": str(pasta), "linhas": n})
 
     if not frames:
-        log.error("Nenhum dado carregado. Verifique --base, --years e --mode.")
+        if modo_base:
+            log.error("Nenhum dado carregado. Verifique --base, --years e --mode.")
+        else:
+            log.error("Nenhum dado carregado. Nenhuma pasta *_s_*/ válida encontrada.")
         sys.exit(1)
 
     log.info("─" * 62)
     df_final    = pd.concat(frames, ignore_index=True)
     total_geral = len(df_final)
-    log.info(f"Total consolidado: {total_geral} linhas ({len(frames)} ano(s))")
+    _unidade = "ano(s)" if modo_base else "pasta(s)"
+    log.info(f"Total consolidado: {total_geral} linhas ({len(frames)} {_unidade})")
 
     stats_global = None
     if len(frames) > 1:
@@ -557,10 +616,11 @@ def main():
         "versao_script":     __version__,
         "timestamp":         datetime.now().isoformat(),
         "parametros": {
-            "base":             str(base.resolve()),
+            "modo":             "multi-ano" if modo_base else "arquivo-unico",
+            "base":             str(base.resolve()) if modo_base else None,
             "mode":             args.mode,
-            "anos_solicitados": args.years or "todos",
-            "anos_processados": anos,
+            "anos_solicitados": (args.years or "todos") if modo_base else None,
+            "anos_processados": anos if modo_base else None,
             "termos_originais": termos_originais,
             "termos_deteccao":  termos_deteccao,
             "truncamento":      not args.no_truncate,

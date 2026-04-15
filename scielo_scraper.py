@@ -23,7 +23,8 @@ a partir de um CSV com PIDs, usando duas fontes por ordem de prioridade:
 
 UTILIZAÇÃO
 ----------
-  python scielo_scraper.py <entrada.csv> [opções]
+  python scielo_scraper.py [entrada.csv] [opções]
+  (sem CSV: usa o sc_*.csv mais recente no diretório atual)
 
 OPÇÕES
 ------
@@ -66,6 +67,7 @@ import json
 import logging
 import random
 import re
+import shutil
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -871,6 +873,8 @@ def main():
              "Use 1 para salvar após cada artigo, 0 para salvar apenas no final.")
     ap.add_argument("--resume",       action="store_true")
     ap.add_argument("--no-resume",    action="store_true")
+    ap.add_argument("--no-clean",     action="store_true",
+        help="Não remover pastas incompletas (sem resultado.csv) — apenas avisar")
     ap.add_argument("--only-api",     action="store_true",
         help="Usar apenas ArticleMeta API (sem HTML)")
     ap.add_argument("--only-html",    action="store_true",
@@ -973,7 +977,11 @@ def main():
         sys.exit("❌  --only-api e --only-html são mutuamente exclusivos")
 
     if not args.input_csv:
-        sys.exit("❌  Informe o CSV de entrada. Use -h para ajuda ou --list-collections para ver as coleções disponíveis.")
+        candidates = sorted(Path(".").glob("sc_*.csv"), reverse=True)
+        if not candidates:
+            sys.exit("❌  Nenhum CSV sc_*.csv encontrado no diretório atual. Informe o arquivo explicitamente.")
+        args.input_csv = str(candidates[0])
+        print(f"  CSV não informado — usando o mais recente: {candidates[0].name}")
 
     input_path = Path(args.input_csv).resolve()
     if not input_path.exists():
@@ -987,6 +995,21 @@ def main():
     mode_slug = ("api" if args.only_api
                  else "html" if args.only_html
                  else "api+html")
+
+    # ── Detectar e limpar pastas incompletas (sem resultado.csv) ────────────────
+    incompletas = [
+        d for d in input_path.parent.iterdir()
+        if d.is_dir()
+        and d.name.startswith(base_name + "_s_")
+        and not (d / "resultado.csv").exists()
+    ]
+    if incompletas:
+        for d in sorted(incompletas):
+            if args.no_clean:
+                print(f"⚠  Pasta incompleta (sem resultado.csv): {d.name} — mantida (--no-clean)")
+            else:
+                print(f"⚠  Pasta incompleta (sem resultado.csv): {d.name} — removida")
+                shutil.rmtree(d)
 
     # ── Detectar pasta de resume antes de definir out_dir ────────────────────
     resume_dir  = None

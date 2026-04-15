@@ -22,9 +22,9 @@ UTILIZAÇÃO
 
 OPÇÕES
 ------
-  --terms T1 T2 ...   Termos de busca. Por padrão, $ é adicionado automaticamente
-                      ao final de cada termo para truncamento (ex: "avalia" → "avalia$").
-                      Para desativar, use --no-truncate.
+  --terms T1 T2 ...   Termos de busca (default: avalia educa). Por padrão, $ é adicionado
+                      automaticamente ao final de cada termo para truncamento
+                      (ex: "avalia" → "avalia$"). Para desativar, use --no-truncate.
   --years Y1 Y2 ...   Anos a incluir. Pode ser lista (2020 2021) ou intervalo (2010-2022)
   --collection COD    Coleção SciELO (default: scl). Use --list-collections para ver opções
   --fields CAMPO      Campos de busca: ti (só título), ab (só resumo), ti+ab (ambos, default)
@@ -337,9 +337,9 @@ def main():
     ap.add_argument("-h", "--help", "-?", action="help",
         default=argparse.SUPPRESS,
         help="Mostrar esta mensagem de ajuda e sair")
-    ap.add_argument("--terms", nargs="+", metavar="TERMO",
-        help="Termos de busca. $ é adicionado automaticamente ao final de cada termo "
-             "(truncamento). Ex: 'avalia' vira 'avalia$'. Use --no-truncate para desativar.")
+    ap.add_argument("--terms", nargs="+", metavar="TERMO", default=["avalia", "educa"],
+        help="Termos de busca (default: avalia educa). $ é adicionado automaticamente ao final "
+             "de cada termo (truncamento). Ex: 'avalia' vira 'avalia$'. Use --no-truncate para desativar.")
     ap.add_argument("--years", nargs="+", metavar="ANO",
         help="Anos (ex: 2022 ou 2010-2022 ou 2001 2005 2010-2015)")
     ap.add_argument("--collection", default="scl", metavar="COD",
@@ -392,12 +392,33 @@ def main():
             target = candidates[0]
         with open(target, encoding="utf-8") as f:
             data = json.load(f)
-        print(json.dumps(data, ensure_ascii=False, indent=2))
+        sep = "─" * 62
+        print(f"\n{'=' * 62}")
+        print(f"  SciELO Search — Parâmetros da busca")
+        print(f"  Arquivo  : {target}")
+        print(f"{'=' * 62}")
+        print(f"\n  Timestamp       : {data.get('timestamp', '—')}")
+        print(f"  Coleção         : {data.get('colecao', '—')}")
+        termos = data.get('termos_originais', [])
+        trunc  = data.get('truncamento', True)
+        termos_fmt = [f"{t}$" if trunc else t for t in termos]
+        print(f"  Termos          : {', '.join(termos_fmt)}")
+        print(f"  Truncamento     : {'ativo ($)' if trunc else 'desativado'}")
+        print(f"  Campos          : {data.get('campos', '—')}")
+        anos = data.get('anos', [])
+        anos_str = f"{anos[0]}–{anos[-1]}  ({len(anos)} anos)" if anos else "—"
+        print(f"  Anos            : {anos_str}")
+        print(f"  Total resultados: {data.get('total_resultados', '—')}")
+        print(f"\n{sep}")
+        url = data.get('query_url', '')
+        print(f"  URL da query:")
+        # Quebra a URL em chunks de 60 chars para legibilidade
+        for i in range(0, len(url), 100):
+            print(f"    {url[i:i+100]}")
+        print(f"{'=' * 62}\n")
         return
 
     # ── Validações ────────────────────────────────────────────────────────────
-    if not args.terms:
-        ap.error("--terms é obrigatório. Ex: --terms avalia educa")
     if not args.years:
         ap.error("--years é obrigatório. Ex: --years 2022 ou --years 2010-2022")
 
