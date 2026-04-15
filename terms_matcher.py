@@ -357,7 +357,10 @@ def _cmd_stats_report(arg, log_level: str):
     print(f"  Modo extração   : {p.get('mode', '—')}")
     print(f"  Anos processados: {p.get('anos_processados', '—')}")
     print(f"  Truncamento     : {'ativo' if p.get('truncamento') else 'desativado'}")
-    print(f"  Colunas bool    : {p.get('n_colunas_bool', '—')}")
+    campos_bool = p.get('campos_bool', [])
+    campos_req  = p.get('campos_required', [])
+    print(f"  Colunas bool    : {p.get('n_colunas_bool', '—')}  (campos: {', '.join(campos_bool)})")
+    print(f"  Critério ok     : todos os termos em ≥1 de: {', '.join(campos_req)}")
 
     def _print_fatia(fatia: dict, label: str):
         if not fatia:
@@ -430,7 +433,8 @@ def main():
     log.info(f"  Termos            : {', '.join(termos_originais)}")
     log.info(f"  Termos (busca)    : {', '.join(termos_deteccao)}")
     log.info(f"  Campos required   : {', '.join(campos_required)}")
-    log.info(f"  Colunas booleanas : {n_bool_cols}  ({len(termos_deteccao)} termos × {len(CAMPOS_DISPONIVEIS)} campos)")
+    log.info(f"  Colunas booleanas : {n_bool_cols}  ({len(termos_deteccao)} termos × {len(CAMPOS_DISPONIVEIS)} campos: titulo, resumo, keywords)")
+    log.info(f"  Critério (criterio_ok): todos os termos em ≥1 campo required")
     log.info(f"  CSV de saída      : {csv_out}")
     log.info(f"  Log               : {log_path}")
     log.info(f"  Stats             : {stats_path}")
@@ -555,6 +559,7 @@ def main():
             "truncamento":      not args.no_truncate,
             "campos_required":  campos_required,
             "n_colunas_bool":   n_bool_cols,
+            "campos_bool":      CAMPOS_DISPONIVEIS,
         },
         "saida": {
             "csv":           str(csv_out),

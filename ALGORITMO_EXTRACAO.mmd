@@ -1,0 +1,48 @@
+flowchart TD
+    A([process_article]) --> B[clean_pid\nnormaliza / valida PID]
+
+    B --> C{PID válido?}
+    C -- Não --> D([status = erro_pid_invalido])
+    C -- Sim --> E
+
+    subgraph FASE1["FASE 1 — ArticleMeta API (ignorada se --only-html)"]
+        E["GET articlemeta.scielo.org\n?code=pid&collection=col&format=json"]
+        E --> F{Resposta com\ndados PT?}
+        F -- Não --> G2
+        F -- Sim --> G["extract_pt_from_isis\ntitles / abstracts / keywords\nfiltra lang=pt"]
+        G --> H{T + R + KW\npreenchidos?}
+        H -- Todos --> I([ok via API])
+        H -- Parcial --> G2["campos ausentes:\nneed_t / need_r / need_k"]
+    end
+
+    subgraph FASE2["FASE 2 — Fallback HTML (ignorada se --only-api ou todos os campos ok)"]
+        G2 --> J
+
+        J["ETAPA 1 — URL Legacy\nscielo.br?script=sci_arttext&pid=P&lang=pt\n(requests segue redirect)"]
+        J --> K{Erro HTTP\nou Connection?}
+        K -- Sim --> L([return None / erro_extracao])
+        K -- Não --> M
+
+        M{"ETAPA 2\nis_article_page?"}
+        M -- Sim --> N["apply_missing\n1. meta tags\n2. corpo HTML"]
+        M -- Não --> O
+
+        O{"is_aop?\npid[14:17] = 005"}
+        O -- Não --> R
+        O -- Sim --> P["ETAPA 4 — AoP\ntenta og:url da página home\nGET og:url, is_article_page?\nSim → apply_missing"]
+        P --> R
+
+        N --> R{"ETAPA 3\nlíngua da página != pt?\ne campos ausentes?"}
+        R -- Não --> S
+        R -- Sim --> T["_find_pt_link\nprocura href com lang=pt ou /pt/"]
+        T -- link encontrado --> U["GET link PT\napply_missing"]
+        T -- não encontrado --> S
+        U --> S
+    end
+
+    S["RESULTADO FINAL\nhas_t / has_r / has_k"]
+    S --> V{campos\nextraídos?}
+    V -- T e R e K --> W([ok_completo])
+    V -- T ou R ou K --> X([ok_parcial])
+    V -- url acessada --> Y([nada_encontrado])
+    V -- else --> Z([erro_extracao])
