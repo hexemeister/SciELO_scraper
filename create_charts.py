@@ -14,9 +14,9 @@ Uso:
     uv run python create_charts.py -?                   # ajuda (equivalente a -h)
 
 Gráficos gerados (salvo na pasta --output, default: diretório atual):
-    grafico_status[_<ts>].png  — distribuição de status por modo e ano
-    grafico_fontes[_<ts>].png  — fontes de extração por modo e ano
-    grafico_tempo[_<ts>].png   — tempo total por modo e ano
+    chart_status[_<ts>].png   — distribuição de status por modo e ano
+    chart_sources[_<ts>].png  — fontes de extração por modo e ano
+    chart_time[_<ts>].png     — tempo total por modo e ano
 """
 
 import argparse
@@ -644,11 +644,11 @@ def main():
 
     graficos_a_gerar = []
     if not args.no_status:
-        graficos_a_gerar.append(png_name("grafico_status"))
+        graficos_a_gerar.append(png_name("chart_status"))
     if not args.no_sources:
-        graficos_a_gerar.append(png_name("grafico_fontes"))
+        graficos_a_gerar.append(png_name("chart_sources"))
     if not args.no_time:
-        graficos_a_gerar.append(png_name("grafico_tempo"))
+        graficos_a_gerar.append(png_name("chart_time"))
 
     print(f"\nModo             : {'multi-ano (--base)' if modo_base else 'diretório atual (padrão)'}")
     print(f"Labels           : {sorted(stats_por_ano, key=str)}")
@@ -664,13 +664,13 @@ def main():
     print()
 
     if not args.no_status:
-        grafico_status(stats_por_ano, output, png_name("grafico_status"))
+        grafico_status(stats_por_ano, output, png_name("chart_status"))
 
     if not args.no_sources:
-        grafico_fontes(stats_por_ano, output, png_name("grafico_fontes"))
+        grafico_fontes(stats_por_ano, output, png_name("chart_sources"))
 
     if not args.no_time:
-        grafico_tempo(stats_por_ano, output, png_name("grafico_tempo"))
+        grafico_tempo(stats_por_ano, output, png_name("chart_time"))
 
     print("\nPronto.")
 
