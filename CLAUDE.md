@@ -6,9 +6,9 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `run_pipeline.py` | Pipeline completo de teste (v1.4) | `--year` | `exemplos/<ano>/` |
+| `run_pipeline.py` | Pipeline completo (v2.0): busca → 3×scraping → análise → 3×match → gráficos → cópia | `--year` | `runs/<ano>/` |
 | `create_charts.py` | Gera gráficos comparativos das execuções | `[--base]`, `--years`, `--output`, `--timestamp` | `chart_status[_<ts>].png`, `chart_sources[_<ts>].png`, `chart_time[_<ts>].png` |
-| `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
+| `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
 ## Convenções obrigatórias
@@ -23,7 +23,7 @@
 - Params da busca: `sc_<timestamp>_params.json`
 - Pasta de scraping: `<stem>_s_<timestamp>_<modo>/`
   - `<modo>`: `api+html` (padrão) | `api` | `html`
-- Exemplos de runs: `exemplos/<ano>/`
+- Pasta de runs: `runs/<ano>/`
 
 ## Comportamento do scielo_search.py
 
@@ -31,16 +31,45 @@
 - **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
 - **`--list-collections`:** lista as 36 coleções SciELO e sai
 
-## Comportamento do run_pipeline.py (v1.4)
+## Comportamento do run_pipeline.py (v2.0)
 
-- **Estratégias testadas:** padrão (`api+html`), apenas-api, apenas-html — sempre em sequência completa
-- **`--no-resume` implícito:** o scraper é sempre chamado com `--no-resume`; cada estratégia começa do zero
-- **Limpeza automática:** após copiar tudo para `exemplos/<ano>/`, os originais no diretório raiz são removidos (CSV, `_params.json`, 3 pastas de scraping, `ANALISE_DISCREPANCIA_*.md`)
-- **`-?`:** equivalente a `-h` / `--help`
+**Etapas do pipeline** (9 no total por ano):
+1. Busca (`scielo_search.py`)
+2. Scraping api+html (`scielo_scraper.py`)
+3. Scraping api (`scielo_scraper.py --only-api`)
+4. Scraping html (`scielo_scraper.py --only-html`)
+5. Análise de discrepância (compara as 3 estratégias)
+6. Terms matcher para api+html (`terms_matcher.py --mode api+html`)
+7. Terms matcher para api (`terms_matcher.py --mode api`)
+8. Terms matcher para html (`terms_matcher.py --mode html`)
+9. Gráficos comparativos (`create_charts.py --output runs/<ano>/`)
+
+**Comportamento padrão** (zero flags adicionais):
+- `--terms avalia educa` — termos de busca e detecção
+- `--terms-fields titulo keywords` — campos verificados pelo matcher
+- `--terms-match-mode all` — todos os termos devem estar presentes
+- `--collection scl` — coleção SciELO Brasil
+- Destino: `runs/<ano>/`
+
+**Flags de controle:**
+- **`--no-resume` implícito:** scraper sempre chamado com `--no-resume`; cada estratégia começa do zero
+- **`--skip-search`:** reutiliza CSV `sc_*` mais recente
+- **`--skip-scrape`:** reutiliza pastas existentes — não reexecuta o scraper
+- **`--skip-analysis`:** pula análise de discrepância
+- **`--skip-match`:** pula as 3 invocações do terms_matcher
+- **`--skip-charts`:** pula geração de gráficos
 - **`--dry-run`:** mostra os comandos sem executar, inclusive a limpeza que seria feita
-- **`--skip-scrape`:** reutiliza pastas existentes — não aplica `--no-resume` (skip não reexecuta o scraper)
-- **`--stats-report [DIR]`:** gera relatório Markdown consolidado de todos os `stats.json` em `exemplos/` (ou `DIR`); funciona sem `--year` — modo standalone
-- **`--per-year`:** executa o pipeline para cada ano encontrado em `exemplos/`, com barra de progresso global e ETA estimado por histórico de execuções anteriores
+- **`--stats-report [DIR]`:** gera relatório Markdown consolidado de todos os `stats.json` em `runs/` (ou `DIR`); funciona sem `--year` — modo standalone
+- **`--per-year`:** executa o pipeline para cada ano, com barra de progresso global e ETA estimado por histórico
+
+**Saída em `runs/<ano>/`:**
+- `sc_<ts>.csv` + `sc_<ts>_params.json`
+- 3 pastas de scraping (cada uma contém `resultado.csv`, `stats.json`, `terms_<ts>.*`)
+- `ANALISE_DISCREPANCIA_<ano>.md`
+- `chart_status.png`, `chart_sources.png`, `chart_time.png`
+- `pipeline_stats.json` — resumo completo da execução (versão, termos, campos, etapas, stats por estratégia)
+
+**Limpeza automática:** após copiar tudo para `runs/<ano>/`, os originais no diretório raiz são removidos (CSV, `_params.json`, 3 pastas de scraping, `ANALISE_DISCREPANCIA_*.md`). Os gráficos e terms são gerados diretamente em `runs/<ano>/` (sem copiar do raiz).
 
 ## Comportamento do scraper (scielo_scraper.py v2.4)
 
@@ -63,7 +92,7 @@
 ## Dependências
 
 ```bash
-uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
+uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli matplotlib
 ```
 
 > `brotli` é obrigatório — o CDN do SciELO usa compressão Brotli.

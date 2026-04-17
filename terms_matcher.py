@@ -34,6 +34,7 @@ UTILIZAÇÃO
   uv run python terms_matcher.py --base exemplos --years 2022 2024
   uv run python terms_matcher.py --terms avalia educa   # default
   uv run python terms_matcher.py --required-fields titulo resumo keywords
+  uv run python terms_matcher.py --match-mode any   # qualquer termo é suficiente
   uv run python terms_matcher.py --mode api
   uv run python terms_matcher.py --no-truncate
   uv run python terms_matcher.py --output resultado.csv
@@ -204,12 +205,16 @@ def enriquecer(
     df: pd.DataFrame,
     termos: list[str],          # raízes sem $, ex: ["avalia", "educa"]
     campos_required: list[str], # ex: ["titulo", "keywords"]
+    match_mode: str = "all",    # "all" = todos os termos presentes; "any" = qualquer termo
 ) -> pd.DataFrame:
     """
     Adiciona ao DataFrame:
       - n_palavras_titulo, n_palavras_resumo, n_keywords_pt
       - <termo>_<campo> (bool) para cada combinação
       - criterio_ok (bool)
+
+    match_mode="all": criterio_ok=True se TODOS os termos aparecem em pelo menos um campo required.
+    match_mode="any": criterio_ok=True se QUALQUER termo aparece em pelo menos um campo required.
     """
     df = df.copy()
 
@@ -233,13 +238,22 @@ def enriquecer(
             df[nome_col] = textos[campo].apply(lambda txt, r=t: _contem(txt, r))
             bool_cols[t][campo] = nome_col
 
-    # ── criterio_ok: todos os termos em pelo menos um dos campos required
-    def _criterio(row) -> bool:
-        for t in termos:
-            # pelo menos um campo required tem o termo?
-            if not any(row[bool_cols[t][c]] for c in campos_required):
-                return False
-        return True
+    # ── criterio_ok: depende de match_mode
+    if match_mode == "all":
+        # todos os termos presentes em pelo menos um campo required
+        def _criterio(row) -> bool:
+            for t in termos:
+                if not any(row[bool_cols[t][c]] for c in campos_required):
+                    return False
+            return True
+    else:
+        # any: pelo menos um termo presente em pelo menos um campo required
+        def _criterio(row) -> bool:
+            return any(
+                row[bool_cols[t][c]]
+                for t in termos
+                for c in campos_required
+            )
 
     df["criterio_ok"] = df.apply(_criterio, axis=1)
 
@@ -247,7 +261,8 @@ def enriquecer(
 
 
 # ── Estatísticas por fatia ────────────────────────────────────────────────────
-def calcular_stats(df: pd.DataFrame, termos: list[str], campos_required: list[str], label: str) -> dict:
+def calcular_stats(df: pd.DataFrame, termos: list[str], campos_required: list[str], label: str,
+                   match_mode: str = "all") -> dict:
     total = len(df)
     if total == 0:
         return {"label": label, "total": 0}
@@ -270,6 +285,7 @@ def calcular_stats(df: pd.DataFrame, termos: list[str], campos_required: list[st
         "total":           total,
         "criterio_ok":     criterio_ok,
         "criterio_ok_pct": pct(criterio_ok),
+        "match_mode":      match_mode,
         "campos_required": campos_required,
         "por_termo":       por_termo,
         "n_palavras_titulo_medio":  round(float(df["n_palavras_titulo"].mean()), 1),
@@ -326,6 +342,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mode", metavar="MODO", default=MODO_DEFAULT,
                         choices=list(MODO_SUFIXO.keys()),
                         help=f"Modo de extração a usar (default: {MODO_DEFAULT})")
+    parser.add_argument("--match-mode", metavar="MODO", default="all",
+                        choices=["all", "any"],
+                        help=(
+                            "Como combinar os termos em criterio_ok: "
+                            "all=todos os termos presentes (default), "
+                            "any=qualquer termo suficiente"
+                        ))
     parser.add_argument("--output", metavar="ARQ",
                         help="Arquivo CSV de saída (default: terms_<timestamp>.csv)")
     parser.add_argument("--output-dir", metavar="DIR",
@@ -487,6 +510,7 @@ def main():
         print(f"  Modo extração   : {args.mode}")
         print(f"  Termos          : {', '.join(termos_originais)}")
         print(f"  Campos required : {', '.join(campos_required)}")
+        print(f"  Match mode      : {args.match_mode}")
         print(f"  Colunas bool    : {n_bool_cols}")
         print(f"\n  Entradas a processar:")
         for label, pasta_e, _ in entradas:
@@ -523,7 +547,12 @@ def main():
     log.info(f"  Termos (busca)  : {', '.join(termos_deteccao)}")
     log.info(f"  Campos required : {', '.join(campos_required)}")
     log.info(f"  Colunas bool    : {n_bool_cols}  ({len(termos_deteccao)} termos × {len(CAMPOS_DISPONIVEIS)} campos: titulo, resumo, keywords)")
-    log.info(f"  Critério        : todos os termos em ≥1 campo required")
+    _criterio_desc = (
+        "todos os termos presentes em ≥1 campo required (all)"
+        if args.match_mode == "all"
+        else "qualquer termo presente em ≥1 campo required (any)"
+    )
+    log.info(f"  Critério        : {_criterio_desc}")
     log.info(f"  CSV de saída    : {csv_out}")
     log.info(f"  Log             : {log_path}")
     log.info(f"  Stats           : {stats_path}")
@@ -561,10 +590,11 @@ def main():
         n = len(df_bruto)
         log.info(f"[{label}]   {n} linhas carregadas")
 
-        df_enriq = enriquecer(df_bruto, termos_deteccao, campos_required)
+        df_enriq = enriquecer(df_bruto, termos_deteccao, campos_required, match_mode=args.match_mode)
         frames.append(df_enriq)
 
-        s = calcular_stats(df_enriq, termos_deteccao, campos_required, label=label)
+        s = calcular_stats(df_enriq, termos_deteccao, campos_required, label=label,
+                           match_mode=args.match_mode)
         s["pasta_origem"]  = str(pasta)
         s["stats_scraper"] = carregar_stats(pasta)
         s["params_busca"]  = carregar_params(ano_dir) if modo_base else {}
@@ -595,7 +625,8 @@ def main():
 
     stats_global = None
     if len(frames) > 1:
-        stats_global = calcular_stats(df_final, termos_deteccao, campos_required, label="GLOBAL")
+        stats_global = calcular_stats(df_final, termos_deteccao, campos_required, label="GLOBAL",
+                                      match_mode=args.match_mode)
         log.info("─" * 62)
         log.info("Estatísticas GLOBAIS:")
         log.info(f"  criterio_ok : {stats_global['criterio_ok']} ({stats_global['criterio_ok_pct']})")
@@ -624,6 +655,7 @@ def main():
             "termos_originais": termos_originais,
             "termos_deteccao":  termos_deteccao,
             "truncamento":      not args.no_truncate,
+            "match_mode":       args.match_mode,
             "campos_required":  campos_required,
             "n_colunas_bool":   n_bool_cols,
             "campos_bool":      CAMPOS_DISPONIVEIS,
