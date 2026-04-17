@@ -2,9 +2,9 @@
 create_charts.py — Gera gráficos comparativos das execuções do SciELO Scraper.
 
 Uso:
-    uv run python create_charts.py                      # lê exemplos/ no diretório atual
-    uv run python create_charts.py --base exemplos      # idem (explícito)
-    uv run python create_charts.py --years 2022 2024    # apenas esses anos
+    uv run python create_charts.py                      # pastas *_s_*/ mais recentes no dir atual
+    uv run python create_charts.py --base exemplos      # varre exemplos/<ano>/ (multi-ano)
+    uv run python create_charts.py --base exemplos --years 2022 2024
     uv run python create_charts.py --output graficos/   # pasta de saída personalizada
     uv run python create_charts.py --timestamp          # adiciona timestamp nos nomes dos PNGs
     uv run python create_charts.py --no-status          # pula gráfico de status
@@ -68,6 +68,30 @@ def descobrir_pasta_modo(ano_dir: Path, modo: str) -> Path | None:
         return None
     # Mais recente pelo nome (timestamp embutido)
     return sorted(candidatas)[-1]
+
+
+def descobrir_pastas_cwd(cwd: Path) -> dict[str, Path]:
+    """
+    Modo padrão (sem --base): descobre o sc_*.csv mais recente no diretório atual
+    e retorna as pastas <stem>_s_*_<modo>/ correspondentes que possuem stats.json.
+    Retorna {modo: pasta} com apenas os modos encontrados.
+    """
+    csvs = sorted(cwd.glob("sc_*.csv"), reverse=True)
+    if not csvs:
+        return {}
+    stem = csvs[0].stem   # ex: sc_20260415_223214
+    resultado: dict[str, Path] = {}
+    for modo, padrao in MODO_SUFIXO.items():
+        candidatas = [
+            p for p in cwd.iterdir()
+            if p.is_dir()
+            and p.name.startswith(stem + "_s_")
+            and padrao.search(p.name)
+            and (p / "stats.json").exists()
+        ]
+        if candidatas:
+            resultado[modo] = sorted(candidatas)[-1]
+    return resultado
 
 
 def carregar_stats(pasta: Path) -> dict:
@@ -536,12 +560,13 @@ def main():
         epilog="Exemplo: uv run python create_charts.py --years 2022 2024 2025",
     )
     parser.add_argument(
-        "--base", default="exemplos", metavar="DIR",
-        help="Pasta raiz com subpastas por ano (default: exemplos/)",
+        "--base", default=None, metavar="DIR",
+        help="Pasta raiz com subpastas por ano (ex: exemplos). "
+             "Sem --base: usa as pastas *_s_*/ mais recentes no diretório atual.",
     )
     parser.add_argument(
         "--years", nargs="+", type=int, metavar="YEAR",
-        help="Anos a incluir (default: todos encontrados em --base)",
+        help="Anos a incluir — apenas com --base (ignorado no modo padrão)",
     )
     parser.add_argument(
         "--output", default=".", metavar="DIR",
@@ -561,38 +586,57 @@ def main():
     def png_name(base_name: str) -> str:
         return f"{base_name}{ts_suffix}.png"
 
-    base = Path(args.base)
-    if not base.is_dir():
-        print(f"Erro: pasta base '{base}' não encontrada.", file=sys.stderr)
-        sys.exit(1)
-
+    cwd    = Path(".")
     output = Path(args.output)
-
-    anos = args.years if args.years else descobrir_anos(base)
-    if not anos:
-        print(f"Nenhum ano encontrado em '{base}'.", file=sys.stderr)
-        sys.exit(1)
-
-    modos = ["api+html", "api", "html"]
+    modos  = ["api+html", "api", "html"]
+    modo_base = args.base is not None
 
     # Carregar stats de cada ano/modo
     stats_por_ano: dict = {}
 
-    for ano in anos:
-        ano_dir = base / str(ano)
-        if not ano_dir.is_dir():
-            print(f"  Aviso: pasta '{ano_dir}' não encontrada — ano {ano} ignorado.")
-            continue
-        stats_por_ano[ano] = {}
-        for modo in modos:
-            pasta = descobrir_pasta_modo(ano_dir, modo)
-            if pasta is None:
-                print(f"  Aviso: nenhuma pasta '{modo}' encontrada em {ano_dir} — modo ignorado.")
+    if modo_base:
+        base = Path(args.base)
+        if not base.is_dir():
+            print(f"Erro: pasta base '{base}' não encontrada.", file=sys.stderr)
+            sys.exit(1)
+        anos = args.years if args.years else descobrir_anos(base)
+        if not anos:
+            print(f"Nenhum ano encontrado em '{base}'.", file=sys.stderr)
+            sys.exit(1)
+        for ano in anos:
+            ano_dir = base / str(ano)
+            if not ano_dir.is_dir():
+                print(f"  Aviso: pasta '{ano_dir}' não encontrada — ano {ano} ignorado.")
                 continue
+            stats_por_ano[ano] = {}
+            for modo in modos:
+                pasta = descobrir_pasta_modo(ano_dir, modo)
+                if pasta is None:
+                    print(f"  Aviso: nenhuma pasta '{modo}' encontrada em {ano_dir} — modo ignorado.")
+                    continue
+                try:
+                    stats_por_ano[ano][modo] = carregar_stats(pasta)
+                except FileNotFoundError as e:
+                    print(f"  Aviso: {e} — modo {modo}/{ano} ignorado.")
+    else:
+        # Modo padrão: pastas *_s_*/ mais recentes no diretório atual
+        pastas_cwd = descobrir_pastas_cwd(cwd)
+        if not pastas_cwd:
+            print(
+                "❌  Nenhuma pasta *_s_*/ com stats.json encontrada no diretório atual.\n"
+                "   Use --base para apontar para outra pasta.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        # Usa "run atual" como label do eixo (nome do CSV stem)
+        csvs = sorted(cwd.glob("sc_*.csv"), reverse=True)
+        label = csvs[0].stem if csvs else "run"
+        stats_por_ano[label] = {}
+        for modo, pasta in pastas_cwd.items():
             try:
-                stats_por_ano[ano][modo] = carregar_stats(pasta)
+                stats_por_ano[label][modo] = carregar_stats(pasta)
             except FileNotFoundError as e:
-                print(f"  Aviso: {e} — modo {modo}/{ano} ignorado.")
+                print(f"  Aviso: {e} — modo {modo} ignorado.")
 
     if not stats_por_ano:
         print("Nenhum dado encontrado.", file=sys.stderr)
@@ -606,7 +650,8 @@ def main():
     if not args.no_time:
         graficos_a_gerar.append(png_name("grafico_tempo"))
 
-    print(f"\nAnos encontrados : {sorted(stats_por_ano)}")
+    print(f"\nModo             : {'multi-ano (--base)' if modo_base else 'diretório atual (padrão)'}")
+    print(f"Labels           : {sorted(stats_por_ano, key=str)}")
     print(f"Pasta de saída   : {output.resolve()}")
     print(f"Timestamp        : {'sim (' + ts_suffix.lstrip('_') + ')' if args.timestamp else 'não (nome fixo)'}")
     print(f"Gráficos a gerar : {', '.join(graficos_a_gerar) if graficos_a_gerar else '(nenhum)'}")
