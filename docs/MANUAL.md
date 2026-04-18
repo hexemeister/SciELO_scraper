@@ -2,6 +2,7 @@
 
 ## Sumário
 
+- [Guia rápido — Qual comando responde qual pergunta?](#guia-rápido--qual-comando-responde-qual-pergunta)
 0. [Buscando artigos com scielo_search.py](#0-buscando-artigos-com-scielo_searchpy)
 1. [Instalação](#1-instalação)
 2. [Preparando o CSV de entrada](#2-preparando-o-csv-de-entrada)
@@ -12,11 +13,71 @@
 7. [Outras coleções SciELO](#7-outras-coleções-scielo)
 8. [Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
 9. [Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
-10. [Gráficos comparativos com create_charts.py](#10-gráficos-comparativos-com-gerar_graficospy)
-11. [Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-teste_pipelinepy---stats-report)
+10. [Gráficos comparativos com create_charts.py](#10-gráficos-comparativos-com-create_chartspy)
+11. [Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-run_pipelinepy---stats-report)
 12. [Detecção de termos com terms_matcher.py](#12-detecção-de-termos-com-terms_matcherpy)
 13. [Problemas comuns](#13-problemas-comuns)
 14. [Dicionário de dados e termos](#14-dicionário-de-dados-e-termos)
+
+---
+
+## Guia rápido — Qual comando responde qual pergunta?
+
+Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro.
+
+### Pipeline completo (recomendado)
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Rodar tudo para um ano | `uv run python run_pipeline.py --year 2024` | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, `pipeline_stats.json` | `runs/2024/` |
+| Rodar tudo para vários anos em sequência | `uv run python run_pipeline.py --per-year --year 2022 2023 2024 2025` | Idem por ano + gráfico agregado de comparação entre anos | `runs/<ano>/` cada um + `runs/chart_*.png` |
+| Ver o que seria executado sem rodar | `uv run python run_pipeline.py --year 2024 --dry-run` | Nada (apenas imprime os comandos) | — |
+| Reutilizar busca já feita (pular `scielo_search.py`) | `uv run python run_pipeline.py --year 2024 --skip-search` | Idem sem nova busca | `runs/2024/` |
+| Reutilizar scraping já feito (pular scraper) | `uv run python run_pipeline.py --year 2024 --skip-scrape` | Análise + termos + gráficos | `runs/2024/` |
+| Pular análise de discrepância | `uv run python run_pipeline.py --year 2024 --skip-analysis` | Busca + scraping + termos + gráficos | `runs/2024/` |
+| Pular detecção de termos | `uv run python run_pipeline.py --year 2024 --skip-match` | Busca + scraping + análise + gráficos | `runs/2024/` |
+| Pular gráficos | `uv run python run_pipeline.py --year 2024 --skip-charts` | Busca + scraping + análise + termos | `runs/2024/` |
+| Ver relatório consolidado de todos os anos | `uv run python run_pipeline.py --stats-report` | Imprime Markdown no terminal | — |
+| Salvar relatório em arquivo | `uv run python run_pipeline.py --stats-report > stats.md` | `stats.md` | Diretório atual |
+
+### Busca de artigos
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Buscar artigos com termos e anos | `uv run python scielo_search.py --terms avalia educa --years 2022-2025` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Buscar em outra coleção | `uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Ver parâmetros da última busca | `uv run python scielo_search.py --show-params` | Nada (imprime no terminal) | — |
+| Listar todas as coleções disponíveis | `uv run python scielo_search.py --list-collections` | Nada (imprime no terminal) | — |
+
+### Scraping de artigos
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Extrair título, resumo e keywords (modo padrão) | `uv run python scielo_scraper.py sc_<ts>.csv` | `resultado.csv`, `scraper.log`, `stats.json` | `sc_<ts>_s_<ts>_api+html/` |
+| Extrair apenas via API (mais rápido, sem AoPs) | `uv run python scielo_scraper.py sc_<ts>.csv --only-api` | Idem | `sc_<ts>_s_<ts>_api/` |
+| Extrair apenas via HTML (API fora do ar) | `uv run python scielo_scraper.py sc_<ts>.csv --only-html` | Idem | `sc_<ts>_s_<ts>_html/` |
+| Retomar execução interrompida | `uv run python scielo_scraper.py sc_<ts>.csv --resume` | Nada novo — continua na pasta existente | Pasta mais recente existente |
+| Ver estatísticas de uma execução anterior | `uv run python scielo_scraper.py sc_<ts>.csv --stats-report` | Nada (imprime no terminal) | — |
+
+### Detecção de termos
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Detectar termos nos resultados (todos os anos) | `uv run python terms_matcher.py` | `terms_<ts>.csv`, `terms_<ts>.log`, `terms_<ts>_stats.json` | Diretório atual |
+| Detectar termos em anos específicos | `uv run python terms_matcher.py --years 2022 2024` | Idem | Diretório atual |
+| Alterar campos verificados em `criterio_ok` | `uv run python terms_matcher.py --required-fields titulo resumo keywords` | Idem | Diretório atual |
+| Exigir qualquer termo (não todos) | `uv run python terms_matcher.py --match-mode any` | Idem | Diretório atual |
+| Ver relatório do último run de termos | `uv run python terms_matcher.py --stats-report` | Nada (imprime no terminal) | — |
+
+### Gráficos comparativos
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Gerar gráficos a partir de `runs/` | `uv run python create_charts.py` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | Diretório atual |
+| Gráficos de anos específicos | `uv run python create_charts.py --years 2022 2024` | Idem | Diretório atual |
+| Salvar gráficos em outra pasta | `uv run python create_charts.py --output graficos/` | Idem | `graficos/` |
+| Gráfico agregado comparando todos os anos | `uv run python create_charts.py --base runs/ --output runs/` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | `runs/` |
+| Pular gráfico de fontes | `uv run python create_charts.py --no-sources` | `chart_status.png`, `chart_time.png` | Diretório atual |
 
 ---
 
@@ -415,7 +476,7 @@ uv run python scielo_scraper.py --stats-report --output-dir resultados/minha_pas
 
 ## 10. Gráficos comparativos com create_charts.py
 
-O `create_charts.py` lê as pastas `exemplos/<ano>/` geradas pelo `run_pipeline.py` e produz três gráficos PNG prontos para publicação.
+O `create_charts.py` lê as pastas `runs/<ano>/` geradas pelo `run_pipeline.py` e produz três gráficos PNG prontos para publicação.
 
 ### Uso básico
 
@@ -423,7 +484,7 @@ O `create_charts.py` lê as pastas `exemplos/<ano>/` geradas pelo `run_pipeline.
 uv run python create_charts.py
 ```
 
-Lê automaticamente todos os anos presentes em `exemplos/` e salva os gráficos no diretório atual.
+Lê automaticamente todos os anos presentes em `runs/` e salva os gráficos no diretório atual.
 
 ### Gráficos gerados
 
@@ -436,22 +497,23 @@ Lê automaticamente todos os anos presentes em `exemplos/` e salva os gráficos 
 ### Opções
 
 ```bash
-uv run python create_charts.py --years 2022 2024       # apenas esses anos
-uv run python create_charts.py --base outra/pasta      # pasta raiz alternativa
-uv run python create_charts.py --output graficos/      # pasta de saída
-uv run python create_charts.py --no-sources            # pular gráfico de fontes
-uv run python create_charts.py --no-status --no-time   # apenas gráfico de fontes
-uv run python create_charts.py -?                      # ajuda
+uv run python create_charts.py --years 2022 2024            # apenas esses anos
+uv run python create_charts.py --base outra/pasta           # pasta raiz alternativa
+uv run python create_charts.py --output graficos/           # pasta de saída
+uv run python create_charts.py --stem sc_20260411_143022    # run específico (evita ambiguidade)
+uv run python create_charts.py --no-sources                 # pular gráfico de fontes
+uv run python create_charts.py --no-status --no-time        # apenas gráfico de fontes
+uv run python create_charts.py -?                           # ajuda
 ```
 
 ---
 
 ## 11. Relatório consolidado com run_pipeline.py --stats-report
 
-Gera um relatório Markdown com as estatísticas de todas as execuções armazenadas em `exemplos/`, sem executar nenhum scraping.
+Gera um relatório Markdown com as estatísticas de todas as execuções armazenadas em `runs/`, sem executar nenhum scraping.
 
 ```bash
-# Relatório para exemplos/ no diretório atual (imprime no terminal)
+# Relatório para runs/ no diretório atual (imprime no terminal)
 uv run python run_pipeline.py --stats-report
 
 # Salvar em arquivo
@@ -669,7 +731,7 @@ uv run python scielo_scraper.py lista.csv
 | `sc_<ts>.csv` | `sc_20260411_143022.csv` | scielo_search.py |
 | `sc_<ts>_params.json` | `sc_20260411_143022_params.json` | scielo_search.py |
 | `<stem>_s_<ts>_<modo>/` | `sc_20260411_s_20260411_150312_api+html/` | scielo_scraper.py |
-| `exemplos/<ano>/` | `exemplos/2024/` | run_pipeline.py |
+| `runs/<ano>/` | `runs/2024/` | run_pipeline.py |
 | `terms_<ts>.csv` | `terms_20260415_161055.csv` | terms_matcher.py |
 | `terms_<ts>.log` | `terms_20260415_161055.log` | terms_matcher.py |
 | `terms_<ts>_stats.json` | `terms_20260415_161055_stats.json` | terms_matcher.py |
