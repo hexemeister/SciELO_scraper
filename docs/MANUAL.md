@@ -2,26 +2,26 @@
 
 ## Sumário
 
-- [Guia rápido — Qual comando responde qual pergunta?](#guia-rápido--qual-comando-responde-qual-pergunta)
-0. [Buscando artigos com scielo_search.py](#0-buscando-artigos-com-scielo_searchpy)
-1. [Instalação](#1-instalação)
-2. [Preparando o CSV de entrada](#2-preparando-o-csv-de-entrada)
-3. [Rodando o script](#3-rodando-o-script)
-4. [Entendendo os resultados](#4-entendendo-os-resultados)
-5. [Retomando uma execução interrompida](#5-retomando-uma-execução-interrompida)
-6. [Estratégias de extração](#6-estratégias-de-extração)
-7. [Outras coleções SciELO](#7-outras-coleções-scielo)
-8. [Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
-9. [Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
-10. [Gráficos comparativos com create_charts.py](#10-gráficos-comparativos-com-create_chartspy)
-11. [Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-run_pipelinepy---stats-report)
-12. [Detecção de termos com terms_matcher.py](#12-detecção-de-termos-com-terms_matcherpy)
-13. [Problemas comuns](#13-problemas-comuns)
-14. [Dicionário de dados e termos](#14-dicionário-de-dados-e-termos)
+- [Guia rápido de comandos](#guia-rápido-de-comandos)
+- [0. Buscando artigos com scielo_search.py](#0-buscando-artigos-com-scielo_searchpy)
+- [1. Instalação](#1-instalação)
+- [2. Preparando o CSV de entrada](#2-preparando-o-csv-de-entrada)
+- [3. Rodando o script](#3-rodando-o-script)
+- [4. Entendendo os resultados](#4-entendendo-os-resultados)
+- [5. Retomando uma execução interrompida](#5-retomando-uma-execução-interrompida)
+- [6. Estratégias de extração](#6-estratégias-de-extração)
+- [7. Outras coleções SciELO](#7-outras-coleções-scielo)
+- [8. Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
+- [9. Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
+- [10. Gráficos comparativos com create_charts.py](#10-gráficos-comparativos-com-create_chartspy)
+- [11. Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-run_pipelinepy---stats-report)
+- [12. Detecção de termos com terms_matcher.py](#12-detecção-de-termos-com-terms_matcherpy)
+- [13. Problemas comuns](#13-problemas-comuns)
+- [14. Dicionário de dados e termos](#14-dicionário-de-dados-e-termos)
 
 ---
 
-## Guia rápido — Qual comando responde qual pergunta?
+## Guia rápido de comandos
 
 Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro.
 
