@@ -2,21 +2,27 @@
 create_charts.py — Gera gráficos comparativos das execuções do SciELO Scraper.
 
 Uso:
-    uv run python create_charts.py                      # pastas *_s_*/ mais recentes no dir atual
-    uv run python create_charts.py --base exemplos      # varre exemplos/<ano>/ (multi-ano)
-    uv run python create_charts.py --base exemplos --years 2022 2024
-    uv run python create_charts.py --output graficos/   # pasta de saída personalizada
-    uv run python create_charts.py --timestamp          # adiciona timestamp nos nomes dos PNGs
-    uv run python create_charts.py --no-status          # pula gráfico de status
-    uv run python create_charts.py --no-sources         # pula gráfico de fontes
-    uv run python create_charts.py --no-time            # pula gráfico de tempo
-    uv run python create_charts.py --dry-run            # mostra o que faria sem gravar nada
-    uv run python create_charts.py -?                   # ajuda (equivalente a -h)
+    uv run python create_charts.py                           # pastas *_s_*/ mais recentes no dir atual
+    uv run python create_charts.py --stem sc_20260418_123456 # busca pastas do stem específico (determinístico)
+    uv run python create_charts.py --base runs               # varre runs/<ano>/ (multi-ano)
+    uv run python create_charts.py --base runs --years 2022 2024
+    uv run python create_charts.py --output graficos/        # pasta de saída personalizada
+    uv run python create_charts.py --timestamp               # adiciona timestamp nos nomes dos PNGs
+    uv run python create_charts.py --no-status               # pula gráfico de status
+    uv run python create_charts.py --no-sources              # pula gráfico de fontes
+    uv run python create_charts.py --no-time                 # pula gráfico de tempo
+    uv run python create_charts.py --dry-run                 # mostra o que faria sem gravar nada
+    uv run python create_charts.py -?                        # ajuda (equivalente a -h)
 
 Gráficos gerados (salvo na pasta --output, default: diretório atual):
     chart_status[_<ts>].png   — distribuição de status por modo e ano
     chart_sources[_<ts>].png  — fontes de extração por modo e ano
     chart_time[_<ts>].png     — tempo total por modo e ano
+
+Notas:
+    --stem  garante busca determinística no modo padrão (sem --base): usa exatamente
+            as pastas <stem>_s_*_<modo>/ em vez do CSV mais recente no diretório.
+            Útil quando há múltiplos runs no mesmo diretório (ex: pipeline --per-year).
 """
 
 import argparse
@@ -70,16 +76,20 @@ def descobrir_pasta_modo(ano_dir: Path, modo: str) -> Path | None:
     return sorted(candidatas)[-1]
 
 
-def descobrir_pastas_cwd(cwd: Path) -> dict[str, Path]:
+def descobrir_pastas_cwd(cwd: Path, stem: str | None = None) -> dict[str, Path]:
     """
-    Modo padrão (sem --base): descobre o sc_*.csv mais recente no diretório atual
-    e retorna as pastas <stem>_s_*_<modo>/ correspondentes que possuem stats.json.
-    Retorna {modo: pasta} com apenas os modos encontrados.
+    Modo padrão (sem --base): descobre as pastas <stem>_s_*_<modo>/ no diretório atual.
+
+    Se stem for fornecido (ex: "sc_20260418_123456"), filtra exatamente por esse stem.
+    Caso contrário, usa o sc_*.csv mais recente como referência.
+    Retorna {modo: pasta} com apenas os modos encontrados (com stats.json).
     """
-    csvs = sorted(cwd.glob("sc_*.csv"), reverse=True)
-    if not csvs:
-        return {}
-    stem = csvs[0].stem   # ex: sc_20260415_223214
+    if stem is None:
+        csvs = sorted(cwd.glob("sc_*.csv"), reverse=True)
+        if not csvs:
+            return {}
+        stem = csvs[0].stem   # ex: sc_20260415_223214
+
     resultado: dict[str, Path] = {}
     for modo, padrao in MODO_SUFIXO.items():
         candidatas = [
@@ -561,12 +571,18 @@ def main():
     )
     parser.add_argument(
         "--base", default=None, metavar="DIR",
-        help="Pasta raiz com subpastas por ano (ex: exemplos). "
+        help="Pasta raiz com subpastas por ano (ex: runs). "
              "Sem --base: usa as pastas *_s_*/ mais recentes no diretório atual.",
     )
     parser.add_argument(
         "--years", nargs="+", type=int, metavar="YEAR",
         help="Anos a incluir — apenas com --base (ignorado no modo padrão)",
+    )
+    parser.add_argument(
+        "--stem", default=None, metavar="STEM",
+        help="Stem do CSV de busca (ex: sc_20260418_123456). "
+             "Filtra exatamente as pastas desse run no modo padrão (sem --base). "
+             "Ignorado quando --base é usado.",
     )
     parser.add_argument(
         "--output", default=".", metavar="DIR",
@@ -619,18 +635,25 @@ def main():
                 except FileNotFoundError as e:
                     print(f"  Aviso: {e} — modo {modo}/{ano} ignorado.")
     else:
-        # Modo padrão: pastas *_s_*/ mais recentes no diretório atual
-        pastas_cwd = descobrir_pastas_cwd(cwd)
+        # Modo padrão: pastas *_s_*/ no diretório atual
+        # --stem garante busca determinística; sem --stem usa o CSV mais recente
+        pastas_cwd = descobrir_pastas_cwd(cwd, stem=args.stem)
         if not pastas_cwd:
-            print(
+            msg = (
+                f"❌  Nenhuma pasta '{args.stem}_s_*/' com stats.json encontrada.\n"
+                f"   Verifique se o stem '{args.stem}' é correto."
+                if args.stem else
                 "❌  Nenhuma pasta *_s_*/ com stats.json encontrada no diretório atual.\n"
-                "   Use --base para apontar para outra pasta.",
-                file=sys.stderr,
+                "   Use --base para apontar para outra pasta ou --stem para especificar o run."
             )
+            print(msg, file=sys.stderr)
             sys.exit(1)
-        # Usa "run atual" como label do eixo (nome do CSV stem)
-        csvs = sorted(cwd.glob("sc_*.csv"), reverse=True)
-        label = csvs[0].stem if csvs else "run"
+        # Label do eixo: stem explícito ou stem do CSV mais recente
+        if args.stem:
+            label = args.stem
+        else:
+            csvs = sorted(cwd.glob("sc_*.csv"), reverse=True)
+            label = csvs[0].stem if csvs else "run"
         stats_por_ano[label] = {}
         for modo, pasta in pastas_cwd.items():
             try:

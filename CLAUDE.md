@@ -7,7 +7,7 @@
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
 | `run_pipeline.py` | Pipeline completo (v2.0): busca → 3×scraping → análise → 3×match → gráficos → cópia | `--year` | `runs/<ano>/` |
-| `create_charts.py` | Gera gráficos comparativos das execuções | `[--base]`, `--years`, `--output`, `--timestamp` | `chart_status[_<ts>].png`, `chart_sources[_<ts>].png`, `chart_time[_<ts>].png` |
+| `create_charts.py` | Gera gráficos comparativos das execuções | `[--base]`, `[--stem]`, `--years`, `--output`, `--timestamp` | `chart_status[_<ts>].png`, `chart_sources[_<ts>].png`, `chart_time[_<ts>].png` |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
@@ -42,7 +42,8 @@
 6. Terms matcher para api+html (`terms_matcher.py --mode api+html`)
 7. Terms matcher para api (`terms_matcher.py --mode api`)
 8. Terms matcher para html (`terms_matcher.py --mode html`)
-9. Gráficos comparativos (`create_charts.py --output runs/<ano>/`)
+9. Gráficos comparativos (`create_charts.py --stem <sc_ts> --output runs/<ano>/`)
+   - No `--per-year` com múltiplos anos: etapa extra ao final — `create_charts.py --base runs/ --output runs/` (chart agregado comparando todos os anos)
 
 **Comportamento padrão** (zero flags adicionais):
 - `--terms avalia educa` — termos de busca e detecção
@@ -69,7 +70,13 @@
 - `chart_status.png`, `chart_sources.png`, `chart_time.png`
 - `pipeline_stats.json` — resumo completo da execução (versão, termos, campos, etapas, stats por estratégia)
 
-**Limpeza automática:** após copiar tudo para `runs/<ano>/`, os originais no diretório raiz são removidos (CSV, `_params.json`, 3 pastas de scraping, `ANALISE_DISCREPANCIA_*.md`). Os gráficos e terms são gerados diretamente em `runs/<ano>/` (sem copiar do raiz).
+**Arquivamento automático (nunca apaga):** após copiar tudo para `runs/<ano>/`, o pipeline faz uma varredura de segurança no diretório raiz procurando qualquer arquivo/pasta do run atual (identificados pelo stem do CSV). Se encontrar algo:
+- Se já existe em `runs/<ano>/` → remove o original do raiz (era cópia redundante)
+- Se **não** existe em `runs/<ano>/` → **move** para `runs/<ano>/` e loga aviso (indica que a etapa não gerou no lugar certo)
+
+Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo raiz), então a varredura de segurança normalmente não encontra nada.
+
+**`create_charts.py --stem`:** o pipeline passa `--stem <sc_ts>` para busca determinística das pastas do run correto, evitando ambiguidade quando múltiplos runs coexistem no diretório (ex: durante `--per-year`).
 
 ## Comportamento do scraper (scielo_scraper.py v2.4)
 

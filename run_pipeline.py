@@ -828,6 +828,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
     # ── 9. Gráficos ───────────────────────────────────────────────────────────
     if not skip_charts:
         _header(9, "Graficos comparativos")
+        log(f"  Stem       : {stem}")
         log(f"  Saida      : {dest}/")
         log(f"  Graficos   : chart_status.png, chart_sources.png, chart_time.png")
 
@@ -837,6 +838,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
 
         rc = run(
             [python, "create_charts.py",
+             "--stem",   stem,
              "--output", str(dest)],
             dry,
         )
@@ -899,24 +901,77 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             run_dirs=run_dirs,
         )
 
-        # Limpar originais do diretório raiz
-        log("Limpando originais do diretorio raiz...")
-        for f in [csv_path, params]:
-            if f.exists():
-                f.unlink()
-                log(f"  Removido: {f.name}")
-        for est_item in ESTRATEGIAS:
-            path = run_dirs.get(est_item["label"])
-            if path and path.exists():
-                shutil.rmtree(path)
-                log(f"  Removido: {path.name}/")
-        if not skip_analysis and analise_path.exists():
-            analise_path.unlink()
-            log(f"  Removido: {analise_path.name}")
+        # Arquivar originais do diretório raiz (move → nunca apaga)
+        log("Arquivando originais do diretorio raiz...")
+        _arquivar_originais(
+            dest=dest,
+            stem=stem,
+            csv_path=csv_path,
+            params=params,
+            run_dirs=run_dirs,
+            analise_path=analise_path if not skip_analysis else None,
+        )
     else:
         log(f"  (dry-run) copiaria CSV, params.json, 3 pastas e analise para {dest}")
         log(f"  (dry-run) gravaria pipeline_stats.json em {dest}")
-        log(f"  (dry-run) removeria os originais do diretorio raiz")
+        log(f"  (dry-run) arquivaria (moveria) originais do diretorio raiz para {dest}")
+
+
+def _arquivar_originais(dest: Path, stem: str, csv_path: Path, params: Path,
+                        run_dirs: dict, analise_path: Path | None):
+    """
+    Move para dest qualquer arquivo/pasta do run atual que ainda esteja no raiz.
+    Nunca apaga — todo produto de cada etapa é importante.
+    Loga aviso para cada item movido (indica que foi gerado fora do lugar esperado).
+    """
+    movidos = 0
+
+    def _mover(src: Path, label: str):
+        nonlocal movidos
+        if not src.exists():
+            return
+        target = dest / src.name
+        if target.exists():
+            # Já copiado anteriormente — só remove o original
+            if src.is_dir():
+                shutil.rmtree(src)
+            else:
+                src.unlink()
+            log(f"  Removido (ja estava em dest): {label}")
+        else:
+            # Não estava em dest — move e avisa
+            if src.is_dir():
+                shutil.move(str(src), str(target))
+            else:
+                shutil.move(str(src), str(target))
+            log(f"  Arquivado (movido para dest): {label}", "WARN")
+        movidos += 1
+
+    # CSV de busca e params
+    _mover(csv_path, csv_path.name)
+    _mover(params,   params.name)
+
+    # Pastas de scraping
+    for est in ESTRATEGIAS:
+        path = run_dirs.get(est["label"])
+        if path:
+            _mover(path, path.name + "/")
+
+    # Análise de discrepância
+    if analise_path:
+        _mover(analise_path, analise_path.name)
+
+    # Varredura de segurança: qualquer outro arquivo/pasta do stem que sobrou
+    for item in HERE.iterdir():
+        if item == dest:
+            continue
+        if item.name.startswith(stem) and item != dest:
+            _mover(item, item.name + ("/" if item.is_dir() else ""))
+
+    if movidos == 0:
+        log("  Diretorio raiz limpo — nenhum arquivo residual encontrado.")
+    else:
+        log(f"  {movidos} item(ns) arquivado(s) em {dest.name}/")
 
 
 def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
@@ -1144,6 +1199,31 @@ def main():
                 terms_match_mode=args.terms_match_mode,
                 gp=gp,
             )
+
+        # ── Chart agregado multi-ano ───────────────────────────────────────────
+        if not args.skip_charts and len(years) > 1:
+            print()
+            log("=" * 62, "STEP")
+            log("Chart agregado multi-ano (todos os anos comparados)", "STEP")
+            log("=" * 62, "STEP")
+            log(f"  Fonte    : {base_runs}/")
+            log(f"  Saida    : {base_runs}/")
+            log(f"  Graficos : chart_status.png, chart_sources.png, chart_time.png")
+            if not dry:
+                base_runs.mkdir(parents=True, exist_ok=True)
+            rc = run(
+                [python, "create_charts.py",
+                 "--base",   str(base_runs),
+                 "--output", str(base_runs)],
+                dry,
+            )
+            if rc != 0:
+                log("  Chart agregado falhou — continuando", "WARN")
+            elif not dry:
+                charts = list(base_runs.glob("chart_*.png"))
+                if charts:
+                    log(f"  {len(charts)} grafico(s) agregado(s) gerado(s) em {base_runs.name}/")
+            print()
     else:
         dest = (
             Path(args.output_dir)
