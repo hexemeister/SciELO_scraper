@@ -178,29 +178,45 @@ uv run python scielo_search.py --terms avalia educa --years 2022-2025
 uv run python scielo_scraper.py sc_20260411_143022.csv
 # → gera sc_20260411_143022_s_20260411_150312_api+html/
 
-# 3. (Opcional) Gerar gráficos comparativos entre anos
-uv run python create_charts.py
-# → gera grafico_status.png, grafico_fontes.png, grafico_tempo.png
+# 3. (Opcional) Gerar gráficos comparativos de processo entre anos
+uv run python process_charts.py
+# → gera chart_status.png, chart_sources.png, chart_time.png
 
 # 4. (Opcional) Detectar termos por campo e gerar CSV auditável
 uv run python terms_matcher.py --years 2022 2023 2024 2025
 # → gera terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
 ```
 
-## create_charts.py — Gráficos comparativos
+## process_charts.py — Diagnóstico técnico do processo
 
-Gera três gráficos PNG a partir das pastas `exemplos/<ano>/` produzidas pelo `run_pipeline.py`:
+Gera três gráficos PNG de diagnóstico técnico (como o scraping correu) a partir das pastas `runs/<ano>/`:
 
-- **`grafico_status.png`** — distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano
-- **`grafico_fontes.png`** — fontes de extração no modo `api+html` por ano, com tabela de n exatos
-- **`grafico_tempo.png`** — tempo total de scraping por modo e ano
+- **`chart_status.png`** — distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano
+- **`chart_sources.png`** — fontes de extração no modo `api+html` por ano, com tabela de n exatos
+- **`chart_time.png`** — tempo total de scraping por modo e ano
 
 ```bash
-uv run python create_charts.py                      # lê exemplos/ no diretório atual
-uv run python create_charts.py --years 2022 2024    # apenas esses anos
-uv run python create_charts.py --output graficos/   # pasta de saída personalizada
-uv run python create_charts.py -?                   # ajuda
+uv run python process_charts.py                       # lê runs/ no diretório atual
+uv run python process_charts.py --years 2022 2024     # apenas esses anos
+uv run python process_charts.py --output graficos/    # pasta de saída personalizada
+uv run python process_charts.py --lang en             # gráficos em inglês
+uv run python process_charts.py --lang all            # gera em todos os idiomas
+uv run python process_charts.py -?                    # ajuda
 ```
+
+## results_report.py — Artefatos científicos
+
+Gera o arcabouço completo de artefatos científicos publication-ready a partir do `terms_*.csv` produzido pelo `terms_matcher.py`. Para o projeto e-Aval (Estado da Arte da Avaliação):
+
+```bash
+uv run python results_report.py                       # api+html, todos os anos em runs/
+uv run python results_report.py --years 2022 2024     # anos específicos
+uv run python results_report.py --lang en             # artefatos em inglês
+uv run python results_report.py --lang all            # todos os idiomas
+uv run python results_report.py -?                    # ajuda
+```
+
+Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos), tabelas CSV, parágrafos Markdown prontos para publicação (Metodologia + Resultados) e JSON de metadados.
 
 ## terms_matcher.py — Detecção de termos por campo
 

@@ -1059,6 +1059,35 @@ def main():
         logger.info("=" * 62)
 
     logger.info(f"  CSV de entrada   : {input_path.name}")
+
+    # ── Parâmetros da busca (params.json do scielo_search.py) ────────────────
+    params_path = input_path.with_name(input_path.stem + "_params.json")
+    if params_path.exists():
+        try:
+            import json as _json
+            with open(params_path, encoding="utf-8") as _pf:
+                _p = _json.load(_pf)
+            logger.info(f"  Origem busca     : SciELO Search")
+            _anos = _p.get("anos", [])
+            if _anos:
+                logger.info(f"  Anos buscados    : {', '.join(str(a) for a in sorted(_anos))}")
+            _termos = _p.get("termos_originais", [])
+            if _termos:
+                logger.info(f"  Termos de busca  : {', '.join(_termos)}"
+                            + (" (truncados com $)" if _p.get("truncamento") else ""))
+            _col = _p.get("colecao")
+            if _col:
+                logger.info(f"  Coleção busca    : {_col}")
+            _campos = _p.get("campos")
+            if _campos:
+                logger.info(f"  Campos busca     : {_campos}")
+            _total = _p.get("total_resultados")
+            if _total is not None:
+                logger.info(f"  Total buscado    : {_total} artigos")
+        except Exception:
+            pass  # params.json malformado — ignora silenciosamente
+    # ─────────────────────────────────────────────────────────────────────────
+
     logger.info(f"  Coleção          : {args.collection}")
     logger.info(f"  Pasta de saída   : {out_dir}")
     logger.info(f"  Modo extração    : {mode_str}")

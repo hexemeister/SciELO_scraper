@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-run_pipeline.py  v2.0
+run_pipeline.py  v2.1
 =====================
 Executa o pipeline completo: busca → extração (3 estratégias) →
 análise de discrepância → detecção de termos (terms_matcher) →
-gráficos comparativos (create_charts) → cópia para runs/<ano>/.
+gráficos comparativos (process_charts) → relatório científico (results_report) →
+cópia para runs/<ano>/.
 
 Verifica e instala dependências automaticamente antes de começar.
 
@@ -25,6 +26,7 @@ OPÇÕES
   --skip-analysis           Pular análise de discrepância
   --skip-match              Pular etapa do terms_matcher
   --skip-charts             Pular geração de gráficos
+  --skip-report             Pular geração do relatório científico (results_report.py)
   --per-year                Rodar pipeline separado por ano (um CSV e destino por ano)
   --dry-run                 Mostra o que faria sem executar nada
   --stats-report [DIR]      Gera relatório consolidado dos stats.json em DIR (default: runs/)
@@ -59,7 +61,7 @@ EXEMPLOS
   python run_pipeline.py --stats-report runs/         # idem com pasta explícita
 """
 
-__version__ = "2.0"
+__version__ = "2.1"
 
 import argparse
 import json
@@ -106,8 +108,8 @@ MODO_SUFIXO = {
 CAMPOS_DISPONIVEIS = ["titulo", "resumo", "keywords"]
 
 # Etapas do pipeline (para GlobalProgress e pipeline_stats)
-# busca(1) + 3×scraping(3) + análise(1) + 3×match(3) + charts(1) = 9
-ETAPAS_POR_ANO = 9
+# busca(1) + 3×scraping(3) + análise(1) + 3×match(3) + charts(1) + report(1) = 10
+ETAPAS_POR_ANO = 10
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
@@ -609,10 +611,10 @@ def _pasta_preferida(run_dirs: dict) -> Path | None:
 def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
                  collection: str, dest: Path, python: str,
                  skip_search: bool, skip_scrape: bool, skip_analysis: bool,
-                 skip_match: bool, skip_charts: bool, dry: bool,
+                 skip_match: bool, skip_charts: bool, skip_report: bool, dry: bool,
                  terms_fields: list[str], terms_match_mode: str,
                  gp: "GlobalProgress | None" = None):
-    """Executa search → 3×scrape → análise → 3×match → charts → cópia para dest."""
+    """Executa search → 3×scrape → análise → 3×match → charts → report → cópia para dest."""
 
     ano_ref   = years[0]
     anos_label = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
@@ -837,7 +839,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             dest.mkdir(parents=True, exist_ok=True)
 
         rc = run(
-            [python, "create_charts.py",
+            [python, "process_charts.py",
              "--stem",   stem,
              "--output", str(dest)],
             dry,
@@ -851,7 +853,59 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             if charts:
                 log(f"  {len(charts)} grafico(s) gerado(s) em {dest.name}/")
     else:
-        log("  Etapa 9/9: Graficos — PULADA (--skip-charts)", "WARN")
+        log(f"  Etapa 9/{ETAPAS_POR_ANO}: Graficos — PULADA (--skip-charts)", "WARN")
+        if gp:
+            gp.avancar()
+    print()
+
+    # ── 10. Relatório científico ──────────────────────────────────────────────
+    # As pastas de scraping ainda estão no raiz (cópia para dest ocorre depois).
+    # Passamos --stem para que results_report encontre o terms_*.csv correto.
+    if not skip_report:
+        est_principal = ESTRATEGIAS[0]  # api+html
+        slug_principal = est_principal["slug"]
+        pasta_principal = run_dirs.get(est_principal["label"])
+        report_output = dest / f"results_{stem}_{slug_principal}"
+
+        _header(10, "Relatorio cientifico (results_report)")
+        log(f"  Modo       : {slug_principal} (estrategia principal)")
+        log(f"  Pasta CSV  : {pasta_principal}")
+        log(f"  Saida      : {report_output}/")
+
+        if not dry:
+            dest.mkdir(parents=True, exist_ok=True)
+            report_output.mkdir(parents=True, exist_ok=True)
+
+        if pasta_principal and pasta_principal.exists():
+            terms_csvs = sorted(pasta_principal.glob("terms_*.csv"), reverse=True)
+            terms_csv = terms_csvs[0] if terms_csvs else None
+        else:
+            terms_csv = None
+
+        if terms_csv is None and not dry:
+            log("  Nenhum terms_*.csv encontrado — etapa pulada", "WARN")
+            if gp:
+                gp.avancar()
+        else:
+            # Usa --scrape-dir para apontar direto para a pasta de scraping
+            # (as pastas ainda estão no raiz neste momento, antes da cópia)
+            scrape_dir_arg = str(pasta_principal) if pasta_principal else "."
+            rc = run(
+                [python, "results_report.py",
+                 "--scrape-dir", scrape_dir_arg,
+                 "--output-dir", str(report_output)],
+                dry,
+            )
+            if gp:
+                gp.avancar()
+            if rc != 0:
+                log("  Relatorio cientifico falhou — continuando", "WARN")
+            elif not dry:
+                if report_output.exists():
+                    n = len(list(report_output.iterdir()))
+                    log(f"  {n} artefato(s) gerado(s) em {report_output.name}/")
+    else:
+        log(f"  Etapa 10/{ETAPAS_POR_ANO}: Relatorio cientifico — PULADA (--skip-report)", "WARN")
         if gp:
             gp.avancar()
     print()
@@ -898,6 +952,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             skip_analysis=skip_analysis,
             skip_match=skip_match,
             skip_charts=skip_charts,
+            skip_report=skip_report,
             run_dirs=run_dirs,
         )
 
@@ -978,7 +1033,8 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
                             terms: list[str], collection: str,
                             terms_fields: list[str], terms_match_mode: str,
                             skip_search: bool, skip_scrape: bool,
-                            skip_analysis: bool, skip_match: bool, skip_charts: bool,
+                            skip_analysis: bool, skip_match: bool,
+                            skip_charts: bool, skip_report: bool,
                             run_dirs: dict):
     """Grava pipeline_stats.json em dest com resumo completo da execução."""
     ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1014,6 +1070,11 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
         etapas_executadas.append("charts")
     else:
         etapas_puladas.append("charts")
+
+    if not skip_report:
+        etapas_executadas.append("results_report")
+    else:
+        etapas_puladas.append("results_report")
 
     # Resumo de stats por estratégia
     estrategias_stats = {}
@@ -1095,6 +1156,8 @@ def main():
         help="Pular etapa de detecção de termos (terms_matcher)")
     ap.add_argument("--skip-charts", action="store_true",
         help="Pular geração de gráficos comparativos")
+    ap.add_argument("--skip-report", action="store_true",
+        help="Pular geração do relatório científico (results_report.py)")
     ap.add_argument("--dry-run", action="store_true",
         help="Mostra o que faria sem executar nada")
     ap.add_argument(
@@ -1143,6 +1206,7 @@ def main():
         ("analysis", args.skip_analysis),
         ("match",    args.skip_match),
         ("charts",   args.skip_charts),
+        ("report",   args.skip_report),
     ] if v]
     if etapas_skip:
         log(f"Etapas puladas  : {', '.join(etapas_skip)}", "WARN")
@@ -1194,6 +1258,7 @@ def main():
                 skip_analysis=args.skip_analysis,
                 skip_match=args.skip_match,
                 skip_charts=args.skip_charts,
+                skip_report=args.skip_report,
                 dry=dry,
                 terms_fields=args.terms_fields,
                 terms_match_mode=args.terms_match_mode,
@@ -1212,7 +1277,7 @@ def main():
             if not dry:
                 base_runs.mkdir(parents=True, exist_ok=True)
             rc = run(
-                [python, "create_charts.py",
+                [python, "process_charts.py",
                  "--base",   str(base_runs),
                  "--output", str(base_runs)],
                 dry,
@@ -1244,6 +1309,7 @@ def main():
             skip_analysis=args.skip_analysis,
             skip_match=args.skip_match,
             skip_charts=args.skip_charts,
+            skip_report=args.skip_report,
             dry=dry,
             terms_fields=args.terms_fields,
             terms_match_mode=args.terms_match_mode,

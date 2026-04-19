@@ -13,11 +13,12 @@
 - [7. Outras coleções SciELO](#7-outras-coleções-scielo)
 - [8. Ajustando velocidade e comportamento](#8-ajustando-velocidade-e-comportamento)
 - [9. Verificando estatísticas de uma execução anterior](#9-verificando-estatísticas-de-uma-execução-anterior)
-- [10. Gráficos comparativos com create_charts.py](#10-gráficos-comparativos-com-create_chartspy)
+- [10. Gráficos de diagnóstico com process_charts.py](#10-gráficos-de-diagnóstico-com-process_chartspy)
 - [11. Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-run_pipelinepy---stats-report)
 - [12. Detecção de termos com terms_matcher.py](#12-detecção-de-termos-com-terms_matcherpy)
-- [13. Problemas comuns](#13-problemas-comuns)
-- [14. Dicionário de dados e termos](#14-dicionário-de-dados-e-termos)
+- [13. Artefatos científicos com results_report.py](#13-artefatos-científicos-com-results_reportpy)
+- [14. Problemas comuns](#14-problemas-comuns)
+- [15. Dicionário de dados e termos](#15-dicionário-de-dados-e-termos)
 
 ---
 
@@ -36,7 +37,8 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Reutilizar scraping já feito (pular scraper) | `uv run python run_pipeline.py --year 2024 --skip-scrape` | Análise + termos + gráficos | `runs/2024/` |
 | Pular análise de discrepância | `uv run python run_pipeline.py --year 2024 --skip-analysis` | Busca + scraping + termos + gráficos | `runs/2024/` |
 | Pular detecção de termos | `uv run python run_pipeline.py --year 2024 --skip-match` | Busca + scraping + análise + gráficos | `runs/2024/` |
-| Pular gráficos | `uv run python run_pipeline.py --year 2024 --skip-charts` | Busca + scraping + análise + termos | `runs/2024/` |
+| Pular gráficos de processo | `uv run python run_pipeline.py --year 2024 --skip-charts` | Busca + scraping + análise + termos + relatório | `runs/2024/` |
+| Pular relatório científico | `uv run python run_pipeline.py --year 2024 --skip-report` | Busca + scraping + análise + termos + gráficos | `runs/2024/` |
 | Ver relatório consolidado de todos os anos | `uv run python run_pipeline.py --stats-report` | Imprime Markdown no terminal | — |
 | Salvar relatório em arquivo | `uv run python run_pipeline.py --stats-report > stats.md` | `stats.md` | Diretório atual |
 
@@ -69,15 +71,27 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Exigir qualquer termo (não todos) | `uv run python terms_matcher.py --match-mode any` | Idem | Diretório atual |
 | Ver relatório do último run de termos | `uv run python terms_matcher.py --stats-report` | Nada (imprime no terminal) | — |
 
-### Gráficos comparativos
+### Gráficos de diagnóstico do processo
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Gerar gráficos a partir de `runs/` | `uv run python create_charts.py` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | Diretório atual |
-| Gráficos de anos específicos | `uv run python create_charts.py --years 2022 2024` | Idem | Diretório atual |
-| Salvar gráficos em outra pasta | `uv run python create_charts.py --output graficos/` | Idem | `graficos/` |
-| Gráfico agregado comparando todos os anos | `uv run python create_charts.py --base runs/ --output runs/` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | `runs/` |
-| Pular gráfico de fontes | `uv run python create_charts.py --no-sources` | `chart_status.png`, `chart_time.png` | Diretório atual |
+| Gerar gráficos a partir de `runs/` | `uv run python process_charts.py` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | Diretório atual |
+| Gráficos de anos específicos | `uv run python process_charts.py --years 2022 2024` | Idem | Diretório atual |
+| Salvar gráficos em outra pasta | `uv run python process_charts.py --output graficos/` | Idem | `graficos/` |
+| Gráfico agregado comparando todos os anos | `uv run python process_charts.py --base runs/ --output runs/` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | `runs/` |
+| Gráficos em inglês | `uv run python process_charts.py --lang en` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | Diretório atual |
+| Gráficos em todos os idiomas | `uv run python process_charts.py --lang all` | `chart_status_pt.png`, `chart_status_en.png`, ... | Diretório atual |
+| Pular gráfico de fontes | `uv run python process_charts.py --no-sources` | `chart_status.png`, `chart_time.png` | Diretório atual |
+
+### Artefatos científicos (resultados)
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Gerar todos os artefatos (api+html, todos os anos) | `uv run python results_report.py` | 5 gráficos, 3 CSVs, `results_text.md`, `results_report.json` | `runs/<último_ano>/results_<stem>/` |
+| Anos específicos | `uv run python results_report.py --years 2022 2024` | Idem | `runs/<último_ano>/results_<stem>/` |
+| Estratégia alternativa | `uv run python results_report.py --mode api` | Idem | `runs/<último_ano>/results_<stem>/` |
+| Artefatos em inglês | `uv run python results_report.py --lang en` | Idem com sufixo `_en` nos textos | `runs/<último_ano>/results_<stem>/` |
+| Pasta de saída explícita | `uv run python results_report.py --output-dir relatorios/` | Idem | `relatorios/` |
 
 ---
 
@@ -474,14 +488,14 @@ uv run python scielo_scraper.py --stats-report --output-dir resultados/minha_pas
 
 ---
 
-## 10. Gráficos comparativos com create_charts.py
+## 10. Gráficos de diagnóstico com process_charts.py
 
-O `create_charts.py` lê as pastas `runs/<ano>/` geradas pelo `run_pipeline.py` e produz três gráficos PNG prontos para publicação.
+O `process_charts.py` é o script de **diagnóstico técnico do processo** — visualiza como o scraping correu (taxas de sucesso, fontes de extração, tempo). Lê as pastas `runs/<ano>/` e produz três gráficos PNG.
 
 ### Uso básico
 
 ```bash
-uv run python create_charts.py
+uv run python process_charts.py
 ```
 
 Lê automaticamente todos os anos presentes em `runs/` e salva os gráficos no diretório atual.
@@ -490,20 +504,22 @@ Lê automaticamente todos os anos presentes em `runs/` e salva os gráficos no d
 
 | Arquivo | O que mostra |
 |---|---|
-| `grafico_status.png` | Distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano. Barras cinzas para a categoria dominante; cores fortes para casos raros. Tabela inset com n exatos. |
-| `grafico_fontes.png` | Fontes de extração no modo `api+html` por ano: ArticleMeta API, Fallback API+HTML, Fallback HTML, Falha de acesso. Tabela com n exatos abaixo. |
-| `grafico_tempo.png` | Tempo total de scraping (em minutos) por modo e ano, para comparar custo entre estratégias. |
+| `chart_status.png` | Distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano. Barras cinzas para a categoria dominante; cores fortes para casos raros. Tabela inset com n exatos. |
+| `chart_sources.png` | Fontes de extração no modo `api+html` por ano. Distingue: *ArticleMeta API* (todos os campos via API), *Fallback API+HTML* (API parcial + complemento HTML), *Fallback HTML* (API sem dados + extração inteiramente via HTML), *Falha de acesso* (erro HTTP). |
+| `chart_time.png` | Tempo total de scraping (em minutos) por modo e ano, para comparar custo entre estratégias. |
 
 ### Opções
 
 ```bash
-uv run python create_charts.py --years 2022 2024            # apenas esses anos
-uv run python create_charts.py --base outra/pasta           # pasta raiz alternativa
-uv run python create_charts.py --output graficos/           # pasta de saída
-uv run python create_charts.py --stem sc_20260411_143022    # run específico (evita ambiguidade)
-uv run python create_charts.py --no-sources                 # pular gráfico de fontes
-uv run python create_charts.py --no-status --no-time        # apenas gráfico de fontes
-uv run python create_charts.py -?                           # ajuda
+uv run python process_charts.py --years 2022 2024            # apenas esses anos
+uv run python process_charts.py --base outra/pasta           # pasta raiz alternativa
+uv run python process_charts.py --output graficos/           # pasta de saída
+uv run python process_charts.py --stem sc_20260411_143022    # run específico (evita ambiguidade)
+uv run python process_charts.py --lang en                    # gráficos em inglês
+uv run python process_charts.py --lang all                   # todos os idiomas (sufixo _pt/_en)
+uv run python process_charts.py --no-sources                 # pular gráfico de fontes
+uv run python process_charts.py --no-status --no-time        # apenas gráfico de fontes
+uv run python process_charts.py -?                           # ajuda
 ```
 
 ---
@@ -615,7 +631,82 @@ uv run python terms_matcher.py -?                          # ajuda
 
 ---
 
-## 13. Problemas comuns
+## 13. Artefatos científicos com results_report.py
+
+Gera o arcabouço completo de artefatos científicos publication-ready a partir do `terms_*.csv` produzido pelo `terms_matcher.py`. Focado nos **resultados** — o que foi encontrado, não como o processo técnico correu.
+
+Contexto: ferramenta do projeto *Estado da Arte da Avaliação* (e-Aval), grupo de pesquisa do Mestrado Profissional em Avaliação da Fundação Cesgranrio.
+
+### Uso básico
+
+```bash
+# Todos os anos em runs/, estratégia api+html (padrão)
+uv run python results_report.py
+
+# Anos específicos
+uv run python results_report.py --years 2022 2023 2024 2025
+
+# Pasta de saída explícita
+uv run python results_report.py --output-dir meus_relatorios/
+
+# Artefatos em inglês
+uv run python results_report.py --lang en
+
+# Todos os idiomas (gera um conjunto por idioma)
+uv run python results_report.py --lang all
+```
+
+### Artefatos gerados em `results_<stem>/`
+
+**Gráficos:**
+
+| Arquivo | O que mostra |
+|---|---|
+| `results_funnel.png` | Funil de seleção: total buscado → scrapeado → criterio_ok, por ano |
+| `results_trend.png` | Evolução temporal de criterio_ok: n artigos e % por ano |
+| `results_terms_heatmap.png` | Heatmap termos × campos: % de artigos (base: criterio_ok=True) onde cada termo aparece em cada campo |
+| `results_journals.png` | Top N periódicos com mais artigos criterio_ok |
+| `results_coverage.png` | % de artigos com título / resumo / keywords em PT presentes, por ano |
+
+**Tabelas:**
+
+| Arquivo | Conteúdo |
+|---|---|
+| `results_table_summary.csv` | Funil por ano: total buscado, scrapeado, criterio_ok n e % |
+| `results_table_terms.csv` | Por termo × campo: n e % de ocorrência (base: criterio_ok) |
+| `results_table_journals.csv` | Todos os periódicos com contagem, % e anos presentes |
+
+**Texto:**
+
+| Arquivo | Conteúdo |
+|---|---|
+| `results_text.md` | Parágrafos prontos para publicação: Metodologia + Resultados (em PT-BR) |
+| `results_text_en.md` | Idem em inglês (gerado com `--lang en` ou `--lang all`) |
+
+**Metadados:**
+
+| Arquivo | Conteúdo |
+|---|---|
+| `results_report.json` | Todos os dados calculados — para consulta, reúso ou integração |
+
+### Opções completas
+
+```bash
+uv run python results_report.py --base outra/pasta        # pasta raiz alternativa
+uv run python results_report.py --years 2022 2024         # anos específicos
+uv run python results_report.py --mode api                # estratégia alternativa
+uv run python results_report.py --scrape-dir sc_<ts>_s_<ts>_api+html/  # pasta direta
+uv run python results_report.py --output-dir relatorios/  # pasta de saída
+uv run python results_report.py --lang en                 # inglês
+uv run python results_report.py --lang all                # todos os idiomas
+uv run python results_report.py --top-journals 20         # top 20 periódicos (default: 15)
+uv run python results_report.py --dry-run                 # simula sem gravar
+uv run python results_report.py -?                        # ajuda
+```
+
+---
+
+## 14. Problemas comuns
 
 ### "PID inválido"
 
@@ -652,7 +743,7 @@ uv run python scielo_scraper.py lista.csv
 
 ---
 
-## 14. Dicionário de dados e termos
+## 15. Dicionário de dados e termos
 
 ### Conceitos e terminologia
 
@@ -735,3 +826,6 @@ uv run python scielo_scraper.py lista.csv
 | `terms_<ts>.csv` | `terms_20260415_161055.csv` | terms_matcher.py |
 | `terms_<ts>.log` | `terms_20260415_161055.log` | terms_matcher.py |
 | `terms_<ts>_stats.json` | `terms_20260415_161055_stats.json` | terms_matcher.py |
+| `results_<stem>/` | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
+| `results_text[_en].md` | `results_text.md`, `results_text_en.md` | results_report.py |
+| `results_report.json` | `results_report.json` | results_report.py |
