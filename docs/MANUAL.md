@@ -1,5 +1,13 @@
 # Manual do Usuário — SciELO Scraper v2.4
 
+> **Projeto e-Aval — Estado da Arte da Avaliação**
+> Grupo de pesquisa do Mestrado Profissional em Avaliação da Fundação Cesgranrio.
+> Este conjunto de ferramentas apoia o processo anual de coleta, extração, filtragem e análise
+> da produção científica em avaliação educacional indexada no SciELO Brasil.
+>
+> - 🌐 Banco de dados público: https://eavaleducacao1.websiteseguro.com/
+> - 💻 Repositório do banco de dados: https://github.com/hexemeister/eaval
+
 ## Sumário
 
 - [Guia rápido de comandos](#guia-rápido-de-comandos)
@@ -91,7 +99,11 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Anos específicos | `uv run python results_report.py --years 2022 2024` | Idem | `runs/<último_ano>/results_<stem>/` |
 | Estratégia alternativa | `uv run python results_report.py --mode api` | Idem | `runs/<último_ano>/results_<stem>/` |
 | Artefatos em inglês | `uv run python results_report.py --lang en` | Idem com sufixo `_en` nos textos | `runs/<último_ano>/results_<stem>/` |
+| Ambos os idiomas | `uv run python results_report.py --lang all` | PT + EN em paralelo | `runs/<último_ano>/results_<stem>/` |
 | Pasta de saída explícita | `uv run python results_report.py --output-dir relatorios/` | Idem | `relatorios/` |
+| Ver artefatos no terminal (sem regerar) | `uv run python results_report.py --show-report runs/.../results_report.json` | Nada (imprime no terminal) | — |
+| Listar todos os artefatos com descrição | `uv run python results_report.py --help-artifacts` | Nada (imprime no terminal) | — |
+| Descrição detalhada de um artefato | `uv run python results_report.py --help-artifact results_funnel` | Nada (imprime no terminal) | — |
 
 ---
 
@@ -666,7 +678,7 @@ uv run python results_report.py --lang all
 | `results_trend.png` | Evolução temporal de criterio_ok: n artigos e % por ano |
 | `results_terms_heatmap.png` | Heatmap termos × campos: % de artigos (base: criterio_ok=True) onde cada termo aparece em cada campo |
 | `results_journals.png` | Top N periódicos com mais artigos criterio_ok |
-| `results_coverage.png` | % de artigos com título / resumo / keywords em PT presentes, por ano |
+| `results_coverage.png` | % de artigos com título / resumo / palavras-chave em PT presentes, por ano |
 
 **Tabelas:**
 
@@ -680,7 +692,7 @@ uv run python results_report.py --lang all
 
 | Arquivo | Conteúdo |
 |---|---|
-| `results_text.md` | Parágrafos prontos para publicação: Metodologia + Resultados (em PT-BR) |
+| `results_text.md` | Parágrafos prontos para publicação: Metodologia + Resultados + Limitações + Artefatos (PT-BR) |
 | `results_text_en.md` | Idem em inglês (gerado com `--lang en` ou `--lang all`) |
 
 **Metadados:**
@@ -702,7 +714,41 @@ uv run python results_report.py --lang all                # todos os idiomas
 uv run python results_report.py --top-journals 20         # top 20 periódicos (default: 15)
 uv run python results_report.py --dry-run                 # simula sem gravar
 uv run python results_report.py -?                        # ajuda
+uv run python results_report.py --show-report             # renderiza results_report.json existente no terminal
+uv run python results_report.py --show-report outro/caminho/results_report.json  # arquivo específico
+uv run python results_report.py --help-artifacts          # lista resumida de todos os artefatos
+uv run python results_report.py --help-artifact results_funnel  # descrição detalhada de um artefato
 ```
+
+### Consultando artefatos gerados
+
+**`--show-report`** — exibe um relatório formatado no terminal a partir de um `results_report.json` já gerado, sem precisar reprocessar os dados:
+
+```bash
+# Usa results_report.json no diretório atual
+uv run python results_report.py --show-report
+
+# Aponta para arquivo específico
+uv run python results_report.py --show-report runs/2026/results_.../results_report.json
+```
+
+Mostra: resumo por ano (buscados, scrapeados, critério ok), tabela de termos × campos e top 10 periódicos.
+
+**`--help-artifacts`** — lista todos os artefatos com nome, tipo e nome de arquivo:
+
+```bash
+uv run python results_report.py --help-artifacts
+```
+
+**`--help-artifact <nome>`** — descrição detalhada de um artefato específico, em PT-BR e EN:
+
+```bash
+uv run python results_report.py --help-artifact results_terms_heatmap
+uv run python results_report.py --help-artifact results_text
+uv run python results_report.py --help-artifact results_report
+```
+
+Nomes de artefatos disponíveis: `results_funnel`, `results_trend`, `results_terms_heatmap`, `results_journals`, `results_coverage`, `results_table_summary`, `results_table_terms`, `results_table_journals`, `results_text`, `results_report`.
 
 ---
 

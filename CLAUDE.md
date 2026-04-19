@@ -102,6 +102,9 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **`--scrape-dir DIR`:** aponta diretamente para uma pasta de scraping (ex: `sc_<ts>_s_<ts>_api+html/`). Usado pelo pipeline antes da cópia para `runs/`.
 - **`--output-dir DIR`:** pasta de saída explícita. Sem esta flag, cria `results_<stem>/` ao lado da pasta de scraping.
 - **`--lang pt|en|all`:** idioma dos artefatos. Gráficos e textos Markdown são gerados por idioma.
+- **`--show-report [JSON]`:** renderiza `results_report.json` no terminal sem regerar artefatos. Mostra: resumo por ano, termos × campos e top 10 periódicos.
+- **`--help-artifacts`:** lista resumida de todos os artefatos (nome, tipo, arquivo).
+- **`--help-artifact <nome>`:** descrição detalhada de um artefato, em PT-BR e EN.
 - **Subpasta de saída:** `results_<stem_scraping>/` — ex: `results_sc_20260418_132349_s_20260418_132356_api+html/`
 
 **Artefatos gerados:**
@@ -112,7 +115,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 | `results_terms_heatmap.png` | Heatmap termos × campos (% de ocorrência, base: criterio_ok) |
 | `results_journals.png` | Top N periódicos por n artigos criterio_ok |
 | `results_coverage.png` | % de artigos com cada campo PT presente por ano |
-| `results_text[_en].md` | Parágrafos prontos: Metodologia + Resultados |
+| `results_text[_en].md` | Texto publication-ready: Metodologia + Resultados + Limitações + Artefatos |
 | `results_table_summary.csv` | Funil por ano + totais |
 | `results_table_terms.csv` | Por termo × campo: n e % |
 | `results_table_journals.csv` | Todos os periódicos com contagem e % |

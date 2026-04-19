@@ -2,6 +2,12 @@
 
 Extrai **título**, **resumo** e **palavras-chave em português** de artigos SciELO a partir de um CSV com PIDs (identificadores SciELO).
 
+Desenvolvido para o projeto **e-Aval** — *Estado da Arte da Avaliação* — do grupo de pesquisa do [Mestrado Profissional em Avaliação da Fundação Cesgranrio](https://eavaleducacao1.websiteseguro.com/). O banco de dados público recebe os artigos curados após o processo de filtragem e verificação humana realizado com este conjunto de ferramentas.
+
+- 🌐 Banco de dados: https://eavaleducacao1.websiteseguro.com/
+- 💻 Repositório do banco de dados: https://github.com/hexemeister/eaval
+- 📧 Contato: eaval.bd@gmail.com
+
 ## Como funciona
 
 O script usa duas fontes de dados por ordem de prioridade:
