@@ -64,7 +64,7 @@ EXEMPLOS
   python scielo_search.py --show-params exemplos/2024/sc_20260413_092345_params.json
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import argparse
 import html as html_mod
@@ -326,6 +326,30 @@ def list_collections(logger: logging.Logger):
     print(f"{'='*62}\n")
 
 
+# ── Rastreabilidade ───────────────────────────────────────────────────────────
+def _origem(args) -> dict:
+    """Reconstrói o comando CLI que gerou este JSON para rastreabilidade."""
+    import sys
+    cmd = ["uv", "run", "python", "scielo_search.py"]
+    if args.terms != ["avalia", "educa"]:
+        cmd += ["--terms"] + args.terms
+    if getattr(args, "years", None):
+        cmd += ["--years"] + [str(y) for y in args.years]
+    if args.collection != "scl":
+        cmd += ["--collection", args.collection]
+    if args.fields != "ti+ab":
+        cmd += ["--fields", args.fields]
+    if getattr(args, "no_truncate", False):
+        cmd += ["--no-truncate"]
+    if getattr(args, "output", None):
+        cmd += ["--output", str(args.output)]
+    return {
+        "comando": " ".join(cmd),
+        "argv":    sys.argv[1:],
+        "cwd":     str(Path(".").resolve()),
+    }
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(
@@ -515,6 +539,7 @@ def main():
 
     # ── Salvar _params.json ───────────────────────────────────────────────────
     params_data["total_resultados"] = len(df)
+    params_data["origem"] = _origem(args)
     try:
         with open(params_path, "w", encoding="utf-8") as f:
             json.dump(params_data, f, ensure_ascii=False, indent=2)

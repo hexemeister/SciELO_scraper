@@ -59,7 +59,7 @@ EXEMPLOS
   python scielo_scraper.py lista.csv --stats-report --output-dir resultados/
 """
 
-__version__ = "2.4"
+__version__ = "2.5"
 
 import argparse
 import html as html_mod
@@ -849,6 +849,36 @@ def log_stats(stats: dict, logger):
         logger.info(line)
 
 
+# ── Rastreabilidade ───────────────────────────────────────────────────────────
+def _origem(args) -> dict:
+    """Reconstrói o comando CLI que gerou este JSON para rastreabilidade."""
+    import sys
+    cmd = ["uv", "run", "python", "scielo_scraper.py"]
+    if args.input_csv:
+        cmd.append(str(args.input_csv))
+    if getattr(args, "only_api", False):
+        cmd.append("--only-api")
+    if getattr(args, "only_html", False):
+        cmd.append("--only-html")
+    if getattr(args, "output_dir", None):
+        cmd += ["--output-dir", str(args.output_dir)]
+    if args.collection != "scl":
+        cmd += ["--collection", args.collection]
+    if args.workers != 1:
+        cmd += ["--workers", str(args.workers)]
+    if args.delay != 1.5:
+        cmd += ["--delay", str(args.delay)]
+    if args.checkpoint != 25:
+        cmd += ["--checkpoint", str(args.checkpoint)]
+    if getattr(args, "no_resume", False):
+        cmd.append("--no-resume")
+    return {
+        "comando": " ".join(cmd),
+        "argv":    sys.argv[1:],
+        "cwd":     str(Path(".").resolve()),
+    }
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(
@@ -1233,6 +1263,7 @@ def main():
         "workers": args.workers, "collection": args.collection,
     }
     stats = compute_stats(all_results, elapsed, __version__, mode_flags)
+    stats["origem"] = _origem(args)
     log_stats(stats, logger)
 
     with open(stats_path, "w", encoding="utf-8") as f:

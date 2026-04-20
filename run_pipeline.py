@@ -61,7 +61,7 @@ EXEMPLOS
   python run_pipeline.py --stats-report runs/         # idem com pasta explícita
 """
 
-__version__ = "2.1"
+__version__ = "2.2"
 
 import argparse
 import json
@@ -954,6 +954,7 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             skip_charts=skip_charts,
             skip_report=skip_report,
             run_dirs=run_dirs,
+            origem=_origem(args),
         )
 
         # Arquivar originais do diretório raiz (move → nunca apaga)
@@ -1029,13 +1030,42 @@ def _arquivar_originais(dest: Path, stem: str, csv_path: Path, params: Path,
         log(f"  {movidos} item(ns) arquivado(s) em {dest.name}/")
 
 
+def _origem(args) -> dict:
+    """Reconstrói o comando CLI que gerou este JSON para rastreabilidade."""
+    import sys
+    cmd = ["uv", "run", "python", "run_pipeline.py"]
+    if args.year:
+        cmd += ["--year"] + [str(y) for y in args.year]
+    if args.terms != ["avalia", "educa"]:
+        cmd += ["--terms"] + args.terms
+    if args.collection != "scl":
+        cmd += ["--collection", args.collection]
+    if getattr(args, "output_dir", None):
+        cmd += ["--output-dir", str(args.output_dir)]
+    if args.terms_fields != ["titulo", "keywords"]:
+        cmd += ["--terms-fields"] + args.terms_fields
+    if args.terms_match_mode != "all":
+        cmd += ["--terms-match-mode", args.terms_match_mode]
+    if getattr(args, "per_year", False):
+        cmd.append("--per-year")
+    for flag in ("skip_search", "skip_scrape", "skip_analysis",
+                 "skip_match", "skip_charts", "skip_report"):
+        if getattr(args, flag, False):
+            cmd.append(f"--{flag.replace('_', '-')}")
+    return {
+        "comando": " ".join(cmd),
+        "argv":    sys.argv[1:],
+        "cwd":     str(Path(".").resolve()),
+    }
+
+
 def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
                             terms: list[str], collection: str,
                             terms_fields: list[str], terms_match_mode: str,
                             skip_search: bool, skip_scrape: bool,
                             skip_analysis: bool, skip_match: bool,
                             skip_charts: bool, skip_report: bool,
-                            run_dirs: dict):
+                            run_dirs: dict, origem: dict | None = None):
     """Grava pipeline_stats.json em dest com resumo completo da execução."""
     ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -1107,6 +1137,7 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
         "etapas_executadas":  etapas_executadas,
         "etapas_puladas":     etapas_puladas,
         "estrategias":        estrategias_stats,
+        "origem":             origem or {},
     }
 
     out = dest / "pipeline_stats.json"

@@ -63,7 +63,7 @@ EXEMPLOS
     → criterio_ok = True se todos os termos estão em qualquer campo
 """
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import argparse
 import json
@@ -441,6 +441,34 @@ def _cmd_stats_report(arg, log_level: str):
     print(f"{'=' * 62}\n")
 
 
+# ── Rastreabilidade ───────────────────────────────────────────────────────────
+def _origem(args) -> dict:
+    """Reconstrói o comando CLI que gerou este JSON para rastreabilidade."""
+    import sys
+    cmd = ["uv", "run", "python", "terms_matcher.py"]
+    if getattr(args, "base", None):
+        cmd += ["--base", str(args.base)]
+    if getattr(args, "years", None):
+        cmd += ["--years"] + [str(y) for y in args.years]
+    if args.terms != TERMOS_DEFAULT:
+        cmd += ["--terms"] + args.terms
+    if args.required_fields != CAMPOS_DEFAULT:
+        cmd += ["--required-fields"] + args.required_fields
+    if args.mode != MODO_DEFAULT:
+        cmd += ["--mode", args.mode]
+    if getattr(args, "match_mode", "all") != "all":
+        cmd += ["--match-mode", args.match_mode]
+    if getattr(args, "output_dir", None):
+        cmd += ["--output-dir", str(args.output_dir)]
+    if getattr(args, "no_truncate", False):
+        cmd.append("--no-truncate")
+    return {
+        "comando": " ".join(cmd),
+        "argv":    sys.argv[1:],
+        "cwd":     str(Path(".").resolve()),
+    }
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     parser = build_parser()
@@ -675,6 +703,7 @@ def main():
         "global":             stats_global,
     }
 
+    stats_saida["origem"] = _origem(args)
     with open(stats_path, "w", encoding="utf-8") as f:
         json.dump(stats_saida, f, ensure_ascii=False, indent=2, default=str)
 
