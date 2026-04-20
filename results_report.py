@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.3"
+__version__ = "1.4"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -1550,6 +1550,8 @@ def _origem(args) -> dict:
         cmd += ["--lang", args.lang]
     if args.top_journals != 15:
         cmd += ["--top-journals", str(args.top_journals)]
+    if getattr(args, "style", None):
+        cmd += ["--style", args.style]
     return {
         "comando": " ".join(cmd),
         "argv": sys.argv[1:],
@@ -1565,6 +1567,18 @@ def main():
     # Alias -? → --help
     if "-?" in sys.argv:
         sys.argv[sys.argv.index("-?")] = "--help"
+
+    # --list-styles: antes do parser para resposta imediata
+    if "--list-styles" in sys.argv:
+        estilos = sorted(plt.style.available)
+        print(f"Estilos matplotlib disponíveis ({len(estilos)}):\n")
+        # Exibe em colunas de 3
+        col_w = max(len(e) for e in estilos) + 2
+        cols  = 3
+        for i in range(0, len(estilos), cols):
+            print("  " + "".join(e.ljust(col_w) for e in estilos[i:i+cols]))
+        print(f"\nUso: --style <nome>   ex: --style ggplot")
+        sys.exit(0)
 
     # --help-artifacts: antes do parser para não conflitar
     if "--help-artifacts" in sys.argv:
@@ -1618,6 +1632,15 @@ def main():
         help="Número de periódicos no gráfico de periódicos (default: 15)",
     )
     parser.add_argument(
+        "--style", default=None, metavar="NOME",
+        help="Estilo matplotlib para os gráficos (ex: ggplot, seaborn-v0_8, bmh). "
+             "Use --list-styles para ver todos os disponíveis.",
+    )
+    parser.add_argument(
+        "--list-styles", action="store_true",
+        help="Lista todos os estilos matplotlib disponíveis e sai.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Mostra o que faria sem gravar nenhum arquivo",
     )
@@ -1641,6 +1664,17 @@ def main():
     if args.show_report is not None:
         _mostrar_show_report(Path(args.show_report))
         return
+
+    # Aplicar estilo matplotlib
+    estilo_ativo = args.style or "default"
+    if args.style:
+        if args.style not in plt.style.available:
+            estilos_prox = [e for e in plt.style.available if args.style.lower() in e.lower()]
+            sugestao = f"  Sugestões: {', '.join(estilos_prox[:5])}" if estilos_prox else ""
+            print(f"❌  Estilo '{args.style}' não encontrado.{sugestao}", file=sys.stderr)
+            print(f"    Use --list-styles para ver os disponíveis.", file=sys.stderr)
+            sys.exit(1)
+        plt.style.use(args.style)
 
     langs_a_gerar = IDIOMAS_DISPONIVEIS if args.lang == "all" else [args.lang]
 
@@ -1749,6 +1783,7 @@ def main():
     print(f"Termos detectados: {termos}")
     print(f"Campos detectados: {campos}")
     print(f"Idioma(s)        : {', '.join(langs_a_gerar)}")
+    print(f"Estilo gráficos  : {estilo_ativo}")
 
     stats = calcular_stats(rows_por_ano, termos, campos, params_por_ano, stats_json_por_ano)
 
@@ -1808,6 +1843,7 @@ def main():
     salvar_table_summary(stats, output)
     salvar_table_terms(stats, output)
     salvar_table_journals(stats, output)
+    stats["estilo_grafico"] = estilo_ativo
     stats["origem"] = _origem(args)
     salvar_json(stats, output)
 
