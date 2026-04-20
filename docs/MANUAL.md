@@ -1,4 +1,4 @@
-# Manual do Usuário — SciELO Scraper v2.4
+# Manual do Usuário — SciELO Scraper v2.5
 
 > **Projeto e-Aval — Estado da Arte da Avaliação**
 > Grupo de pesquisa do Mestrado Profissional em Avaliação da Fundação Cesgranrio.
@@ -38,7 +38,7 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Rodar tudo para um ano | `uv run python run_pipeline.py --year 2024` | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, `pipeline_stats.json` | `runs/2024/` |
+| Rodar tudo para um ano (default: termos `avalia educa`, coleção SciELO Brasil, campos `titulo keywords`) | `uv run python run_pipeline.py --year 2024` | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, `pipeline_stats.json`, `results_<stem>_api+html/` | `runs/2024/` |
 | Rodar tudo para vários anos em sequência | `uv run python run_pipeline.py --per-year --year 2022 2023 2024 2025` | Idem por ano + gráfico agregado de comparação entre anos | `runs/<ano>/` cada um + `runs/chart_*.png` |
 | Ver o que seria executado sem rodar | `uv run python run_pipeline.py --year 2024 --dry-run` | Nada (apenas imprime os comandos) | — |
 | Reutilizar busca já feita (pular `scielo_search.py`) | `uv run python run_pipeline.py --year 2024 --skip-search` | Idem sem nova busca | `runs/2024/` |
@@ -55,7 +55,8 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
 | Buscar artigos com termos e anos | `uv run python scielo_search.py --terms avalia educa --years 2022-2025` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
-| Buscar em outra coleção | `uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Buscar em outra coleção (default: `scl` = Brasil) | `uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Buscar sem truncamento (default: truncamento ativo com `$`) | `uv run python scielo_search.py --terms avaliação educação --no-truncate` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
 | Ver parâmetros da última busca | `uv run python scielo_search.py --show-params` | Nada (imprime no terminal) | — |
 | Listar todas as coleções disponíveis | `uv run python scielo_search.py --list-collections` | Nada (imprime no terminal) | — |
 
@@ -63,7 +64,7 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Extrair título, resumo e keywords (modo padrão) | `uv run python scielo_scraper.py sc_<ts>.csv` | `resultado.csv`, `scraper.log`, `stats.json` | `sc_<ts>_s_<ts>_api+html/` |
+| Extrair título, resumo e keywords (default: api+html, checkpoint a cada 25) | `uv run python scielo_scraper.py sc_<ts>.csv` | `resultado.csv`, `scraper.log`, `stats.json` | `sc_<ts>_s_<ts>_api+html/` |
 | Extrair apenas via API (mais rápido, sem AoPs) | `uv run python scielo_scraper.py sc_<ts>.csv --only-api` | Idem | `sc_<ts>_s_<ts>_api/` |
 | Extrair apenas via HTML (API fora do ar) | `uv run python scielo_scraper.py sc_<ts>.csv --only-html` | Idem | `sc_<ts>_s_<ts>_html/` |
 | Retomar execução interrompida | `uv run python scielo_scraper.py sc_<ts>.csv --resume` | Nada novo — continua na pasta existente | Pasta mais recente existente |
@@ -73,17 +74,17 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Detectar termos nos resultados (todos os anos) | `uv run python terms_matcher.py` | `terms_<ts>.csv`, `terms_<ts>.log`, `terms_<ts>_stats.json` | Diretório atual |
+| Detectar termos nos resultados (default: termos `avalia educa`, campos `titulo keywords`, todos os anos em `runs/`) | `uv run python terms_matcher.py` | `terms_<ts>.csv`, `terms_<ts>.log`, `terms_<ts>_stats.json` | Diretório atual |
 | Detectar termos em anos específicos | `uv run python terms_matcher.py --years 2022 2024` | Idem | Diretório atual |
-| Alterar campos verificados em `criterio_ok` | `uv run python terms_matcher.py --required-fields titulo resumo keywords` | Idem | Diretório atual |
-| Exigir qualquer termo (não todos) | `uv run python terms_matcher.py --match-mode any` | Idem | Diretório atual |
+| Alterar campos verificados em `criterio_ok` (default: `titulo keywords`) | `uv run python terms_matcher.py --required-fields titulo resumo keywords` | Idem | Diretório atual |
+| Exigir qualquer termo (default: todos os termos) | `uv run python terms_matcher.py --match-mode any` | Idem | Diretório atual |
 | Ver relatório do último run de termos | `uv run python terms_matcher.py --stats-report` | Nada (imprime no terminal) | — |
 
 ### Gráficos de diagnóstico do processo
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Gerar gráficos a partir de `runs/` | `uv run python process_charts.py` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | Diretório atual |
+| Gerar gráficos a partir de `runs/` | `uv run python process_charts.py` | `chart_status.png`, `chart_sources.png`, `chart_time.png`, `chart_stats.json` | Diretório atual |
 | Gráficos de anos específicos | `uv run python process_charts.py --years 2022 2024` | Idem | Diretório atual |
 | Salvar gráficos em outra pasta | `uv run python process_charts.py --output graficos/` | Idem | `graficos/` |
 | Gráfico agregado comparando todos os anos | `uv run python process_charts.py --base runs/ --output runs/` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | `runs/` |
@@ -95,12 +96,14 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Gerar todos os artefatos (api+html, todos os anos) | `uv run python results_report.py` | 5 gráficos, 3 CSVs, `results_text.md`, `results_report.json` | `runs/<último_ano>/results_<stem>/` |
-| Anos específicos | `uv run python results_report.py --years 2022 2024` | Idem | `runs/<último_ano>/results_<stem>/` |
-| Estratégia alternativa | `uv run python results_report.py --mode api` | Idem | `runs/<último_ano>/results_<stem>/` |
-| Artefatos em inglês | `uv run python results_report.py --lang en` | Idem com sufixo `_en` nos textos | `runs/<último_ano>/results_<stem>/` |
-| Ambos os idiomas | `uv run python results_report.py --lang all` | PT + EN em paralelo | `runs/<último_ano>/results_<stem>/` |
+| Gerar todos os artefatos (default: api+html, PT, todos os anos em `runs/`) | `uv run python results_report.py` | 5 gráficos, 3 CSVs, `results_text_pt.md`, `results_report.json` | `results_<stem>/` ao lado da pasta de scraping |
+| Anos específicos | `uv run python results_report.py --years 2022 2024` | Idem | Idem |
+| Estratégia alternativa | `uv run python results_report.py --mode api` | Idem | Idem |
+| Artefatos em inglês | `uv run python results_report.py --lang en` | Idem com `results_text_en.md` | Idem |
+| Ambos os idiomas | `uv run python results_report.py --lang all` | PT + EN (`results_text_pt.md` + `results_text_en.md`) | Idem |
 | Pasta de saída explícita | `uv run python results_report.py --output-dir relatorios/` | Idem | `relatorios/` |
+| Estilo de gráficos alternativo | `uv run python results_report.py --style grayscale` | Idem (gráficos em escala de cinza) | Idem |
+| Colormap do heatmap alternativo | `uv run python results_report.py --colormap plasma` | Idem (heatmap em plasma; default: viridis) | Idem |
 | Ver artefatos no terminal (sem regerar) | `uv run python results_report.py --show-report runs/.../results_report.json` | Nada (imprime no terminal) | — |
 | Listar todos os artefatos com descrição | `uv run python results_report.py --help-artifacts` | Nada (imprime no terminal) | — |
 | Descrição detalhada de um artefato | `uv run python results_report.py --help-artifact results_funnel` | Nada (imprime no terminal) | — |
@@ -129,6 +132,7 @@ O `_params.json` tem esta estrutura:
 ```json
 {
   "timestamp": "2026-04-11T14:30:22",
+  "versao_searcher": "1.3",
   "colecao": "scl",
   "termos_originais": ["avalia", "educa"],
   "truncamento": true,
@@ -138,6 +142,8 @@ O `_params.json` tem esta estrutura:
   "query_url": "https://search.scielo.org/?q=..."
 }
 ```
+
+> O campo `versao_searcher` é gravado a partir da v1.3 do `scielo_search.py` e é lido pelo `results_report.py` para enriquecer o texto de Metodologia.
 
 ### Consultar os parâmetros de uma busca anterior
 
@@ -309,7 +315,7 @@ Ao terminar, o script imprime um resumo:
 
 ```
 ==============================================================
-  ESTATÍSTICAS FINAIS  (script v2.4)
+  ESTATÍSTICAS FINAIS  (script v2.5)
 ==============================================================
     Total processados               : 564
     ✅  ok_completo                 : 562  (99.6%)
@@ -460,6 +466,8 @@ uv run python scielo_scraper.py lista.csv --delay 3.0 --jitter 1.0
 
 # Mais rápido (use com cuidado)
 uv run python scielo_scraper.py lista.csv --delay 0.5 --jitter 0.2
+
+# Default: --delay 1.5 --jitter 0.5
 ```
 
 ### Processamento paralelo
@@ -512,25 +520,27 @@ uv run python process_charts.py
 
 Lê automaticamente todos os anos presentes em `runs/` e salva os gráficos no diretório atual.
 
-### Gráficos gerados
+### Gráficos e artefatos gerados
 
 | Arquivo | O que mostra |
 |---|---|
 | `chart_status.png` | Distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano. Barras cinzas para a categoria dominante; cores fortes para casos raros. Tabela inset com n exatos. |
 | `chart_sources.png` | Fontes de extração no modo `api+html` por ano. Distingue: *ArticleMeta API* (todos os campos via API), *Fallback API+HTML* (API parcial + complemento HTML), *Fallback HTML* (API sem dados + extração inteiramente via HTML), *Falha de acesso* (erro HTTP). |
 | `chart_time.png` | Tempo total de scraping (em minutos) por modo e ano, para comparar custo entre estratégias. |
+| `chart_stats.json` | Metadados da execução: `versao_script`, `gerado_em`, `modo`, `labels` (anos/stems processados), `idiomas` e `arquivos_gerados`. Gravado automaticamente na pasta `--output`. |
 
 ### Opções
 
 ```bash
-uv run python process_charts.py --years 2022 2024            # apenas esses anos
-uv run python process_charts.py --base outra/pasta           # pasta raiz alternativa
-uv run python process_charts.py --output graficos/           # pasta de saída
+uv run python process_charts.py --years 2022 2024            # apenas esses anos (default: todos em runs/)
+uv run python process_charts.py --base outra/pasta           # pasta raiz alternativa (default: runs/)
+uv run python process_charts.py --output graficos/           # pasta de saída (default: diretório atual)
 uv run python process_charts.py --stem sc_20260411_143022    # run específico (evita ambiguidade)
-uv run python process_charts.py --lang en                    # gráficos em inglês
-uv run python process_charts.py --lang all                   # todos os idiomas (sufixo _pt/_en)
+uv run python process_charts.py --lang en                    # gráficos em inglês (default: pt)
+uv run python process_charts.py --lang all                   # todos os idiomas, sufixo _pt/_en (default: pt)
 uv run python process_charts.py --no-sources                 # pular gráfico de fontes
 uv run python process_charts.py --no-status --no-time        # apenas gráfico de fontes
+uv run python process_charts.py --version                    # mostrar versão
 uv run python process_charts.py -?                           # ajuda
 ```
 
@@ -629,16 +639,17 @@ Por ano e, quando há mais de um ano, consolidadas globalmente:
 ### Opções completas
 
 ```bash
-uv run python terms_matcher.py --years 2022 2024           # anos específicos
-uv run python terms_matcher.py --terms avalia educa        # termos
-uv run python terms_matcher.py --required-fields titulo keywords  # campos required
-uv run python terms_matcher.py --no-truncate               # não remover $ dos termos
-uv run python terms_matcher.py --mode api                  # modo alternativo
-uv run python terms_matcher.py --base outra/pasta          # pasta base alternativa
-uv run python terms_matcher.py --output saida.csv          # nome de saída
-uv run python terms_matcher.py --stats-report              # relatório do último run
-uv run python terms_matcher.py --log-level DEBUG           # log detalhado
-uv run python terms_matcher.py -?                          # ajuda
+uv run python terms_matcher.py --years 2022 2024                        # anos específicos (default: todos em runs/)
+uv run python terms_matcher.py --terms avalia educa                     # termos (default: avalia educa)
+uv run python terms_matcher.py --required-fields titulo keywords        # campos do criterio_ok (default: titulo keywords)
+uv run python terms_matcher.py --match-mode any                         # qualquer termo satisfaz (default: all = todos)
+uv run python terms_matcher.py --no-truncate                            # não remover $ dos termos
+uv run python terms_matcher.py --mode api                               # modo alternativo (default: api+html)
+uv run python terms_matcher.py --base outra/pasta                       # pasta base alternativa (default: runs/)
+uv run python terms_matcher.py --output saida.csv                       # nome de saída (default: terms_<ts>.csv)
+uv run python terms_matcher.py --stats-report                           # relatório do último run
+uv run python terms_matcher.py --log-level DEBUG                        # log detalhado (default: INFO)
+uv run python terms_matcher.py -?                                       # ajuda
 ```
 
 ---
@@ -692,8 +703,10 @@ uv run python results_report.py --lang all
 
 | Arquivo | Conteúdo |
 |---|---|
-| `results_text.md` | Parágrafos prontos para publicação: Metodologia + Resultados + Limitações + Artefatos (PT-BR) |
+| `results_text_pt.md` | Texto publication-ready em PT-BR com: Metodologia (data da busca, versões dos scripts, tempo de extração, taxa de sucesso, explicação leiga da estratégia api+html) + Nota técnica (URL da busca) + Resultados + Limitações + Descrição dos resultados por figura (versão curta e longa para cada gráfico) |
 | `results_text_en.md` | Idem em inglês (gerado com `--lang en` ou `--lang all`) |
+
+> O arquivo sempre é gerado com sufixo de idioma (`_pt` ou `_en`). Não existe `results_text.md` sem sufixo.
 
 **Metadados:**
 
@@ -704,15 +717,21 @@ uv run python results_report.py --lang all
 ### Opções completas
 
 ```bash
-uv run python results_report.py --base outra/pasta        # pasta raiz alternativa
-uv run python results_report.py --years 2022 2024         # anos específicos
-uv run python results_report.py --mode api                # estratégia alternativa
-uv run python results_report.py --scrape-dir sc_<ts>_s_<ts>_api+html/  # pasta direta
-uv run python results_report.py --output-dir relatorios/  # pasta de saída
+uv run python results_report.py --base outra/pasta        # pasta raiz alternativa (default: runs/)
+uv run python results_report.py --years 2022 2024         # anos específicos (default: todos em runs/)
+uv run python results_report.py --mode api                # estratégia alternativa (default: api+html)
+uv run python results_report.py --scrape-dir sc_<ts>_s_<ts>_api+html/  # pasta direta (sem --base)
+uv run python results_report.py --output-dir relatorios/  # pasta de saída (default: results_<stem>/ ao lado da pasta de scraping)
+uv run python results_report.py --lang pt                 # português (default)
 uv run python results_report.py --lang en                 # inglês
-uv run python results_report.py --lang all                # todos os idiomas
+uv run python results_report.py --lang all                # todos os idiomas (PT + EN)
 uv run python results_report.py --top-journals 20         # top 20 periódicos (default: 15)
+uv run python results_report.py --style seaborn-v0_8      # estilo matplotlib (default: default)
+uv run python results_report.py --list-styles             # listar estilos disponíveis
+uv run python results_report.py --colormap plasma         # colormap do heatmap (default: viridis)
+uv run python results_report.py --list-colormaps          # listar colormaps disponíveis
 uv run python results_report.py --dry-run                 # simula sem gravar
+uv run python results_report.py --version                 # mostrar versão
 uv run python results_report.py -?                        # ajuda
 uv run python results_report.py --show-report             # renderiza results_report.json existente no terminal
 uv run python results_report.py --show-report outro/caminho/results_report.json  # arquivo específico
@@ -873,5 +892,5 @@ uv run python scielo_scraper.py lista.csv
 | `terms_<ts>.log` | `terms_20260415_161055.log` | terms_matcher.py |
 | `terms_<ts>_stats.json` | `terms_20260415_161055_stats.json` | terms_matcher.py |
 | `results_<stem>/` | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
-| `results_text[_en].md` | `results_text.md`, `results_text_en.md` | results_report.py |
+| `results_text_<lang>.md` | `results_text_pt.md`, `results_text_en.md` | results_report.py |
 | `results_report.json` | `results_report.json` | results_report.py |
