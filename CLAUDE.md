@@ -7,7 +7,7 @@
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
 | `run_pipeline.py` | Pipeline completo (v2.1): busca → 3×scraping → análise → 3×match → gráficos → relatório → cópia | `--year` | `runs/<ano>/` |
-| `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png` |
+| `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png`, `chart_stats.json` |
 | `results_report.py` | Artefatos científicos publication-ready dos resultados | `[--base]`, `[--scrape-dir]`, `--years`, `--mode`, `--output-dir`, `--lang`, `--top-journals` | `results_*/` (gráficos + CSVs + Markdown + JSON) |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
@@ -88,6 +88,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **`--lang pt|en|all`:** gera gráficos em português, inglês ou ambos. Com `all`, sufixo `_pt`/`_en` nos nomes dos arquivos.
 - **`--stem`:** busca determinística sem `--base` — filtra pastas `<stem>_s_*_<modo>/`. O pipeline sempre passa `--stem`.
 - **Bug fix:** no modo single-run (sem `--base`), o label do eixo X agora mostra o ano real (lido do `params.json` ou `Publication year`), não o stem do CSV.
+- **`chart_stats.json`:** gravado na pasta de saída ao final de cada execução com `versao_script`, `gerado_em`, `modo`, `labels`, `idiomas` e `arquivos_gerados`.
 - **Fontes de extração distinguidas:**
   - *ArticleMeta API* — todos os campos via API
   - *Fallback API+HTML* — API retornou parcial; campos faltantes complementados via HTML

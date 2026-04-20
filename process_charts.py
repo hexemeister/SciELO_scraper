@@ -37,6 +37,7 @@ import json
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 # Garantir UTF-8 no terminal Windows
@@ -47,6 +48,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+
+__version__ = "1.1"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -732,8 +735,6 @@ def main():
     if "-?" in sys.argv:
         sys.argv[sys.argv.index("-?")] = "--help"
 
-    from datetime import datetime
-
     parser = argparse.ArgumentParser(
         description=(
             "Gera gráficos de diagnóstico técnico do processo de extração SciELO.\n"
@@ -771,6 +772,7 @@ def main():
     parser.add_argument("--no-time",    action="store_true", help="Pular gráfico de tempo")
     parser.add_argument("--dry-run",    action="store_true",
                         help="Mostra o que faria sem gravar nenhum arquivo")
+    parser.add_argument("--version", action="version", version=f"process_charts v{__version__}")
     args = parser.parse_args()
 
     ts_suffix = f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}" if args.timestamp else ""
@@ -866,15 +868,37 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     print()
 
+    arquivos_gerados = []
     for lang in langs_a_gerar:
         if len(langs_a_gerar) > 1:
             print(f"  [{lang.upper()}]")
         if not args.no_status:
-            grafico_status(stats_por_label, output, png_name(s("arquivo_status", lang), lang), lang)
+            nome = png_name(s("arquivo_status", lang), lang)
+            grafico_status(stats_por_label, output, nome, lang)
+            arquivos_gerados.append(nome)
         if not args.no_sources:
-            grafico_fontes(stats_por_label, output, png_name(s("arquivo_fontes", lang), lang), lang)
+            nome = png_name(s("arquivo_fontes", lang), lang)
+            grafico_fontes(stats_por_label, output, nome, lang)
+            arquivos_gerados.append(nome)
         if not args.no_time:
-            grafico_tempo(stats_por_label, output, png_name(s("arquivo_tempo", lang), lang), lang)
+            nome = png_name(s("arquivo_tempo", lang), lang)
+            grafico_tempo(stats_por_label, output, nome, lang)
+            arquivos_gerados.append(nome)
+
+    # Gravar chart_stats.json com metadados da execução
+    chart_stats = {
+        "versao_script":   __version__,
+        "gerado_em":       datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "modo":            "multi-ano (--base)" if modo_base else "diretório atual (padrão)",
+        "labels":          sorted(stats_por_label, key=str),
+        "idiomas":         langs_a_gerar,
+        "pasta_saida":     str(output.resolve()),
+        "arquivos_gerados": arquivos_gerados,
+    }
+    json_path = output / "chart_stats.json"
+    with open(json_path, "w", encoding="utf-8") as fh:
+        json.dump(chart_stats, fh, ensure_ascii=False, indent=2)
+    print(f"  ✓ {json_path}")
 
     print("\nPronto.")
 

@@ -200,6 +200,7 @@ Gera três gráficos PNG de diagnóstico técnico (como o scraping correu) a par
 - **`chart_status.png`** — distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano
 - **`chart_sources.png`** — fontes de extração no modo `api+html` por ano, com tabela de n exatos
 - **`chart_time.png`** — tempo total de scraping por modo e ano
+- **`chart_stats.json`** — metadados da execução (versão do script, timestamp, labels, idiomas, arquivos gerados)
 
 ```bash
 uv run python process_charts.py                       # lê runs/ no diretório atual
@@ -207,6 +208,7 @@ uv run python process_charts.py --years 2022 2024     # apenas esses anos
 uv run python process_charts.py --output graficos/    # pasta de saída personalizada
 uv run python process_charts.py --lang en             # gráficos em inglês
 uv run python process_charts.py --lang all            # gera em todos os idiomas
+uv run python process_charts.py --version             # mostrar versão
 uv run python process_charts.py -?                    # ajuda
 ```
 
