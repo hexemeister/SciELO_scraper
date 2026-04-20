@@ -64,7 +64,7 @@ EXEMPLOS
   python scielo_search.py --show-params exemplos/2024/sc_20260413_092345_params.json
 """
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 import argparse
 import html as html_mod
@@ -480,6 +480,7 @@ def main():
     params_path = out_path.with_name(out_path.stem + "_params.json")
     params_data = {
         "timestamp":        datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "versao_searcher":  __version__,
         "colecao":          args.collection,
         "termos_originais": args.terms,
         "truncamento":      not args.no_truncate,

@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.5"
+__version__ = "1.6"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -659,14 +659,19 @@ def calcular_stats(
         truncamento      = params.get("truncamento", True)
         campos_busca     = params.get("campos", "ti+ab")
         data_busca       = params.get("timestamp", "")
-        versao_searcher  = params.get("versao", "")
-        versao_scraper   = stats_j.get("versao_scraper", "")
-        tempo_scraping   = stats_j.get("tempo_total_segundos", None)
+        versao_searcher  = params.get("versao_searcher", "")   # gravado a partir de v1.3
+        query_url        = params.get("query_url", "")
+        versao_scraper   = stats_j.get("versao_script", "")    # campo real em stats.json
+        tempo_scraping   = stats_j.get("elapsed_seconds", None)  # campo real em stats.json
+        tempo_humanizado = stats_j.get("elapsed_humanizado", "")
+        avg_por_artigo   = stats_j.get("avg_per_article_s", None)
         erros_extracao   = {
-            k: v for k, v in stats_j.get("por_status", {}).items()
+            k: v["n"] if isinstance(v, dict) else v
+            for k, v in stats_j.get("por_status", {}).items()
             if k not in ("ok_completo", "ok_parcial")
         } if stats_j.get("por_status") else {}
-        taxa_sucesso     = stats_j.get("taxa_sucesso_pct", None)
+        taxa_sucesso     = stats_j.get("sucesso_total_pct", None)  # campo real em stats.json
+        fontes_extracao  = stats_j.get("por_fonte_extracao", {})
 
         por_ano[ano] = {
             "total_buscado":    total_buscado,
@@ -684,11 +689,15 @@ def calcular_stats(
             "truncamento":      truncamento,
             "campos_busca":     campos_busca,
             "data_busca":       data_busca,
+            "query_url":        query_url,
             "versao_searcher":  versao_searcher,
             "versao_scraper":   versao_scraper,
             "tempo_scraping":   tempo_scraping,
+            "tempo_humanizado": tempo_humanizado,
+            "avg_por_artigo":   avg_por_artigo,
             "erros_extracao":   erros_extracao,
             "taxa_sucesso":     taxa_sucesso,
+            "fontes_extracao":  fontes_extracao,
         }
 
     # Totais globais
@@ -1194,63 +1203,61 @@ def _formato_tempo(segundos) -> str:
     return f"{seg}s"
 
 
-def gerar_texto(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
+def gerar_texto(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):  # noqa: C901
     anos    = stats["anos"]
     por_ano = stats["por_ano"]
     totais  = stats["totais"]
     termos  = stats["termos"]
-    campos  = stats["campos"]
+    campos  = stats["campos"]  # campos detectados no CSV (podem incluir resumo)
 
-    primeiro_ano_v = por_ano[anos[0]]
-    termos_busca  = primeiro_ano_v.get("termos_busca", termos)
-    colecao       = primeiro_ano_v.get("colecao", "scl")
-    truncamento   = primeiro_ano_v.get("truncamento", True)
-    campos_busca  = primeiro_ano_v.get("campos_busca", "ti+ab")
-    data_busca_ts = primeiro_ano_v.get("data_busca", "")
+    # Campos do critério automático (usados em criterio_ok)
+    # Derivamos dos dados: campos onde há co-ocorrência reportada
+    campos_criterio = [c for c in campos if c != "resumo"] or campos
+
+    primeiro_ano_v  = por_ano[anos[0]]
+    termos_busca    = primeiro_ano_v.get("termos_busca", termos)
+    colecao         = primeiro_ano_v.get("colecao", "scl")
+    truncamento     = primeiro_ano_v.get("truncamento", True)
+    campos_busca    = primeiro_ano_v.get("campos_busca", "ti+ab")
+    data_busca_ts   = primeiro_ano_v.get("data_busca", "")
+    query_url       = primeiro_ano_v.get("query_url", "")
     versao_searcher = primeiro_ano_v.get("versao_searcher", "")
     versao_scraper  = primeiro_ano_v.get("versao_scraper", "")
 
-    anos_str  = _anos_str(anos, lang)
-    total_b   = totais["total_buscado"]
-    total_s   = totais["total_scrapeado"]
-    total_ok  = totais["criterio_ok"]
-    pct_ok    = totais["criterio_ok_pct"]
+    total_b  = totais["total_buscado"]
+    total_s  = totais["total_scrapeado"]
+    total_ok = totais["criterio_ok"]
+    pct_ok   = totais["criterio_ok_pct"]
 
-    # Tempo total de scraping (soma dos anos)
-    tempo_total_s = sum(
-        v.get("tempo_scraping") or 0 for v in por_ano.values()
-        if v.get("tempo_scraping") is not None
-    )
-    tempo_str = _formato_tempo(tempo_total_s) if tempo_total_s > 0 else ""
+    ok_compl_total = sum(v["ok_completo"] for v in por_ano.values())
+    ok_parc_total  = sum(v["ok_parcial"]  for v in por_ano.values())
 
-    # Taxa de sucesso média
-    taxas = [v.get("taxa_sucesso") for v in por_ano.values() if v.get("taxa_sucesso") is not None]
-    taxa_media = sum(taxas) / len(taxas) if taxas else None
+    # Tempo total de scraping (soma dos anos com dados disponíveis)
+    tempos_disponiveis = [v["tempo_scraping"] for v in por_ano.values()
+                          if v.get("tempo_scraping") is not None]
+    tempo_total_s  = sum(tempos_disponiveis) if tempos_disponiveis else None
+    tempo_hum_list = [v["tempo_humanizado"] for v in por_ano.values()
+                      if v.get("tempo_humanizado")]
 
-    # Erros de extração globais
+    # Taxa de sucesso (string já formatada como "99.8%" ou None)
+    taxas_str = [v["taxa_sucesso"] for v in por_ano.values()
+                 if v.get("taxa_sucesso") is not None]
+
+    # Erros globais
     erros_global: dict[str, int] = defaultdict(int)
     for v in por_ano.values():
         for k, n in v.get("erros_extracao", {}).items():
             erros_global[k] += n
 
-    # Top 3 periódicos
     top3 = sorted(totais["jornais"].items(), key=lambda x: x[1], reverse=True)[:3]
-
-    # Análise de termos globais
-    tc_global = totais["termos_campos"]
+    tc_global   = totais["termos_campos"]
     cooc_global = totais.get("coocorrencia", {})
 
-    # Distribuição por ano
-    por_ano_str_list = [
-        f"{a}: n={por_ano[a]['criterio_ok']} ({por_ano[a]['criterio_ok_pct']:.1f}%)"
-        for a in anos
-    ]
-
     # ---- helpers de formatação ----
-    def _fmt_termos_busca(sep: str) -> str:
+    def _fmt_termos(sep: str) -> str:
         return sep.join(f'"{t}"' for t in termos_busca)
 
-    def _fmt_campos_busca(cb: str, l: str) -> str:
+    def _fmt_campos_busca_legivel(cb: str, l: str) -> str:
         if l == "pt":
             return {"ti+ab": "título e resumo", "ti": "título", "ab": "resumo"}.get(cb, cb)
         return {"ti+ab": "title and abstract", "ti": "title", "ab": "abstract"}.get(cb, cb)
@@ -1260,10 +1267,53 @@ def gerar_texto(stats: dict, output: Path, lang: str = "pt", lang_suf: str = "")
             return {"scl": "SciELO Brasil", "arg": "SciELO Argentina"}.get(col, col)
         return {"scl": "SciELO Brazil", "arg": "SciELO Argentina"}.get(col, col)
 
-    # Monta descrição da data
-    data_fmt = _formato_data_busca(data_busca_ts, lang)
+    def _fmt_campos_criterio(clist: list[str], l: str) -> str:
+        labels_pt = {"titulo": "título", "resumo": "resumo", "keywords": "palavras-chave"}
+        labels_en = {"titulo": "title",  "resumo": "abstract", "keywords": "keywords"}
+        labels = labels_pt if l == "pt" else labels_en
+        partes = [labels.get(c, c) for c in clist]
+        if len(partes) == 1:
+            return partes[0]
+        conj = " e " if l == "pt" else " and "
+        return ", ".join(partes[:-1]) + conj + partes[-1]
 
-    # ---- Seção: Artefatos ----
+    def _fmt_ver(vs: str, vc: str, l: str) -> str:
+        """Monta string de versões; avisa se ausentes."""
+        parts = []
+        if vs:
+            parts.append(f"SciELO Search v{vs}" if l == "pt" else f"SciELO Search v{vs}")
+        else:
+            parts.append("SciELO Search [versão não disponível — execute com scielo_search.py v1.3+]"
+                         if l == "pt" else
+                         "SciELO Search [version unavailable — run with scielo_search.py v1.3+]")
+        if vc:
+            parts.append(f"SciELO Scraper v{vc}")
+        else:
+            parts.append("SciELO Scraper [versão não disponível]"
+                         if l == "pt" else
+                         "SciELO Scraper [version unavailable]")
+        return "; ".join(parts)
+
+    data_fmt = _formato_data_busca(data_busca_ts, lang)
+    cob_anos_str = _anos_cobertura_str(anos, lang)
+
+    # ── Helpers para seções de figuras ───────────────────────────────────────
+    def _nome_arquivo_figura(chave_arquivo: str) -> str:
+        """Retorna o nome de arquivo do gráfico incluindo o lang_suf atual."""
+        return f"{s(chave_arquivo, lang)}{lang_suf}.png"
+
+    def _link_figura(chave_arquivo: str, titulo_fig: str) -> str:
+        nome = _nome_arquivo_figura(chave_arquivo)
+        return f"[{titulo_fig}]({nome})"
+
+    # nomes de arquivo para os links
+    arq_funnel   = _nome_arquivo_figura("arquivo_funnel")
+    arq_trend    = _nome_arquivo_figura("arquivo_trend")
+    arq_heatmap  = _nome_arquivo_figura("arquivo_heatmap")
+    arq_journals = _nome_arquivo_figura("arquivo_journals")
+    arq_coverage = _nome_arquivo_figura("arquivo_coverage")
+
+    # ── Seção de artefatos ────────────────────────────────────────────────────
     def _gerar_artefatos_section(l: str) -> str:
         linhas = []
         if l == "pt":
@@ -1306,61 +1356,140 @@ def gerar_texto(stats: dict, output: Path, lang: str = "pt", lang_suf: str = "")
                     linhas.append(f"| `{a['arquivo']}` | {a['descricao_en'].split('.')[0]}. |")
         return "\n".join(linhas)
 
-    # ---- PT-BR ----
+    # =========================================================================
+    # PT-BR
+    # =========================================================================
     if lang == "pt":
-        trunc_str = " com truncamento automático (operador $)" if truncamento else ""
-        cbf = _fmt_campos_busca(campos_busca, "pt")
-        colf = _fmt_colecao(colecao, "pt")
-        termos_fmt = _fmt_termos_busca(" e ")
-        data_str = f", conduzida em {data_fmt}," if data_fmt else ""
+        trunc_str   = " com truncamento automático (operador $)" if truncamento else ""
+        cbf         = _fmt_campos_busca_legivel(campos_busca, "pt")
+        colf        = _fmt_colecao(colecao, "pt")
+        termos_fmt  = _fmt_termos(" e ")
+        data_str    = f", conduzida em {data_fmt}," if data_fmt else ""
+        ver_str     = _fmt_ver(versao_searcher, versao_scraper, "pt")
+        ccrit_str   = _fmt_campos_criterio(campos_criterio, "pt")
 
-        # Versões
-        ver_parts = []
-        if versao_searcher:
-            ver_parts.append(f"scielo_search.py v{versao_searcher}")
-        if versao_scraper:
-            ver_parts.append(f"scielo_scraper.py v{versao_scraper}")
-        ver_str = f" ({'; '.join(ver_parts)})" if ver_parts else ""
-
-        # Cobertura
-        ok_compl_total = sum(v["ok_completo"] for v in por_ano.values())
-        ok_parc_total  = sum(v["ok_parcial"]  for v in por_ano.values())
+        # Cobertura de extração
         cob_str = f"{ok_compl_total} artigos com extração completa (título + resumo + palavras-chave)"
         if ok_parc_total:
             cob_str += f" e {ok_parc_total} com extração parcial"
 
-        # Tempo
-        tempo_part = f" O tempo total de extração foi de {tempo_str}." if tempo_str else ""
+        # Cobertura por ano (detalhado)
+        cob_ano_parts = []
+        for a in anos:
+            v = por_ano[a]
+            cob_ano_parts.append(
+                f"{a}: {v['ok_completo']} completos"
+                + (f", {v['ok_parcial']} parcial" if v["ok_parcial"] else "")
+            )
+        cob_por_ano_str = "; ".join(cob_ano_parts) if len(anos) > 1 else ""
 
-        # Taxa sucesso
-        taxa_part = f" A taxa de sucesso de extração foi de {taxa_media:.1f}%." if taxa_media is not None else ""
+        # Tempo de extração
+        if tempo_total_s is not None:
+            t_fmt = _formato_tempo(tempo_total_s)
+            if len(anos) > 1 and tempo_hum_list:
+                tempo_part = (
+                    f" O tempo total de extração foi de {t_fmt}"
+                    f" ({'; '.join(f'{a}: {h}' for a, h in zip(anos, tempo_hum_list))})."
+                )
+            else:
+                tempo_part = f" O tempo total de extração foi de {t_fmt}."
+        else:
+            tempo_part = ""
 
-        cob_anos_str = _anos_cobertura_str(anos, "pt")
-        metodologia = f"""\
-A busca bibliográfica{data_str} foi realizada na plataforma SciELO ({colf}), \
-utilizando os termos {termos_fmt}{trunc_str}, \
-nos campos de {cbf}, \
-abrangendo {cob_anos_str}. \
-Foram recuperados {total_b} registros. \
-Os metadados em português (título, resumo e palavras-chave) foram extraídos \
-por meio do script SciELO Scraper (estratégia api+html){ver_str}, \
-resultando em {cob_str}. \
-{total_s} artigos tiveram dados disponíveis para análise.{tempo_part}{taxa_part} \
-A etapa de filtragem automática verificou a presença simultânea de todos os termos \
-em pelo menos um dos campos requeridos (título ou palavras-chave), \
-identificando {total_ok} artigos ({pct_ok:.1f}%) como potencialmente relevantes \
-para curadoria humana."""
+        # Taxa de sucesso
+        taxa_part = f" Taxa de sucesso da extração: {taxas_str[0]}." if taxas_str else ""
 
-        # --- Resultados ---
-        # Distribuição anual
-        dist_str = "; ".join(por_ano_str_list)
+        # Erros
+        if erros_global:
+            erros_items = []
+            erros_label = {
+                "nada_encontrado": "sem dados encontrados",
+                "erro_extracao":   "erro de acesso (ex: 404)",
+                "erro_pid_invalido": "PID inválido",
+            }
+            for k, n in erros_global.items():
+                erros_items.append(f"{n} {erros_label.get(k, k)}")
+            erros_part = f" Foram identificadas as seguintes ocorrências na extração: {'; '.join(erros_items)}."
+        else:
+            erros_part = " Não foram identificadas falhas de acesso durante a extração."
 
-        # Termos × campos — análise detalhada
+        # Distribuição por ano dos registros buscados
+        if len(anos) > 1:
+            dist_busca_parts = [f"{a}: {por_ano[a]['total_buscado']} registros" for a in anos]
+            dist_busca_str = (
+                f"distribuídos por ano da seguinte forma: {'; '.join(dist_busca_parts)}"
+            )
+        else:
+            dist_busca_str = ""
+
+        # Metodologia — parágrafo 1: busca
+        p_busca = (
+            f"A busca bibliográfica{data_str} foi realizada na plataforma SciELO ({colf}) "
+            f"por meio do SciELO Search ({ver_str.split(';')[0].strip()}), "
+            f"utilizando os termos {termos_fmt}{trunc_str}, "
+            f"nos campos de {cbf}, "
+            f"abrangendo {cob_anos_str}. "
+            f"Foram recuperados {total_b} registros"
+            + (f", {dist_busca_str}" if dist_busca_str else "")
+            + "."
+        )
+
+        # Metodologia — parágrafo 2: estratégia de extração
+        p_estrategia = (
+            "A extração dos metadados em português (título, resumo e palavras-chave) foi "
+            "realizada por meio do SciELO Scraper, utilizando a estratégia denominada "
+            "**api+html**. Nessa abordagem, o sistema consulta primeiramente a "
+            "ArticleMeta API — uma interface de programação mantida pela SciELO que "
+            "fornece metadados estruturados dos artigos indexados. Quando a API retorna "
+            "dados incompletos ou não retorna dados para um determinado artigo (o que "
+            "ocorre com frequência em artigos no estágio Ahead of Print, ou seja, "
+            "publicados online antes de receberem numeração definitiva de fascículo), "
+            "o sistema recorre automaticamente à raspagem direta do HTML da página do "
+            "artigo no portal SciELO — técnica conhecida como *fallback* (alternativa "
+            "de contingência). Essa estratégia combinada maximiza a taxa de extração "
+            "bem-sucedida em comparação com o uso exclusivo da API ou do HTML."
+        )
+
+        # Metodologia — parágrafo 3: extração + filtragem
+        p_extracao = (
+            f"A extração resultou em {cob_str}"
+            + (f" ({cob_por_ano_str})" if cob_por_ano_str else "")
+            + f".{tempo_part}{taxa_part}{erros_part} "
+            f"A etapa de filtragem automática verificou a presença simultânea de todos "
+            f"os termos em pelo menos um dos campos requeridos ({ccrit_str}), "
+            f"identificando {total_ok} artigos ({pct_ok:.1f}%) como potencialmente "
+            f"relevantes para curadoria humana"
+            + (
+                f" (distribuição por ano: "
+                + "; ".join(
+                    f"{a}: n={por_ano[a]['criterio_ok']} ({por_ano[a]['criterio_ok_pct']:.1f}%)"
+                    for a in anos
+                ) + ")"
+                if len(anos) > 1 else ""
+            )
+            + "."
+        )
+
+        metodologia = p_busca + "\n\n" + p_estrategia + "\n\n" + p_extracao
+
+        # Nota técnica: URL da query
+        if query_url:
+            nota_tecnica = (
+                "### Nota técnica — URL da busca\n\n"
+                "A consulta foi executada na seguinte URL (pode ser utilizada como "
+                "nota de rodapé ou referência metodológica):\n\n"
+                f"```\n{query_url}\n```"
+            )
+        else:
+            nota_tecnica = ""
+
+        # ── Resultados ────────────────────────────────────────────────────────
+        # Apenas os campos do critério entram na análise de termos dos resultados
         termos_analise_parts = []
         for t in termos:
             partes_t = []
-            for c in campos:
-                n = tc_global.get(t, {}).get(c, 0)
+            for c in campos_criterio:
+                n   = tc_global.get(t, {}).get(c, 0)
                 pct = n / total_ok * 100 if total_ok else 0
                 label_c, prep_c = {
                     "titulo":   ("título", "no"),
@@ -1373,9 +1502,9 @@ para curadoria humana."""
             )
         termos_analise = " ".join(termos_analise_parts)
 
-        # Co-ocorrência
+        # Co-ocorrência — apenas campos do critério
         cooc_parts = []
-        for c in campos:
+        for c in campos_criterio:
             n_c = cooc_global.get(c, 0)
             if n_c > 0:
                 pct_c = n_c / total_ok * 100
@@ -1385,96 +1514,383 @@ para curadoria humana."""
                     "keywords": ("palavras-chave", "nas"),
                 }.get(c, (c, "no"))
                 cooc_parts.append(f"{n_c} ({pct_c:.1f}%) {prep_c} {label_c}")
-        cooc_str = ""
-        if cooc_parts:
-            cooc_str = (
-                f"A co-ocorrência simultânea de todos os termos foi verificada em: "
-                + "; ".join(cooc_parts) + ". "
-            )
+        cooc_str = (
+            "A co-ocorrência simultânea de todos os termos foi verificada em: "
+            + "; ".join(cooc_parts) + ". "
+        ) if cooc_parts else ""
 
-        # Periódicos
         top3_str = "; ".join(f"{j} (n={n})" for j, n in top3)
         n_journals_total = len(totais["jornais"])
 
-        resultados = f"""\
-Dos {total_s} artigos recuperados e processados, \
-{total_ok} ({pct_ok:.1f}%) atenderam ao critério de filtragem automática \
-e foram encaminhados para verificação humana pelo grupo de pesquisa. \
-"""
+        resultados = (
+            f"{total_ok} ({pct_ok:.1f}%) dos {total_s} artigos extraídos "
+            f"atenderam ao critério de filtragem automática e foram encaminhados "
+            f"para verificação humana pelo grupo de pesquisa."
+        )
         if len(anos) > 1:
-            resultados += f"A distribuição por ano foi: {dist_str}. "
+            dist_ok_parts = [
+                f"{a}: n={por_ano[a]['criterio_ok']} ({por_ano[a]['criterio_ok_pct']:.1f}%)"
+                for a in anos
+            ]
+            resultados += f" Distribuição por ano: {'; '.join(dist_ok_parts)}."
 
-        resultados += termos_analise + " "
-        resultados += cooc_str
+        resultados += "\n\n" + termos_analise
+        if cooc_str:
+            resultados += " " + cooc_str.strip()
 
         if top3:
             resultados += (
-                f"Os artigos critério foram identificados em {n_journals_total} periódicos distintos. "
-                f"Os periódicos com maior representação foram: {top3_str}. "
+                f"\n\nOs artigos critério foram identificados em {n_journals_total} "
+                f"periódicos distintos. Os periódicos com maior representação foram: "
+                f"{top3_str}."
             )
 
-        # Limitações
-        limitacoes = """\
-A busca automatizada com truncamento pode recuperar artigos que contêm os radicais dos \
-termos em contextos não relacionados ao tema principal desta revisão, exigindo curadoria humana \
-para validação da pertinência. \
-A filtragem automática baseia-se exclusivamente na presença simultânea dos termos nos campos \
-selecionados (título ou palavras-chave), sem análise semântica ou de contexto. \
-A cobertura da plataforma SciELO está limitada a periódicos indexados nessa base, \
-não contemplando publicações em outros repositórios (ex: LILACS, PubMed, Scopus). \
-Artigos no estágio Ahead of Print (AoP) podem não estar indexados via API e dependem \
-de extração por HTML, podendo apresentar menor estabilidade nos metadados. \
-A análise de co-ocorrência indica presença dos termos nos mesmos campos, \
-mas não garante relação semântica direta entre eles."""
+        # ── Limitações ────────────────────────────────────────────────────────
+        limitacoes = (
+            "A busca automatizada com truncamento pode recuperar artigos que contêm os "
+            "radicais dos termos em contextos não relacionados ao tema principal desta "
+            "revisão, exigindo curadoria humana para validação da pertinência. "
+            "A filtragem automática baseia-se exclusivamente na presença simultânea dos "
+            f"termos nos campos selecionados ({ccrit_str}), sem análise semântica ou de "
+            "contexto. "
+            "A cobertura da plataforma SciELO está limitada a periódicos indexados nessa "
+            "base, não contemplando publicações em outros repositórios (ex: LILACS, "
+            "PubMed, Scopus). "
+            "Artigos no estágio Ahead of Print (AoP) podem não estar indexados via API e "
+            "dependem de extração por HTML, podendo apresentar menor estabilidade nos "
+            "metadados. "
+            "A análise de co-ocorrência indica presença dos termos nos mesmos campos, "
+            "mas não garante relação semântica direta entre eles."
+        )
 
-    else:  # EN
-        trunc_str = " with automatic truncation ($ operator)" if truncamento else ""
-        cbf = _fmt_campos_busca(campos_busca, "en")
-        colf = _fmt_colecao(colecao, "en")
-        termos_fmt = _fmt_termos_busca(" and ")
-        data_str = f", conducted on {data_fmt}," if data_fmt else ""
+        # ── Figuras ───────────────────────────────────────────────────────────
+        n_anos = len(anos)
 
-        ver_parts = []
-        if versao_searcher:
-            ver_parts.append(f"scielo_search.py v{versao_searcher}")
-        if versao_scraper:
-            ver_parts.append(f"scielo_scraper.py v{versao_scraper}")
-        ver_str = f" ({'; '.join(ver_parts)})" if ver_parts else ""
+        def _fig_funil_pt() -> str:
+            short = (
+                "O funil de seleção apresenta três etapas sequenciais de redução do "
+                "corpus: recuperação via busca na plataforma, extração de metadados por "
+                "raspagem e aplicação do critério de filtragem automática."
+            )
+            linhas_longa = []
+            for a in anos:
+                v = por_ano[a]
+                tb = v["total_buscado"]
+                ts = v["total_scrapeado"]
+                tok = v["criterio_ok"]
+                pok = v["criterio_ok_pct"]
+                pras = ts / tb * 100 if tb else 0
+                linhas_longa.append(
+                    f"Em {a}, foram recuperados {tb} registros na busca. "
+                    f"Todos os {ts} registros tiveram metadados extraídos ({pras:.1f}%), "
+                    f"dos quais {tok} ({pok:.1f}%) atenderam ao critério de filtragem."
+                )
+            if n_anos > 1:
+                pok_total = total_ok / total_b * 100 if total_b else 0
+                linhas_longa.append(
+                    f"Considerando o período completo ({cob_anos_str}), a taxa de "
+                    f"retenção da busca ao corpus criterio_ok foi de "
+                    f"{pok_total:.1f}% ({total_ok}/{total_b})."
+                )
+            long = " ".join(linhas_longa)
+            return (
+                f"#### Versão curta (legenda expandida)\n\n{short}\n\n"
+                f"#### Versão longa (substituto textual)\n\n{long}"
+            )
 
-        ok_compl_total = sum(v["ok_completo"] for v in por_ano.values())
-        ok_parc_total  = sum(v["ok_parcial"]  for v in por_ano.values())
+        def _fig_trend_pt() -> str:
+            if n_anos == 1:
+                return (
+                    "#### Nota\n\n"
+                    "Análise temporal não aplicável — apenas 1 ano disponível no corpus."
+                )
+            short = (
+                "O gráfico apresenta a evolução anual do número de artigos criterio_ok "
+                "e sua proporção em relação ao total extraído."
+            )
+            pcts = [por_ano[a]["criterio_ok_pct"] for a in anos]
+            tendencia = "estável" if max(pcts) - min(pcts) < 3 else (
+                "crescente" if pcts[-1] > pcts[0] else "decrescente"
+            )
+            series = "; ".join(
+                f"{a}: {por_ano[a]['criterio_ok']}/{por_ano[a]['total_scrapeado']} "
+                f"({por_ano[a]['criterio_ok_pct']:.1f}%)"
+                for a in anos
+            )
+            long = (
+                f"A proporção de artigos criterio_ok manteve-se {tendencia} ao longo "
+                f"do período analisado ({series}), "
+                f"com variação de {min(pcts):.1f}% a {max(pcts):.1f}%."
+            )
+            return (
+                f"#### Versão curta (legenda expandida)\n\n{short}\n\n"
+                f"#### Versão longa (substituto textual)\n\n{long}"
+            )
+
+        def _fig_heatmap_pt() -> str:
+            short = (
+                f"O mapa de calor exibe a frequência relativa de cada termo nos campos "
+                f"detectados, calculada sobre os {total_ok} artigos criterio_ok."
+            )
+            linhas_longa = []
+            for t in termos:
+                campo_max = max(campos, key=lambda c: tc_global.get(t, {}).get(c, 0))
+                n_max = tc_global.get(t, {}).get(campo_max, 0)
+                pct_max = n_max / total_ok * 100 if total_ok else 0
+                label_max, prep_max = {
+                    "titulo":   ("título", "no"), "resumo": ("resumo", "no"),
+                    "keywords": ("palavras-chave", "nas"),
+                }.get(campo_max, (campo_max, "no"))
+                outros = [
+                    f"{tc_global.get(t,{}).get(c,0)} ({tc_global.get(t,{}).get(c,0)/total_ok*100:.1f}%) "
+                    + {"titulo": "no título", "resumo": "no resumo",
+                       "keywords": "nas palavras-chave"}.get(c, c)
+                    for c in campos if c != campo_max
+                ]
+                linhas_longa.append(
+                    f'O termo "{t}" apresentou maior ocorrência '
+                    f"{prep_max} {label_max} ({n_max}; {pct_max:.1f}%)"
+                    + (f", seguido de {'; '.join(outros)}" if outros else "")
+                    + "."
+                )
+            # campo com maior co-ocorrência
+            if cooc_global:
+                campo_cooc = max(cooc_global, key=lambda c: cooc_global.get(c, 0))
+                n_cooc = cooc_global[campo_cooc]
+                pct_cooc = n_cooc / total_ok * 100 if total_ok else 0
+                prep_cooc = {"titulo": "no", "resumo": "no", "keywords": "nas"}.get(campo_cooc, "no")
+                label_cooc = {"titulo": "título", "resumo": "resumo",
+                               "keywords": "palavras-chave"}.get(campo_cooc, campo_cooc)
+                linhas_longa.append(
+                    f"O campo com maior co-ocorrência simultânea de todos os termos foi "
+                    f"{prep_cooc} {label_cooc} ({n_cooc}; {pct_cooc:.1f}%)."
+                )
+            long = " ".join(linhas_longa)
+            return (
+                f"#### Versão curta (legenda expandida)\n\n{short}\n\n"
+                f"#### Versão longa (substituto textual)\n\n{long}"
+            )
+
+        def _fig_journals_pt() -> str:
+            n_journals = len(totais["jornais"])
+            short = (
+                "O gráfico apresenta os periódicos com maior número de artigos no "
+                "corpus criterio_ok, ordenados de forma decrescente."
+            )
+            top3_detalhes = "; ".join(
+                f"{j} (n={n}; {n/total_ok*100:.1f}%)" for j, n in top3
+            )
+            n_top3 = sum(n for _, n in top3)
+            pct_top3 = n_top3 / total_ok * 100 if total_ok else 0
+            long = (
+                f"Os {total_ok} artigos criterio_ok distribuíram-se por "
+                f"{n_journals} periódicos distintos. "
+                f"Os três periódicos com maior representação foram: {top3_detalhes}. "
+                f"Em conjunto, esses três periódicos concentraram {pct_top3:.1f}% "
+                f"({n_top3}/{total_ok}) do corpus criterio_ok."
+            )
+            return (
+                f"#### Versão curta (legenda expandida)\n\n{short}\n\n"
+                f"#### Versão longa (substituto textual)\n\n{long}"
+            )
+
+        def _fig_coverage_pt() -> str:
+            short = (
+                "O gráfico exibe, por ano, a proporção de artigos com cada campo de "
+                "metadados em português preenchido (título, resumo e palavras-chave)."
+            )
+            linhas_longa = []
+            for a in anos:
+                v    = por_ano[a]
+                ts_a = v["total_scrapeado"]
+                cob  = v["cobertura_campos"]
+                partes = []
+                for c in ["titulo", "resumo", "keywords"]:
+                    n_c = cob.get(c, 0)
+                    pct_c = n_c / ts_a * 100 if ts_a else 0
+                    label = {"titulo": "título", "resumo": "resumo",
+                             "keywords": "palavras-chave"}.get(c, c)
+                    partes.append(f"{pct_c:.1f}% possuíam {label} em português (n={n_c})")
+                linhas_longa.append(f"Em {a}: {'; '.join(partes)}.")
+            if ok_parc_total:
+                linhas_longa.append(
+                    f"A extração parcial registrada ({ok_parc_total} artigo(s)) "
+                    "não comprometeu de forma significativa a completude do corpus."
+                )
+            else:
+                linhas_longa.append(
+                    "Não foram registradas extrações parciais; todos os artigos "
+                    "apresentaram cobertura completa de metadados."
+                )
+            long = " ".join(linhas_longa)
+            return (
+                f"#### Versão curta (legenda expandida)\n\n{short}\n\n"
+                f"#### Versão longa (substituto textual)\n\n{long}"
+            )
+
+        # Monta seção de figuras
+        figuras_section = (
+            "As seções a seguir descrevem cada figura gerada em duas versões: "
+            "uma **versão curta**, adequada para uso como legenda expandida em "
+            "publicações científicas, e uma **versão longa**, que substitui "
+            "integralmente o gráfico quando o formato do veículo não permite "
+            "a inclusão de imagens.\n"
+        )
+        fig_num = 1
+        figuras_section += (
+            f"\n### Figura {fig_num} — Funil de seleção "
+            f"([{arq_funnel}]({arq_funnel}))\n\n"
+            + _fig_funil_pt()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figura {fig_num} — Evolução temporal "
+            f"([{arq_trend}]({arq_trend}))\n\n"
+            + _fig_trend_pt()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figura {fig_num} — Distribuição de termos por campo "
+            f"([{arq_heatmap}]({arq_heatmap}))\n\n"
+            + _fig_heatmap_pt()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figura {fig_num} — Periódicos com maior representação "
+            f"([{arq_journals}]({arq_journals}))\n\n"
+            + _fig_journals_pt()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figura {fig_num} — Cobertura de metadados em português "
+            f"([{arq_coverage}]({arq_coverage}))\n\n"
+            + _fig_coverage_pt()
+        )
+
+    # =========================================================================
+    # EN
+    # =========================================================================
+    else:
+        trunc_str  = " with automatic truncation ($ operator)" if truncamento else ""
+        cbf        = _fmt_campos_busca_legivel(campos_busca, "en")
+        colf       = _fmt_colecao(colecao, "en")
+        termos_fmt = _fmt_termos(" and ")
+        data_str   = f", conducted on {data_fmt}," if data_fmt else ""
+        ver_str    = _fmt_ver(versao_searcher, versao_scraper, "en")
+        ccrit_str  = _fmt_campos_criterio(campos_criterio, "en")
+
         cob_str = f"{ok_compl_total} articles with complete extraction (title + abstract + keywords)"
         if ok_parc_total:
             cob_str += f" and {ok_parc_total} with partial extraction"
 
-        tempo_part = f" Total extraction time was {tempo_str}." if tempo_str else ""
-        taxa_part = f" Extraction success rate was {taxa_media:.1f}%." if taxa_media is not None else ""
+        cob_ano_parts = []
+        for a in anos:
+            v = por_ano[a]
+            cob_ano_parts.append(
+                f"{a}: {v['ok_completo']} complete"
+                + (f", {v['ok_parcial']} partial" if v["ok_parcial"] else "")
+            )
+        cob_por_ano_str = "; ".join(cob_ano_parts) if len(anos) > 1 else ""
+
+        if tempo_total_s is not None:
+            t_fmt = _formato_tempo(tempo_total_s)
+            if len(anos) > 1 and tempo_hum_list:
+                tempo_part = (
+                    f" Total extraction time was {t_fmt}"
+                    f" ({'; '.join(f'{a}: {h}' for a, h in zip(anos, tempo_hum_list))})."
+                )
+            else:
+                tempo_part = f" Total extraction time was {t_fmt}."
+        else:
+            tempo_part = ""
+
+        taxa_part = f" Extraction success rate: {taxas_str[0]}." if taxas_str else ""
+
+        if erros_global:
+            erros_items = []
+            erros_label = {
+                "nada_encontrado": "no data found",
+                "erro_extracao":   "access error (e.g. 404)",
+                "erro_pid_invalido": "invalid PID",
+            }
+            for k, n in erros_global.items():
+                erros_items.append(f"{n} {erros_label.get(k, k)}")
+            erros_part = f" The following extraction issues were identified: {'; '.join(erros_items)}."
+        else:
+            erros_part = " No access failures were identified during extraction."
+
+        if len(anos) > 1:
+            dist_busca_parts = [f"{a}: {por_ano[a]['total_buscado']} records" for a in anos]
+            dist_busca_str = f"distributed as follows: {'; '.join(dist_busca_parts)}"
+        else:
+            dist_busca_str = ""
 
         cob_anos_str_en = _anos_cobertura_str(anos, "en")
-        metodologia = f"""\
-The bibliographic search{data_str} was conducted on the {colf} platform, \
-using the terms {termos_fmt}{trunc_str}, \
-in the {cbf} fields, \
-covering {cob_anos_str_en}. \
-A total of {total_b} records were retrieved. \
-Portuguese-language metadata (title, abstract, and keywords) were extracted \
-using the SciELO Scraper script (api+html strategy){ver_str}, \
-resulting in {cob_str}. \
-{total_s} articles had data available for analysis.{tempo_part}{taxa_part} \
-The automatic filtering step verified the simultaneous presence of all terms \
-in at least one required field (title or keywords), \
-identifying {total_ok} articles ({pct_ok:.1f}%) as potentially relevant \
-for human curation."""
 
-        dist_str = "; ".join(por_ano_str_list)
+        p_busca = (
+            f"The bibliographic search{data_str} was conducted on the {colf} platform "
+            f"using SciELO Search ({ver_str.split(';')[0].strip()}), "
+            f"with the terms {termos_fmt}{trunc_str}, "
+            f"in the {cbf} fields, "
+            f"covering {cob_anos_str_en}. "
+            f"A total of {total_b} records were retrieved"
+            + (f", {dist_busca_str}" if dist_busca_str else "")
+            + "."
+        )
+
+        p_estrategia = (
+            "Metadata extraction in Portuguese (title, abstract, and keywords) was "
+            "performed using the SciELO Scraper, employing the **api+html** strategy. "
+            "In this approach, the system first queries the ArticleMeta API — a "
+            "programming interface maintained by SciELO that provides structured "
+            "metadata for indexed articles. When the API returns incomplete data or "
+            "no data for a given article (which commonly occurs for Ahead of Print "
+            "articles, i.e., articles published online before receiving a definitive "
+            "issue number), the system automatically falls back to directly scraping "
+            "the HTML of the article page on the SciELO portal. This combined strategy "
+            "maximizes the successful extraction rate compared to using only the API "
+            "or only HTML scraping."
+        )
+
+        p_extracao = (
+            f"Extraction yielded {cob_str}"
+            + (f" ({cob_por_ano_str})" if cob_por_ano_str else "")
+            + f".{tempo_part}{taxa_part}{erros_part} "
+            f"The automatic filtering step verified the simultaneous presence of all "
+            f"terms in at least one required field ({ccrit_str}), "
+            f"identifying {total_ok} articles ({pct_ok:.1f}%) as potentially relevant "
+            f"for human curation"
+            + (
+                f" (annual distribution: "
+                + "; ".join(
+                    f"{a}: n={por_ano[a]['criterio_ok']} ({por_ano[a]['criterio_ok_pct']:.1f}%)"
+                    for a in anos
+                ) + ")"
+                if len(anos) > 1 else ""
+            )
+            + "."
+        )
+
+        metodologia = p_busca + "\n\n" + p_estrategia + "\n\n" + p_extracao
+
+        if query_url:
+            nota_tecnica = (
+                "### Technical note — Search URL\n\n"
+                "The query was executed at the following URL (may be used as a "
+                "footnote or methodological reference):\n\n"
+                f"```\n{query_url}\n```"
+            )
+        else:
+            nota_tecnica = ""
 
         termos_analise_parts = []
         for t in termos:
             partes_t = []
-            for c in campos:
-                n = tc_global.get(t, {}).get(c, 0)
+            for c in campos_criterio:
+                n   = tc_global.get(t, {}).get(c, 0)
                 pct = n / total_ok * 100 if total_ok else 0
-                label_c = {"titulo": "title", "resumo": "abstract", "keywords": "keywords"}.get(c, c)
+                label_c = {"titulo": "title", "resumo": "abstract",
+                           "keywords": "keywords"}.get(c, c)
                 partes_t.append(f"{n} ({pct:.1f}%) in the {label_c}")
             termos_analise_parts.append(
                 f'The term "{t}" was identified in: ' + "; ".join(partes_t) + "."
@@ -1482,63 +1898,300 @@ for human curation."""
         termos_analise = " ".join(termos_analise_parts)
 
         cooc_parts = []
-        for c in campos:
+        for c in campos_criterio:
             n_c = cooc_global.get(c, 0)
             if n_c > 0:
                 pct_c = n_c / total_ok * 100
-                label_c = {"titulo": "title", "resumo": "abstract", "keywords": "keywords"}.get(c, c)
+                label_c = {"titulo": "title", "resumo": "abstract",
+                           "keywords": "keywords"}.get(c, c)
                 cooc_parts.append(f"{n_c} ({pct_c:.1f}%) in the {label_c}")
-        cooc_str = ""
-        if cooc_parts:
-            cooc_str = (
-                "Simultaneous co-occurrence of all terms was found in: "
-                + "; ".join(cooc_parts) + ". "
-            )
+        cooc_str = (
+            "Simultaneous co-occurrence of all terms was found in: "
+            + "; ".join(cooc_parts) + ". "
+        ) if cooc_parts else ""
 
         top3_str = "; ".join(f"{j} (n={n})" for j, n in top3)
         n_journals_total = len(totais["jornais"])
 
-        resultados = f"""\
-Of the {total_s} articles retrieved and processed, \
-{total_ok} ({pct_ok:.1f}%) met the automatic filtering criterion \
-and were forwarded for human review by the research group. \
-"""
+        resultados = (
+            f"{total_ok} ({pct_ok:.1f}%) of the {total_s} extracted articles "
+            f"met the automatic filtering criterion and were forwarded for human "
+            f"review by the research group."
+        )
         if len(anos) > 1:
-            resultados += f"Annual distribution: {dist_str}. "
+            dist_ok_parts = [
+                f"{a}: n={por_ano[a]['criterio_ok']} ({por_ano[a]['criterio_ok_pct']:.1f}%)"
+                for a in anos
+            ]
+            resultados += f" Annual distribution: {'; '.join(dist_ok_parts)}."
 
-        resultados += termos_analise + " "
-        resultados += cooc_str
+        resultados += "\n\n" + termos_analise
+        if cooc_str:
+            resultados += " " + cooc_str.strip()
 
         if top3:
             resultados += (
-                f"The criterion articles were identified across {n_journals_total} distinct journals. "
-                f"The journals with the highest representation were: {top3_str}. "
+                f"\n\nThe criterion articles were identified across "
+                f"{n_journals_total} distinct journals. "
+                f"The journals with the highest representation were: {top3_str}."
             )
 
-        limitacoes = """\
-Automated searching with truncation may retrieve articles containing the term stems in contexts \
-unrelated to the main topic of this review, requiring human curation to validate relevance. \
-The automatic filtering is based solely on the simultaneous presence of terms in selected fields \
-(title or keywords), without semantic or contextual analysis. \
-SciELO platform coverage is limited to journals indexed in this database, \
-and does not include publications in other repositories (e.g., LILACS, PubMed, Scopus). \
-Articles in Ahead of Print (AoP) status may not be indexed via the API and rely on HTML extraction, \
-which may result in lower metadata stability. \
-Co-occurrence analysis indicates the presence of terms in the same fields, \
-but does not guarantee a direct semantic relationship between them."""
+        limitacoes = (
+            "Automated searching with truncation may retrieve articles containing "
+            "term stems in contexts unrelated to the main topic of this review, "
+            "requiring human curation to validate relevance. "
+            "The automatic filtering is based solely on the simultaneous presence "
+            f"of terms in selected fields ({ccrit_str}), without semantic or "
+            "contextual analysis. "
+            "SciELO platform coverage is limited to journals indexed in this "
+            "database, and does not include publications in other repositories "
+            "(e.g., LILACS, PubMed, Scopus). "
+            "Articles in Ahead of Print (AoP) status may not be indexed via the "
+            "API and rely on HTML extraction, which may result in lower metadata "
+            "stability. "
+            "Co-occurrence analysis indicates the presence of terms in the same "
+            "fields, but does not guarantee a direct semantic relationship between them."
+        )
 
-    # Seção de artefatos
+        n_anos = len(anos)
+
+        def _fig_funil_en() -> str:
+            short = (
+                "The selection funnel presents three sequential stages of corpus "
+                "reduction: retrieval via platform search, metadata extraction by "
+                "scraping, and application of the automatic filtering criterion."
+            )
+            linhas_longa = []
+            for a in anos:
+                v = por_ano[a]
+                tb = v["total_buscado"]
+                ts = v["total_scrapeado"]
+                tok = v["criterio_ok"]
+                pok = v["criterio_ok_pct"]
+                pras = ts / tb * 100 if tb else 0
+                linhas_longa.append(
+                    f"In {a}, {tb} records were retrieved. "
+                    f"All {ts} records had metadata extracted ({pras:.1f}%), "
+                    f"of which {tok} ({pok:.1f}%) met the filtering criterion."
+                )
+            if n_anos > 1:
+                pok_total = total_ok / total_b * 100 if total_b else 0
+                linhas_longa.append(
+                    f"Over the full period ({cob_anos_str_en}), the retention rate "
+                    f"from search to criterio_ok corpus was "
+                    f"{pok_total:.1f}% ({total_ok}/{total_b})."
+                )
+            long = " ".join(linhas_longa)
+            return (
+                f"#### Short version (expanded caption)\n\n{short}\n\n"
+                f"#### Long version (textual substitute)\n\n{long}"
+            )
+
+        def _fig_trend_en() -> str:
+            if n_anos == 1:
+                return (
+                    "#### Note\n\n"
+                    "Temporal analysis not applicable — only 1 year available in the corpus."
+                )
+            short = (
+                "The chart presents the annual evolution of the number of criterio_ok "
+                "articles and their proportion relative to the total extracted."
+            )
+            pcts = [por_ano[a]["criterio_ok_pct"] for a in anos]
+            tendencia = "stable" if max(pcts) - min(pcts) < 3 else (
+                "increasing" if pcts[-1] > pcts[0] else "decreasing"
+            )
+            series = "; ".join(
+                f"{a}: {por_ano[a]['criterio_ok']}/{por_ano[a]['total_scrapeado']} "
+                f"({por_ano[a]['criterio_ok_pct']:.1f}%)"
+                for a in anos
+            )
+            long = (
+                f"The proportion of criterio_ok articles remained {tendencia} "
+                f"throughout the analyzed period ({series}), "
+                f"ranging from {min(pcts):.1f}% to {max(pcts):.1f}%."
+            )
+            return (
+                f"#### Short version (expanded caption)\n\n{short}\n\n"
+                f"#### Long version (textual substitute)\n\n{long}"
+            )
+
+        def _fig_heatmap_en() -> str:
+            short = (
+                f"The heat map displays the relative frequency of each term across "
+                f"detected fields, calculated over the {total_ok} criterio_ok articles."
+            )
+            linhas_longa = []
+            for t in termos:
+                campo_max = max(campos, key=lambda c: tc_global.get(t, {}).get(c, 0))
+                n_max = tc_global.get(t, {}).get(campo_max, 0)
+                pct_max = n_max / total_ok * 100 if total_ok else 0
+                label_max = {"titulo": "title", "resumo": "abstract",
+                             "keywords": "keywords"}.get(campo_max, campo_max)
+                outros = [
+                    f"{tc_global.get(t,{}).get(c,0)} "
+                    f"({tc_global.get(t,{}).get(c,0)/total_ok*100:.1f}%) in the "
+                    + {"titulo": "title", "resumo": "abstract",
+                       "keywords": "keywords"}.get(c, c)
+                    for c in campos if c != campo_max
+                ]
+                linhas_longa.append(
+                    f'Term "{t}" showed the highest occurrence in the {label_max} '
+                    f"({n_max}; {pct_max:.1f}%)"
+                    + (f", followed by {'; '.join(outros)}" if outros else "")
+                    + "."
+                )
+            if cooc_global:
+                campo_cooc = max(cooc_global, key=lambda c: cooc_global.get(c, 0))
+                n_cooc = cooc_global[campo_cooc]
+                pct_cooc = n_cooc / total_ok * 100 if total_ok else 0
+                label_cooc = {"titulo": "title", "resumo": "abstract",
+                               "keywords": "keywords"}.get(campo_cooc, campo_cooc)
+                linhas_longa.append(
+                    f"The field with the highest simultaneous co-occurrence of all "
+                    f"terms was {label_cooc} ({n_cooc}; {pct_cooc:.1f}%)."
+                )
+            long = " ".join(linhas_longa)
+            return (
+                f"#### Short version (expanded caption)\n\n{short}\n\n"
+                f"#### Long version (textual substitute)\n\n{long}"
+            )
+
+        def _fig_journals_en() -> str:
+            n_journals = len(totais["jornais"])
+            short = (
+                "The chart presents the journals with the highest number of articles "
+                "in the criterio_ok corpus, in descending order."
+            )
+            top3_detalhes = "; ".join(
+                f"{j} (n={n}; {n/total_ok*100:.1f}%)" for j, n in top3
+            )
+            n_top3 = sum(n for _, n in top3)
+            pct_top3 = n_top3 / total_ok * 100 if total_ok else 0
+            long = (
+                f"The {total_ok} criterio_ok articles were distributed across "
+                f"{n_journals} distinct journals. "
+                f"The three journals with the highest representation were: {top3_detalhes}. "
+                f"Together, these three journals accounted for {pct_top3:.1f}% "
+                f"({n_top3}/{total_ok}) of the criterio_ok corpus."
+            )
+            return (
+                f"#### Short version (expanded caption)\n\n{short}\n\n"
+                f"#### Long version (textual substitute)\n\n{long}"
+            )
+
+        def _fig_coverage_en() -> str:
+            short = (
+                "The chart displays, per year, the proportion of articles with each "
+                "Portuguese-language metadata field populated (title, abstract, "
+                "and keywords)."
+            )
+            linhas_longa = []
+            for a in anos:
+                v    = por_ano[a]
+                ts_a = v["total_scrapeado"]
+                cob  = v["cobertura_campos"]
+                partes = []
+                for c in ["titulo", "resumo", "keywords"]:
+                    n_c = cob.get(c, 0)
+                    pct_c = n_c / ts_a * 100 if ts_a else 0
+                    label = {"titulo": "title", "resumo": "abstract",
+                             "keywords": "keywords"}.get(c, c)
+                    partes.append(f"{pct_c:.1f}% had {label} in Portuguese (n={n_c})")
+                linhas_longa.append(f"In {a}: {'; '.join(partes)}.")
+            if ok_parc_total:
+                linhas_longa.append(
+                    f"The partial extraction recorded ({ok_parc_total} article(s)) "
+                    "did not significantly affect corpus completeness."
+                )
+            else:
+                linhas_longa.append(
+                    "No partial extractions were recorded; all articles presented "
+                    "complete metadata coverage."
+                )
+            long = " ".join(linhas_longa)
+            return (
+                f"#### Short version (expanded caption)\n\n{short}\n\n"
+                f"#### Long version (textual substitute)\n\n{long}"
+            )
+
+        figuras_section = (
+            "The following sections describe each generated figure in two versions: "
+            "a **short version**, suitable as an expanded caption in scientific "
+            "publications, and a **long version**, which fully replaces the figure "
+            "when the publication format does not allow images.\n"
+        )
+        fig_num = 1
+        figuras_section += (
+            f"\n### Figure {fig_num} — Selection funnel "
+            f"([{arq_funnel}]({arq_funnel}))\n\n"
+            + _fig_funil_en()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figure {fig_num} — Temporal trend "
+            f"([{arq_trend}]({arq_trend}))\n\n"
+            + _fig_trend_en()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figure {fig_num} — Term distribution by field "
+            f"([{arq_heatmap}]({arq_heatmap}))\n\n"
+            + _fig_heatmap_en()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figure {fig_num} — Journals with highest representation "
+            f"([{arq_journals}]({arq_journals}))\n\n"
+            + _fig_journals_en()
+        )
+        fig_num += 1
+        figuras_section += (
+            f"\n\n### Figure {fig_num} — Portuguese metadata coverage "
+            f"([{arq_coverage}]({arq_coverage}))\n\n"
+            + _fig_coverage_en()
+        )
+
+    # ── Seção de artefatos ────────────────────────────────────────────────────
     artefatos_section = _gerar_artefatos_section(lang)
+
+    # ── Escrever arquivo ──────────────────────────────────────────────────────
+    aviso_pt = (
+        "> **Aviso:** Este documento e todos os artefatos gerados são **sugestões "
+        "publicáveis** produzidas automaticamente a partir dos dados extraídos. "
+        "Recomenda-se revisão crítica pelo pesquisador responsável antes da "
+        "submissão ou publicação."
+    )
+    aviso_en = (
+        "> **Notice:** This document and all generated artifacts are **publishable "
+        "suggestions** automatically produced from the extracted data. Critical "
+        "review by the responsible researcher is recommended prior to submission "
+        "or publication."
+    )
+    aviso = aviso_pt if lang == "pt" else aviso_en
+
+    sec_figuras = "## Descrição dos resultados por figura" if lang == "pt" \
+        else "## Figure descriptions"
+    sec_nota    = "## Nota técnica" if lang == "pt" else "## Technical note"
 
     dest = output / f"results_text{lang_suf}.md"
     with open(dest, "w", encoding="utf-8") as f:
-        f.write(f"<!-- Gerado por results_report.py v{__version__} em {datetime.now().strftime('%Y-%m-%d %H:%M')} -->\n\n")
+        f.write(
+            f"<!-- Gerado por results_report.py v{__version__} "
+            f"em {datetime.now().strftime('%Y-%m-%d %H:%M')} -->\n\n"
+        )
+        f.write(aviso + "\n\n")
         f.write(s("sec_metodologia", lang) + "\n\n")
         f.write(metodologia + "\n\n")
+        if nota_tecnica:
+            f.write(sec_nota + "\n\n")
+            f.write(nota_tecnica + "\n\n")
         f.write(s("sec_resultados", lang) + "\n\n")
         f.write(resultados.strip() + "\n\n")
         f.write(s("sec_limitacoes", lang) + "\n\n")
         f.write(limitacoes + "\n\n")
+        f.write(sec_figuras + "\n\n")
+        f.write(figuras_section + "\n\n")
         f.write(s("sec_artefatos", lang) + "\n\n")
         f.write(artefatos_section + "\n")
     print(f"  ✓ {dest}")
