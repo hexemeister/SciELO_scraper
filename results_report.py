@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.2"
+__version__ = "1.3"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -438,6 +438,7 @@ def _mostrar_show_report(path: Path):
     campos    = data.get("campos", [])
     por_ano   = data.get("por_ano", {})
     totais    = data.get("totais", {})
+    origem    = data.get("origem", {})
 
     print(f"\n{'═' * 64}")
     print(f"  results_report.json  —  v{versao}  —  {gerado_em[:16].replace('T', ' ')}")
@@ -445,6 +446,10 @@ def _mostrar_show_report(path: Path):
     print(f"  Anos    : {', '.join(str(a) for a in anos)}")
     print(f"  Termos  : {', '.join(termos)}")
     print(f"  Campos  : {', '.join(campos)}")
+    if origem:
+        print(f"  Comando : {origem.get('comando', '?')}")
+        if origem.get("cwd"):
+            print(f"  Dir     : {origem['cwd']}")
 
     print(f"\n{'─' * 64}")
     print("  RESUMO POR ANO")
@@ -1527,6 +1532,31 @@ def salvar_json(stats: dict, output: Path):
     print(f"  ✓ {dest}")
 
 
+def _origem(args) -> dict:
+    """Reconstrói o comando CLI que gerou este relatório, para rastreabilidade."""
+    cmd = ["uv", "run", "python", "results_report.py"]
+    if args.scrape_dir:
+        cmd += ["--scrape-dir", str(args.scrape_dir)]
+    else:
+        if args.base:
+            cmd += ["--base", str(args.base)]
+        if args.years:
+            cmd += ["--years"] + [str(y) for y in args.years]
+        if args.mode != "api+html":
+            cmd += ["--mode", args.mode]
+    if args.output_dir:
+        cmd += ["--output-dir", str(args.output_dir)]
+    if args.lang != "pt":
+        cmd += ["--lang", args.lang]
+    if args.top_journals != 15:
+        cmd += ["--top-journals", str(args.top_journals)]
+    return {
+        "comando": " ".join(cmd),
+        "argv": sys.argv[1:],
+        "cwd": str(Path.cwd()),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1778,6 +1808,7 @@ def main():
     salvar_table_summary(stats, output)
     salvar_table_terms(stats, output)
     salvar_table_journals(stats, output)
+    stats["origem"] = _origem(args)
     salvar_json(stats, output)
 
     print(f"\nPronto. Artefatos em: {output.resolve()}")
