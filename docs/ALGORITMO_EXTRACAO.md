@@ -1,4 +1,4 @@
-# Algoritmo de Extração — SciELO Scraper v2.4
+# Algoritmo de Extração — SciELO Scraper v2.5
 
 ## Fluxograma de Decisão
 

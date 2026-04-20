@@ -79,7 +79,7 @@ python scielo_search.py --terms avalia educa --years 2022-2025
 Gera dois arquivos no diretório atual:
 
 - `sc_<timestamp>.csv` — lista de artigos com PIDs e metadados
-- `sc_<timestamp>_params.json` — parâmetros completos da busca usados
+- `sc_<timestamp>_params.json` — parâmetros completos da busca, incluindo `versao_searcher` (a partir de v1.3)
 
 ### Opções
 
@@ -217,14 +217,18 @@ uv run python process_charts.py -?                    # ajuda
 Gera o arcabouço completo de artefatos científicos publication-ready a partir do `terms_*.csv` produzido pelo `terms_matcher.py`. Para o projeto e-Aval (Estado da Arte da Avaliação):
 
 ```bash
-uv run python results_report.py                       # api+html, todos os anos em runs/
+uv run python results_report.py                       # api+html, PT, todos os anos em runs/
 uv run python results_report.py --years 2022 2024     # anos específicos
 uv run python results_report.py --lang en             # artefatos em inglês
-uv run python results_report.py --lang all            # todos os idiomas
+uv run python results_report.py --lang all            # todos os idiomas (PT + EN)
+uv run python results_report.py --style grayscale     # estilo dos gráficos (default: default)
+uv run python results_report.py --list-styles         # listar estilos matplotlib disponíveis
+uv run python results_report.py --colormap plasma     # colormap do heatmap (default: viridis)
+uv run python results_report.py --list-colormaps      # listar colormaps disponíveis
 uv run python results_report.py -?                    # ajuda
 ```
 
-Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos), tabelas CSV, parágrafos Markdown prontos para publicação (Metodologia + Resultados) e JSON de metadados.
+Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos), tabelas CSV, texto Markdown publication-ready (`results_text_pt.md` / `results_text_en.md`) com Metodologia enriquecida, Nota técnica com URL da busca, e descrição textual de cada figura — e JSON de metadados.
 
 ## terms_matcher.py — Detecção de termos por campo
 
