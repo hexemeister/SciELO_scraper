@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.4"
+__version__ = "1.5"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -732,10 +732,23 @@ def calcular_stats(
 # Gráficos
 # ---------------------------------------------------------------------------
 
-CORES_FUNNEL = ["#2980b9", "#27ae60", "#e67e22"]
-CORES_CAMPOS = {"titulo": "#3498db", "resumo": "#2ecc71", "keywords": "#e67e22"}
-CORES_ANOS   = ["#2980b9", "#27ae60", "#e67e22", "#8e44ad", "#c0392b",
-                 "#16a085", "#d35400", "#2c3e50"]
+# Paleta default (usada apenas quando o estilo ativo não define prop_cycle)
+_CORES_DEFAULT = ["#2980b9", "#27ae60", "#e67e22", "#8e44ad", "#c0392b",
+                  "#16a085", "#d35400", "#2c3e50"]
+
+# Colormaps sequenciais disponíveis para o heatmap (--colormap)
+COLORMAPS_DISPONIVEIS = ["viridis", "plasma", "inferno", "magma", "cividis"]
+_COLORMAP_DEFAULT     = "viridis"
+
+# Colormap global ativo (alterado por --colormap em main())
+_colormap_ativo: str = _COLORMAP_DEFAULT
+
+
+def _cycle_colors(n: int) -> list[str]:
+    """Retorna n cores do prop_cycle do estilo matplotlib atualmente ativo."""
+    cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", _CORES_DEFAULT)
+    # Repete o ciclo se n > len(cycle)
+    return [cycle[i % len(cycle)] for i in range(n)]
 
 
 def grafico_funnel(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
@@ -761,8 +774,9 @@ def grafico_funnel(stats: dict, output: Path, lang: str = "pt", lang_suf: str = 
         vals = [v[k] for k in estagios_keys]
         x    = range(len(vals))
 
-        bars = ax.bar(x, vals, color=CORES_FUNNEL, edgecolor="white", linewidth=0.8, zorder=2)
-        ax.yaxis.grid(True, linestyle="--", linewidth=0.5, color="#dddddd", zorder=0)
+        cores = _cycle_colors(len(vals))
+        bars = ax.bar(x, vals, color=cores, edgecolor="white", linewidth=0.8, zorder=2)
+        ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, zorder=0)
         ax.set_axisbelow(True)
 
         for bar, val in zip(bars, vals):
@@ -807,11 +821,14 @@ def grafico_trend(stats: dict, output: Path, lang: str = "pt", lang_suf: str = "
     x = np.arange(len(anos))
     w = 0.35
 
+    cores = _cycle_colors(3)
+    c_total, c_ok, c_pct = cores[0], cores[1], cores[2]
+
     ax1.bar(x - w/2, vals_total, w, label=s("legenda_total_scrapeado", lang),
-            color="#bdc3c7", zorder=2)
+            color=c_total, alpha=0.6, zorder=2)
     ax1.bar(x + w/2, vals_ok,    w, label=s("legenda_criterio_ok", lang),
-            color="#27ae60", zorder=2)
-    ax1.yaxis.grid(True, linestyle="--", linewidth=0.5, color="#dddddd", zorder=0)
+            color=c_ok, zorder=2)
+    ax1.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, zorder=0)
     ax1.set_axisbelow(True)
     ax1.set_ylabel(s("eixo_n_artigos", lang), fontsize=11)
     ax1.set_xticks(x)
@@ -819,15 +836,15 @@ def grafico_trend(stats: dict, output: Path, lang: str = "pt", lang_suf: str = "
     ax1.set_xlabel(s("eixo_ano", lang), fontsize=11)
 
     ax2 = ax1.twinx()
-    ax2.plot(x, pcts, "o--", color="#e74c3c", linewidth=2, markersize=7,
+    ax2.plot(x, pcts, "o--", color=c_pct, linewidth=2, markersize=7,
              label=s("legenda_pct_criterio", lang))
-    ax2.set_ylabel(s("legenda_pct_criterio", lang), fontsize=11, color="#e74c3c")
-    ax2.tick_params(axis="y", labelcolor="#e74c3c")
+    ax2.set_ylabel(s("legenda_pct_criterio", lang), fontsize=11, color=c_pct)
+    ax2.tick_params(axis="y", labelcolor=c_pct)
     ax2.set_ylim(0, 110)
 
     for xi, pct in zip(x, pcts):
         ax2.text(xi, pct + 3, f"{pct:.1f}%", ha="center", fontsize=9,
-                 color="#e74c3c", fontweight="bold")
+                 color=c_pct, fontweight="bold")
 
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
@@ -873,7 +890,7 @@ def grafico_heatmap(stats: dict, output: Path, lang: str = "pt", lang_suf: str =
     fig, ax = plt.subplots(figsize=(max(5, 2.5 * len(campos)), max(4, 1.2 * len(termos))))
     fig.suptitle(s("titulo_heatmap", lang), fontsize=13, fontweight="bold")
 
-    im = ax.imshow(matriz, aspect="auto", cmap="YlOrRd", vmin=0, vmax=100)
+    im = ax.imshow(matriz, aspect="auto", cmap=_colormap_ativo, vmin=0, vmax=100)
     plt.colorbar(im, ax=ax, label="%", shrink=0.8)
 
     ax.set_xticks(range(len(campos)))
@@ -883,10 +900,15 @@ def grafico_heatmap(stats: dict, output: Path, lang: str = "pt", lang_suf: str =
     ax.set_xlabel(s("eixo_campo", lang), fontsize=11)
     ax.set_ylabel(s("eixo_termo", lang), fontsize=11)
 
+    # Cor do texto adaptada à luminância do colormap no ponto dado
+    cmap_obj = plt.get_cmap(_colormap_ativo)
     for i in range(len(termos)):
         for j in range(len(campos)):
             val = matriz[i, j]
-            cor = "white" if val > 60 else "#333333"
+            rgba = cmap_obj(val / 100)
+            # Luminância perceptual (ITU-R BT.709)
+            lum = 0.2126 * rgba[0] + 0.7152 * rgba[1] + 0.0722 * rgba[2]
+            cor = "white" if lum < 0.45 else "#1a1a1a"
             ax.text(j, i, f"{val:.1f}%", ha="center", va="center",
                     fontsize=11, color=cor, fontweight="bold")
 
@@ -916,7 +938,7 @@ def grafico_journals(stats: dict, output: Path, top_n: int = 15, lang: str = "pt
     fig.suptitle(s("titulo_journals", lang), fontsize=13, fontweight="bold")
 
     y = np.arange(len(top))
-    bars = ax.barh(y, vals, color="#2980b9", edgecolor="white", linewidth=0.5)
+    bars = ax.barh(y, vals, color=_cycle_colors(1)[0], edgecolor="white", linewidth=0.5)
 
     for bar, val in zip(bars, vals):
         pct = val / total_ok * 100 if total_ok else 0
@@ -927,7 +949,7 @@ def grafico_journals(stats: dict, output: Path, top_n: int = 15, lang: str = "pt
     ax.set_yticklabels(nomes_curtos, fontsize=9)
     ax.invert_yaxis()
     ax.set_xlabel(s("eixo_n_artigos", lang), fontsize=11)
-    ax.xaxis.grid(True, linestyle="--", linewidth=0.5, color="#dddddd", zorder=0)
+    ax.xaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, zorder=0)
     ax.set_axisbelow(True)
     ax.set_xlim(0, max(vals) * 1.22)
 
@@ -956,6 +978,7 @@ def grafico_coverage(stats: dict, output: Path, lang: str = "pt", lang_suf: str 
     fig, ax = plt.subplots(figsize=(max(7, 2 * len(anos)), 5.5))
     fig.suptitle(s("titulo_coverage", lang), fontsize=13, fontweight="bold")
 
+    cores_campos = _cycle_colors(len(campos_disponiveis))
     for i, campo in enumerate(campos_disponiveis):
         pcts = []
         ns   = []
@@ -968,7 +991,7 @@ def grafico_coverage(stats: dict, output: Path, lang: str = "pt", lang_suf: str 
         offset = (i - n_campos / 2 + 0.5) * width
         bars = ax.bar(x + offset, pcts, width,
                       label=campo_labels[campo],
-                      color=CORES_CAMPOS[campo],
+                      color=cores_campos[i],
                       edgecolor="white", linewidth=0.5)
         for bar, pct, n_abs in zip(bars, pcts, ns):
             if pct > 3:
@@ -989,7 +1012,7 @@ def grafico_coverage(stats: dict, output: Path, lang: str = "pt", lang_suf: str 
     ax.set_xlabel(s("eixo_ano", lang), fontsize=11)
     ax.set_ylabel(s("eixo_pct", lang), fontsize=11)
     ax.set_ylim(0, 122)
-    ax.yaxis.grid(True, linestyle="--", linewidth=0.5, color="#dddddd", zorder=0)
+    ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, zorder=0)
     ax.set_axisbelow(True)
     # Legenda abaixo do gráfico para evitar colisão com as barras
     ax.legend(
@@ -1552,6 +1575,8 @@ def _origem(args) -> dict:
         cmd += ["--top-journals", str(args.top_journals)]
     if getattr(args, "style", None):
         cmd += ["--style", args.style]
+    if getattr(args, "colormap", None) and args.colormap != _COLORMAP_DEFAULT:
+        cmd += ["--colormap", args.colormap]
     return {
         "comando": " ".join(cmd),
         "argv": sys.argv[1:],
@@ -1567,6 +1592,15 @@ def main():
     # Alias -? → --help
     if "-?" in sys.argv:
         sys.argv[sys.argv.index("-?")] = "--help"
+
+    # --list-colormaps: antes do parser para resposta imediata
+    if "--list-colormaps" in sys.argv:
+        print(f"Colormaps disponíveis ({len(COLORMAPS_DISPONIVEIS)}):\n")
+        for cm in COLORMAPS_DISPONIVEIS:
+            marker = " ← default" if cm == _COLORMAP_DEFAULT else ""
+            print(f"  {cm}{marker}")
+        print(f"\nUso: --colormap <nome>   ex: --colormap plasma")
+        sys.exit(0)
 
     # --list-styles: antes do parser para resposta imediata
     if "--list-styles" in sys.argv:
@@ -1641,6 +1675,17 @@ def main():
         help="Lista todos os estilos matplotlib disponíveis e sai.",
     )
     parser.add_argument(
+        "--colormap", default=None, metavar="NOME",
+        choices=COLORMAPS_DISPONIVEIS,
+        help=f"Colormap sequencial para o heatmap: "
+             f"{', '.join(COLORMAPS_DISPONIVEIS)} (default: {_COLORMAP_DEFAULT}). "
+             "Use --list-colormaps para descrição visual.",
+    )
+    parser.add_argument(
+        "--list-colormaps", action="store_true",
+        help="Lista os colormaps disponíveis e sai.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Mostra o que faria sem gravar nenhum arquivo",
     )
@@ -1675,6 +1720,25 @@ def main():
             print(f"    Use --list-styles para ver os disponíveis.", file=sys.stderr)
             sys.exit(1)
         plt.style.use(args.style)
+
+    # Aplicar colormap
+    colormap_ativo = getattr(args, "colormap", None) or _COLORMAP_DEFAULT
+    if getattr(args, "colormap", None):
+        if args.colormap not in COLORMAPS_DISPONIVEIS:
+            print(f"❌  Colormap '{args.colormap}' inválido.", file=sys.stderr)
+            print(f"    Disponíveis: {', '.join(COLORMAPS_DISPONIVEIS)}", file=sys.stderr)
+            sys.exit(1)
+    global _colormap_ativo
+    _colormap_ativo = colormap_ativo
+
+    # Sufixo de estilo para nomes de arquivo (só inclui quando não é default)
+    # Caracteres problemáticos em nomes de arquivo são substituídos por _
+    def _safe_name(nome: str) -> str:
+        import re
+        return re.sub(r"[^\w\-]", "_", nome)
+
+    style_suf = f"_{_safe_name(estilo_ativo)}" if estilo_ativo != "default" else ""
+    cmap_suf  = f"_{colormap_ativo}"           if colormap_ativo != _COLORMAP_DEFAULT else ""
 
     langs_a_gerar = IDIOMAS_DISPONIVEIS if args.lang == "all" else [args.lang]
 
@@ -1784,6 +1848,7 @@ def main():
     print(f"Campos detectados: {campos}")
     print(f"Idioma(s)        : {', '.join(langs_a_gerar)}")
     print(f"Estilo gráficos  : {estilo_ativo}")
+    print(f"Colormap         : {colormap_ativo}")
 
     stats = calcular_stats(rows_por_ano, termos, campos, params_por_ano, stats_json_por_ano)
 
@@ -1800,17 +1865,21 @@ def main():
 
     print(f"Pasta de saída   : {output.resolve()}")
 
-    # Sufixo de idioma: sempre _<lang> (ex: _pt, _en)
+    # Sufixo composto: _<style>_<colormap>_<lang>
+    # style_suf e cmap_suf são vazios quando usam o valor default
+    def _make_suf(lang: str) -> str:
+        return f"{style_suf}{cmap_suf}_{lang}"
+
     artefatos = []
     for lang in langs_a_gerar:
-        lang_suf = f"_{lang}"
+        suf = _make_suf(lang)
         artefatos += [
-            f"{s('arquivo_funnel',   lang)}{lang_suf}.png",
-            f"{s('arquivo_trend',    lang)}{lang_suf}.png",
-            f"{s('arquivo_heatmap',  lang)}{lang_suf}.png",
-            f"{s('arquivo_journals', lang)}{lang_suf}.png",
-            f"{s('arquivo_coverage', lang)}{lang_suf}.png",
-            f"results_text{lang_suf}.md",
+            f"{s('arquivo_funnel',   lang)}{suf}.png",
+            f"{s('arquivo_trend',    lang)}{suf}.png",
+            f"{s('arquivo_heatmap',  lang)}{suf}.png",
+            f"{s('arquivo_journals', lang)}{suf}.png",
+            f"{s('arquivo_coverage', lang)}{suf}.png",
+            f"results_text{suf}.md",
         ]
     artefatos += [
         "results_table_summary.csv",
@@ -1830,20 +1899,21 @@ def main():
     print()
 
     for lang in langs_a_gerar:
-        lang_suf = f"_{lang}"
+        suf = _make_suf(lang)
         if len(langs_a_gerar) > 1:
             print(f"  [{lang.upper()}]")
-        grafico_funnel(stats, output, lang, lang_suf)
-        grafico_trend(stats, output, lang, lang_suf)
-        grafico_heatmap(stats, output, lang, lang_suf)
-        grafico_journals(stats, output, args.top_journals, lang, lang_suf)
-        grafico_coverage(stats, output, lang, lang_suf)
-        gerar_texto(stats, output, lang, lang_suf)
+        grafico_funnel(stats, output, lang, suf)
+        grafico_trend(stats, output, lang, suf)
+        grafico_heatmap(stats, output, lang, suf)
+        grafico_journals(stats, output, args.top_journals, lang, suf)
+        grafico_coverage(stats, output, lang, suf)
+        gerar_texto(stats, output, lang, suf)
 
     salvar_table_summary(stats, output)
     salvar_table_terms(stats, output)
     salvar_table_journals(stats, output)
     stats["estilo_grafico"] = estilo_ativo
+    stats["colormap"]       = colormap_ativo
     stats["origem"] = _origem(args)
     salvar_json(stats, output)
 
