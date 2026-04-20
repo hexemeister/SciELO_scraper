@@ -11,20 +11,20 @@ com criterio_ok=True serão encaminhados para curadoria humana antes de integrar
 o banco de dados público (https://eavaleducacao1.websiteseguro.com/).
 
 Artefatos gerados em runs/<ano>/results_<stem_scraping>/ (ou --output-dir):
-    Gráficos:
-        results_funnel.png          — funil: buscado → scrapeado → criterio_ok
-        results_trend.png           — evolução temporal de criterio_ok por ano
-        results_terms_heatmap.png   — heatmap termos × campos (% de ocorrência)
-        results_journals.png        — top periódicos por n artigos criterio_ok
-        results_coverage.png        — % de artigos com cada campo PT presente
+    Gráficos (sempre com sufixo de idioma, ex: _pt ou _en):
+        results_funnel_<lang>.png          — funil: buscado → raspado → criterio_ok
+        results_trend_<lang>.png           — evolução temporal de criterio_ok por ano
+        results_terms_heatmap_<lang>.png   — heatmap termos × campos (% de ocorrência)
+        results_journals_<lang>.png        — top periódicos por n artigos criterio_ok
+        results_coverage_<lang>.png        — % de artigos com cada campo PT presente
 
-    Tabelas (CSV):
+    Tabelas (CSV — sem sufixo de idioma):
         results_table_summary.csv   — funil por ano + totais
         results_table_terms.csv     — por termo × campo: n e % de ocorrência
         results_table_journals.csv  — periódicos com contagem e % (todos, sem limite)
 
-    Texto (Markdown):
-        results_text.md             — seções: Metodologia, Resultados e Limitações
+    Texto (Markdown — sempre com sufixo de idioma):
+        results_text_<lang>.md      — seções: Metodologia, Resultados e Limitações
 
     Metadados:
         results_report.json         — todos os dados calculados (para reúso/consulta)
@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -125,7 +125,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "Retrieved\n(SciELO Search)",
     },
     "funnel_scrapeado": {
-        "pt": "Scrapeados\n(dados extraídos)",
+        "pt": "Raspados\n(dados extraídos)",
         "en": "Scraped\n(data extracted)",
     },
     "funnel_criterio": {
@@ -185,7 +185,7 @@ STRINGS: dict[str, dict[str, str]] = {
     "arquivo_texto":    {"pt": "results_text",           "en": "results_text"},
     # Legenda trend
     "legenda_total_scrapeado": {
-        "pt": "total scrapeado",
+        "pt": "total raspado",
         "en": "total scraped",
     },
     "legenda_criterio_ok": {
@@ -211,9 +211,9 @@ ARTEFATOS_CATALOGO = [
     {
         "nome":     "results_funnel",
         "tipo":     "gráfico PNG",
-        "arquivo":  "results_funnel[_<lang>].png",
+        "arquivo":  "results_funnel_<lang>.png",
         "descricao_pt": (
-            "Funil de seleção com três etapas (buscado → scrapeado → criterio_ok) "
+            "Funil de seleção com três etapas (recuperados → raspados → criterio_ok) "
             "exibidas em barras separadas por ano. "
             "Mostra a cobertura do processo: quantos artigos foram recuperados, quantos tiveram "
             "metadados extraídos com sucesso, e quantos passaram pelo critério de filtragem automática."
@@ -230,10 +230,10 @@ ARTEFATOS_CATALOGO = [
     {
         "nome":     "results_trend",
         "tipo":     "gráfico PNG",
-        "arquivo":  "results_trend[_<lang>].png",
+        "arquivo":  "results_trend_<lang>.png",
         "descricao_pt": (
             "Gráfico de barras duplas com linha de % sobreposta, mostrando a evolução temporal "
-            "de criterio_ok. Eixo esquerdo: n artigos (total scrapeado e criterio_ok); "
+            "de criterio_ok. Eixo esquerdo: n artigos (total raspado e criterio_ok); "
             "eixo direito: % de artigos que atendem ao critério por ano."
         ),
         "descricao_en": (
@@ -247,7 +247,7 @@ ARTEFATOS_CATALOGO = [
     {
         "nome":     "results_terms_heatmap",
         "tipo":     "gráfico PNG",
-        "arquivo":  "results_terms_heatmap[_<lang>].png",
+        "arquivo":  "results_terms_heatmap_<lang>.png",
         "descricao_pt": (
             "Heatmap com termos nas linhas e campos (título, resumo, palavras-chave) nas colunas. "
             "Cada célula mostra a % de artigos do corpus criterio_ok em que o termo aparece naquele campo. "
@@ -264,7 +264,7 @@ ARTEFATOS_CATALOGO = [
     {
         "nome":     "results_journals",
         "tipo":     "gráfico PNG",
-        "arquivo":  "results_journals[_<lang>].png",
+        "arquivo":  "results_journals_<lang>.png",
         "descricao_pt": (
             "Gráfico de barras horizontais com os top-N periódicos por número de artigos no corpus "
             "criterio_ok. Cada barra exibe n e % em relação ao total criterio_ok. "
@@ -281,7 +281,7 @@ ARTEFATOS_CATALOGO = [
     {
         "nome":     "results_coverage",
         "tipo":     "gráfico PNG",
-        "arquivo":  "results_coverage[_<lang>].png",
+        "arquivo":  "results_coverage_<lang>.png",
         "descricao_pt": (
             "Gráfico de barras agrupadas com % de artigos que possuem cada campo PT preenchido "
             "(título PT, resumo PT, palavras-chave PT), por ano. "
@@ -301,7 +301,7 @@ ARTEFATOS_CATALOGO = [
         "arquivo":  "results_table_summary.csv",
         "descricao_pt": (
             "Tabela-resumo do funil de seleção por ano, com linha de totais. "
-            "Colunas: ano, total_buscado, total_scrapeado, ok_completo, ok_parcial, "
+            "Colunas: ano, total_buscado, total_raspado, ok_completo, ok_parcial, "
             "criterio_ok, criterio_ok_pct."
         ),
         "descricao_en": (
@@ -319,7 +319,7 @@ ARTEFATOS_CATALOGO = [
         "descricao_pt": (
             "Tabela de frequência de termos por campo, calculada sobre o corpus criterio_ok. "
             "Colunas: termo, campo, n_criterio_ok, pct_criterio_ok (base: criterio_ok total), "
-            "pct_total_scrapeado (base: todos os artigos scrapeados)."
+            "pct_total_raspado (base: todos os artigos raspados)."
         ),
         "descricao_en": (
             "Term frequency table per field, calculated on the criterio_ok corpus. "
@@ -349,7 +349,7 @@ ARTEFATOS_CATALOGO = [
     {
         "nome":     "results_text",
         "tipo":     "texto Markdown",
-        "arquivo":  "results_text[_<lang>].md",
+        "arquivo":  "results_text_<lang>.md",
         "descricao_pt": (
             "Texto publication-ready com seções de Metodologia, Resultados e Limitações. "
             "Inclui: data da busca, termos, coleção, campos, estratégia de extração, "
@@ -371,7 +371,7 @@ ARTEFATOS_CATALOGO = [
         "arquivo":  "results_report.json",
         "descricao_pt": (
             "JSON com todos os dados calculados: versão, data de geração, anos, termos, campos, "
-            "estatísticas por ano (total_buscado, total_scrapeado, ok_completo, ok_parcial, "
+            "estatísticas por ano (total_buscado, total_raspado, ok_completo, ok_parcial, "
             "criterio_ok, cobertura_campos, termos_campos, jornais) e totais globais. "
             "Pode ser renderizado em tela com --show-report."
         ),
@@ -449,7 +449,7 @@ def _mostrar_show_report(path: Path):
     print(f"\n{'─' * 64}")
     print("  RESUMO POR ANO")
     print(f"{'─' * 64}")
-    print(f"  {'Ano':<6} {'Buscado':>8} {'Scrapeado':>10} {'Ok compl':>9} {'Ok parc':>8} {'Critério':>9} {'%':>7}")
+    print(f"  {'Ano':<6} {'Buscado':>8} {'Raspado':>10} {'Ok compl':>9} {'Ok parc':>8} {'Critério':>9} {'%':>7}")
     print(f"  {'-'*6} {'-'*8} {'-'*10} {'-'*9} {'-'*8} {'-'*9} {'-'*7}")
     for ano_str, v in sorted(por_ano.items()):
         pct = v.get("criterio_ok_pct", 0)
@@ -733,7 +733,7 @@ CORES_ANOS   = ["#2980b9", "#27ae60", "#e67e22", "#8e44ad", "#c0392b",
                  "#16a085", "#d35400", "#2c3e50"]
 
 
-def grafico_funnel(stats: dict, output: Path, lang: str = "pt"):
+def grafico_funnel(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
     anos = stats["anos"]
     por_ano = stats["por_ano"]
     n_anos  = len(anos)
@@ -782,13 +782,13 @@ def grafico_funnel(stats: dict, output: Path, lang: str = "pt"):
     fig.text(0.5, -0.03, s("nota_funnel", lang),
              ha="center", fontsize=8.5, color="#666666", style="italic")
     plt.tight_layout()
-    dest = output / f"{s('arquivo_funnel', lang)}.png"
+    dest = output / f"{s('arquivo_funnel', lang)}{lang_suf}.png"
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
 
 
-def grafico_trend(stats: dict, output: Path, lang: str = "pt"):
+def grafico_trend(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
     anos    = stats["anos"]
     por_ano = stats["por_ano"]
 
@@ -826,16 +826,24 @@ def grafico_trend(stats: dict, output: Path, lang: str = "pt"):
 
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left", fontsize=9)
+    # Legenda fora da área do gráfico para evitar colisão com barras
+    ax1.legend(
+        lines1 + lines2, labels1 + labels2,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.12),
+        ncol=3,
+        fontsize=9,
+        frameon=True,
+    )
 
     plt.tight_layout()
-    dest = output / f"{s('arquivo_trend', lang)}.png"
+    dest = output / f"{s('arquivo_trend', lang)}{lang_suf}.png"
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
 
 
-def grafico_heatmap(stats: dict, output: Path, lang: str = "pt"):
+def grafico_heatmap(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
     termos  = stats["termos"]
     campos  = stats["campos"]
     totais  = stats["totais"]
@@ -880,13 +888,13 @@ def grafico_heatmap(stats: dict, output: Path, lang: str = "pt"):
     fig.text(0.5, -0.03, s("nota_heatmap", lang),
              ha="center", fontsize=8.5, color="#666666", style="italic")
     plt.tight_layout()
-    dest = output / f"{s('arquivo_heatmap', lang)}.png"
+    dest = output / f"{s('arquivo_heatmap', lang)}{lang_suf}.png"
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
 
 
-def grafico_journals(stats: dict, output: Path, top_n: int = 15, lang: str = "pt"):
+def grafico_journals(stats: dict, output: Path, top_n: int = 15, lang: str = "pt", lang_suf: str = ""):
     jornais = stats["totais"]["jornais"]
     if not jornais:
         print("  ⚠ Gráfico de periódicos pulado — sem dados.")
@@ -919,13 +927,13 @@ def grafico_journals(stats: dict, output: Path, top_n: int = 15, lang: str = "pt
     ax.set_xlim(0, max(vals) * 1.22)
 
     plt.tight_layout()
-    dest = output / f"{s('arquivo_journals', lang)}.png"
+    dest = output / f"{s('arquivo_journals', lang)}{lang_suf}.png"
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
 
 
-def grafico_coverage(stats: dict, output: Path, lang: str = "pt"):
+def grafico_coverage(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
     anos    = stats["anos"]
     por_ano = stats["por_ano"]
 
@@ -940,32 +948,42 @@ def grafico_coverage(stats: dict, output: Path, lang: str = "pt"):
     width = 0.25
     n_campos = len(campos_disponiveis)
 
-    fig, ax = plt.subplots(figsize=(max(7, 2 * len(anos)), 5))
+    fig, ax = plt.subplots(figsize=(max(7, 2 * len(anos)), 5.5))
     fig.suptitle(s("titulo_coverage", lang), fontsize=13, fontweight="bold")
 
     for i, campo in enumerate(campos_disponiveis):
         pcts = []
+        ns   = []
         for ano in anos:
             total = por_ano[ano]["total_scrapeado"]
             n_ok  = por_ano[ano]["cobertura_campos"].get(campo, 0)
             pcts.append(n_ok / total * 100 if total else 0)
+            ns.append(n_ok)
 
         offset = (i - n_campos / 2 + 0.5) * width
         bars = ax.bar(x + offset, pcts, width,
                       label=campo_labels[campo],
                       color=CORES_CAMPOS[campo],
                       edgecolor="white", linewidth=0.5)
-        for bar, pct in zip(bars, pcts):
+        for bar, pct, n_abs in zip(bars, pcts, ns):
             if pct > 3:
+                # % acima da barra
                 ax.text(bar.get_x() + bar.get_width() / 2,
                         bar.get_height() + 0.5,
-                        f"{pct:.1f}%", ha="center", va="bottom", fontsize=8)
+                        f"{pct:.1f}%", ha="center", va="bottom", fontsize=7.5,
+                        fontweight="bold")
+                # n absoluto dentro da barra (centralizado verticalmente)
+                if pct > 8:
+                    ax.text(bar.get_x() + bar.get_width() / 2,
+                            bar.get_height() / 2,
+                            f"n={n_abs}", ha="center", va="center", fontsize=7,
+                            color="white", fontweight="bold")
 
     ax.set_xticks(x)
     ax.set_xticklabels([str(a) for a in anos], fontsize=11)
     ax.set_xlabel(s("eixo_ano", lang), fontsize=11)
     ax.set_ylabel(s("eixo_pct", lang), fontsize=11)
-    ax.set_ylim(0, 120)
+    ax.set_ylim(0, 122)
     ax.yaxis.grid(True, linestyle="--", linewidth=0.5, color="#dddddd", zorder=0)
     ax.set_axisbelow(True)
     # Legenda abaixo do gráfico para evitar colisão com as barras
@@ -973,13 +991,13 @@ def grafico_coverage(stats: dict, output: Path, lang: str = "pt"):
         title=s("legenda_campo", lang),
         fontsize=10,
         loc="upper center",
-        bbox_to_anchor=(0.5, -0.12),
+        bbox_to_anchor=(0.5, -0.14),
         ncol=n_campos,
         frameon=True,
     )
 
     plt.tight_layout()
-    dest = output / f"{s('arquivo_coverage', lang)}.png"
+    dest = output / f"{s('arquivo_coverage', lang)}{lang_suf}.png"
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
@@ -1148,7 +1166,7 @@ def _formato_tempo(segundos) -> str:
     return f"{seg}s"
 
 
-def gerar_texto(stats: dict, output: Path, lang: str = "pt"):
+def gerar_texto(stats: dict, output: Path, lang: str = "pt", lang_suf: str = ""):
     anos    = stats["anos"]
     por_ano = stats["por_ano"]
     totais  = stats["totais"]
@@ -1266,7 +1284,7 @@ def gerar_texto(stats: dict, output: Path, lang: str = "pt"):
         cbf = _fmt_campos_busca(campos_busca, "pt")
         colf = _fmt_colecao(colecao, "pt")
         termos_fmt = _fmt_termos_busca(" e ")
-        data_str = f" (realizada em {data_fmt})" if data_fmt else ""
+        data_str = f", conduzida em {data_fmt}," if data_fmt else ""
 
         # Versões
         ver_parts = []
@@ -1386,7 +1404,7 @@ mas não garante relação semântica direta entre eles."""
         cbf = _fmt_campos_busca(campos_busca, "en")
         colf = _fmt_colecao(colecao, "en")
         termos_fmt = _fmt_termos_busca(" and ")
-        data_str = f" (conducted on {data_fmt})" if data_fmt else ""
+        data_str = f", conducted on {data_fmt}," if data_fmt else ""
 
         ver_parts = []
         if versao_searcher:
@@ -1484,8 +1502,7 @@ but does not guarantee a direct semantic relationship between them."""
     # Seção de artefatos
     artefatos_section = _gerar_artefatos_section(lang)
 
-    lang_suffix = f"_{lang}" if lang != "pt" else ""
-    dest = output / f"results_text{lang_suffix}.md"
+    dest = output / f"results_text{lang_suf}.md"
     with open(dest, "w", encoding="utf-8") as f:
         f.write(f"<!-- Gerado por results_report.py v{__version__} em {datetime.now().strftime('%Y-%m-%d %H:%M')} -->\n\n")
         f.write(s("sec_metodologia", lang) + "\n\n")
@@ -1718,9 +1735,10 @@ def main():
 
     print(f"Pasta de saída   : {output.resolve()}")
 
+    # Sufixo de idioma: sempre _<lang> (ex: _pt, _en)
     artefatos = []
     for lang in langs_a_gerar:
-        lang_suf = f"_{lang}" if args.lang == "all" else ""
+        lang_suf = f"_{lang}"
         artefatos += [
             f"{s('arquivo_funnel',   lang)}{lang_suf}.png",
             f"{s('arquivo_trend',    lang)}{lang_suf}.png",
@@ -1747,14 +1765,15 @@ def main():
     print()
 
     for lang in langs_a_gerar:
+        lang_suf = f"_{lang}"
         if len(langs_a_gerar) > 1:
             print(f"  [{lang.upper()}]")
-        grafico_funnel(stats, output, lang)
-        grafico_trend(stats, output, lang)
-        grafico_heatmap(stats, output, lang)
-        grafico_journals(stats, output, args.top_journals, lang)
-        grafico_coverage(stats, output, lang)
-        gerar_texto(stats, output, lang)
+        grafico_funnel(stats, output, lang, lang_suf)
+        grafico_trend(stats, output, lang, lang_suf)
+        grafico_heatmap(stats, output, lang, lang_suf)
+        grafico_journals(stats, output, args.top_journals, lang, lang_suf)
+        grafico_coverage(stats, output, lang, lang_suf)
+        gerar_texto(stats, output, lang, lang_suf)
 
     salvar_table_summary(stats, output)
     salvar_table_terms(stats, output)
