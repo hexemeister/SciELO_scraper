@@ -737,7 +737,7 @@ _CORES_DEFAULT = ["#2980b9", "#27ae60", "#e67e22", "#8e44ad", "#c0392b",
                   "#16a085", "#d35400", "#2c3e50"]
 
 # Colormaps sequenciais disponíveis para o heatmap (--colormap)
-COLORMAPS_DISPONIVEIS = ["viridis", "plasma", "inferno", "magma", "cividis"]
+COLORMAPS_DISPONIVEIS = ["viridis", "plasma", "inferno", "magma", "cividis", "YlOrRd"]
 _COLORMAP_DEFAULT     = "viridis"
 
 # Colormap global ativo (alterado por --colormap em main())
