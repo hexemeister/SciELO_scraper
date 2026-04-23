@@ -10,6 +10,8 @@
 | `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png`, `chart_stats.json` |
 | `results_report.py` | Artefatos científicos publication-ready dos resultados | `[--base]`, `[--scrape-dir]`, `--years`, `--mode`, `--output-dir`, `--lang`, `--top-journals` | `results_*/` (gráficos + CSVs + Markdown + JSON) |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
+| `scielo_wordcloud.py` | Gera nuvem de palavras a partir de CSV de scraping | `CSV`, `[--field]`, `[--lang]`, `[--corpus]`, `[--mask]`, `[--colormap]` | `wordcloud_<campo>_<lang>_<ts>.png` + `wordcloud_stats_<ts>.json` |
+| `prisma_workflow.py` | Gera PDF preenchível A4 com diagrama PRISMA 2020 | `results_report.json`, `[--human-data]`, `[--lang]`, `[-i]` | `prisma_<stem>_<lang>_<ts>.pdf` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
 ## Convenções obrigatórias
@@ -116,11 +118,44 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 | `results_terms_heatmap.png` | Heatmap termos × campos (% de ocorrência, base: criterio_ok) |
 | `results_journals.png` | Top N periódicos por n artigos criterio_ok |
 | `results_coverage.png` | % de artigos com cada campo PT presente por ano |
+| `results_venn[_en].png` | Diagrama de Venn (≤3 termos) ou UpSet (≥4) — sobreposição de termos por campo |
 | `results_text[_en].md` | Texto publication-ready: Metodologia + Resultados + Limitações + Artefatos |
 | `results_table_summary.csv` | Funil por ano + totais |
 | `results_table_terms.csv` | Por termo × campo: n e % |
 | `results_table_journals.csv` | Todos os periódicos com contagem e % |
 | `results_report.json` | Todos os dados calculados (para reúso/consulta) |
+
+## Comportamento do scielo_wordcloud.py
+
+- **Propósito:** gera nuvem de palavras a partir do CSV de scraping (`resultado.csv`).
+- **Campos disponíveis:** `title` (Titulo_PT), `keywords` (Palavras_Chave_PT), `abstract` (Resumo_PT). Padrão: `title` + `keywords`.
+- **`--field CAMPO`:** um campo por chamada. Gera um PNG por campo.
+- **`--custom-field COL`:** nome bruto da coluna no CSV (para campos não-padrão).
+- **`--lang pt|en|es|...`:** idioma para stopwords NLTK. Padrão: `pt`.
+- **`--corpus criterio_ok|all`:** filtra artigos por status. Padrão: `criterio_ok`.
+- **`--stopwords ARQ`:** arquivo com stopwords adicionais (uma por linha ou CSV key,value).
+- **`--no-domain-stopwords`:** desativa lista de stopwords acadêmicas do domínio.
+- **`--mask IMG`:** imagem PNG/JPG para definir shape da nuvem (pixels escuros = área preenchível).
+- **`--width / --height`:** dimensões em pixels. Se só `--width` → height = width/2. Se só `--height` → width = height×2. Padrão: 800×400.
+- **`--colormap NOME`:** colormap matplotlib. Padrão: `viridis`. Ver `--list-colormaps`.
+- **`--max-words N`:** número máximo de palavras. Padrão: 200.
+- **`--output-dir DIR`:** pasta de saída. Padrão: diretório do CSV.
+- **`--dry-run`:** mostra configuração sem gerar arquivos.
+- **Saída:** `wordcloud_{campo}_{lang}_{ts}.png` + `wordcloud_stats_{ts}.json`.
+
+## Comportamento do prisma_workflow.py
+
+- **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Fase de Identificação auto-preenchida; Triagem e Inclusão com campos AcroForm editáveis.
+- **Entrada obrigatória:** `results_report.json` gerado pelo `results_report.py`.
+- **Campos auto-preenchidos:** total buscado, registros de automação, erros, registros para triagem (calculados do JSON).
+- **`--lang pt|en`:** idioma do PDF. Padrão: `pt`.
+- **`-i / --interactive`:** modo interativo no terminal para preencher campos humanos.
+- **`--human-data ARQ`:** JSON ou CSV (key,value) com campos humanos pré-preenchidos.
+- **Flags de campos humanos:** `--duplicates`, `--excluded-screening`, `--sought`, `--not-retrieved`, `--assessed`, `--excluded-eligibility`, `--included`, `--included-reports`.
+- **`--output-dir DIR`:** pasta de saída. Padrão: diretório do JSON.
+- **`--dry-run`:** mostra dados calculados sem gerar PDF.
+- **Saída:** `prisma_<stem>_<lang>_<ts>.pdf`
+- **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. Triagem e Inclusão requerem curadoria humana após o processamento.
 
 ## Comportamento do scraper (scielo_scraper.py v2.4)
 
@@ -144,9 +179,16 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 
 ```bash
 uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli matplotlib
+# Para results_report.py (Venn/UpSet):
+uv pip install matplotlib-venn upsetplot
+# Para scielo_wordcloud.py:
+uv pip install wordcloud nltk pillow
+# Para prisma_workflow.py:
+uv pip install reportlab
 ```
 
 > `brotli` é obrigatório — o CDN do SciELO usa compressão Brotli.
+> NLTK stopwords são baixadas automaticamente na primeira execução (`nltk.download('stopwords')`).
 
 ## Skills disponíveis (.claude/skills/)
 

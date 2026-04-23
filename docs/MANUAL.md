@@ -1,4 +1,4 @@
-# Manual do Usuário — SciELO Scraper v2.5
+# Manual do Usuário — SciELO Scraper v2.6
 
 > **Projeto e-Aval — Estado da Arte da Avaliação**
 > Grupo de pesquisa do Mestrado Profissional em Avaliação da Fundação Cesgranrio.
@@ -25,8 +25,10 @@
 - [11. Relatório consolidado com run_pipeline.py --stats-report](#11-relatório-consolidado-com-run_pipelinepy---stats-report)
 - [12. Detecção de termos com terms_matcher.py](#12-detecção-de-termos-com-terms_matcherpy)
 - [13. Artefatos científicos com results_report.py](#13-artefatos-científicos-com-results_reportpy)
-- [14. Problemas comuns](#14-problemas-comuns)
-- [15. Dicionário de dados e termos](#15-dicionário-de-dados-e-termos)
+- [14. Nuvem de palavras com scielo_wordcloud.py](#14-nuvem-de-palavras-com-scielo_wordcloudpy)
+- [15. Diagrama PRISMA 2020 com prisma_workflow.py](#15-diagrama-prisma-2020-com-prisma_workflowpy)
+- [16. Problemas comuns](#16-problemas-comuns)
+- [17. Dicionário de dados e termos](#17-dicionário-de-dados-e-termos)
 
 ---
 
@@ -107,6 +109,31 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Ver artefatos no terminal (sem regerar) | `uv run python results_report.py --show-report runs/.../results_report.json` | Nada (imprime no terminal) | — |
 | Listar todos os artefatos com descrição | `uv run python results_report.py --help-artifacts` | Nada (imprime no terminal) | — |
 | Descrição detalhada de um artefato | `uv run python results_report.py --help-artifact results_funnel` | Nada (imprime no terminal) | — |
+
+### Nuvem de palavras
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Gerar wordcloud de title + keywords (padrão, criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv` | `wordcloud_title_pt_<ts>.png`, `wordcloud_keywords_pt_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório do CSV |
+| Apenas um campo | `uv run python scielo_wordcloud.py resultado.csv --field abstract` | `wordcloud_abstract_pt_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório do CSV |
+| Todos os artigos extraídos (não só criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv --corpus all` | Idem | Idem |
+| Shape personalizada | `uv run python scielo_wordcloud.py resultado.csv --mask forma.png` | Idem (recortado na forma) | Idem |
+| Pasta de saída específica | `uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/` | Idem | `graficos/` |
+| Stopwords extras | `uv run python scielo_wordcloud.py resultado.csv --stopwords extra.txt` | Idem | Idem |
+| Colormap alternativo | `uv run python scielo_wordcloud.py resultado.csv --colormap plasma` | Idem (cores plasma) | Idem |
+| Simular sem gerar arquivos | `uv run python scielo_wordcloud.py resultado.csv --dry-run` | Nada (imprime config) | — |
+
+### Diagrama PRISMA 2020
+
+| Pergunta / Objetivo | Comando | O que cria | Onde salva |
+|---|---|---|---|
+| Gerar PDF PRISMA (campos humanos em branco) | `uv run python prisma_workflow.py results_report.json` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
+| Com campos humanos via CLI | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem |
+| Modo interativo (terminal pergunta os valores) | `uv run python prisma_workflow.py results_report.json -i` | Idem | Idem |
+| Campos humanos de arquivo | `uv run python prisma_workflow.py results_report.json --human-data campos.json` | Idem | Idem |
+| PDF em inglês | `uv run python prisma_workflow.py results_report.json --lang en` | `prisma_<stem>_en_<ts>.pdf` | Idem |
+| Pasta de saída específica | `uv run python prisma_workflow.py results_report.json --output-dir pdfs/` | Idem | `pdfs/` |
+| Simular sem gerar PDF | `uv run python prisma_workflow.py results_report.json --dry-run` | Nada (imprime dados calculados) | — |
 
 ---
 
@@ -690,6 +717,7 @@ uv run python results_report.py --lang all
 | `results_terms_heatmap.png` | Heatmap termos × campos: % de artigos (base: criterio_ok=True) onde cada termo aparece em cada campo |
 | `results_journals.png` | Top N periódicos com mais artigos criterio_ok |
 | `results_coverage.png` | % de artigos com título / resumo / palavras-chave em PT presentes, por ano |
+| `results_venn[_en].png` | Diagrama de Venn (≤3 termos) ou UpSet (≥4 termos) — sobreposição de termos por campo no corpus completo |
 
 **Tabelas:**
 
@@ -771,7 +799,144 @@ Nomes de artefatos disponíveis: `results_funnel`, `results_trend`, `results_ter
 
 ---
 
-## 14. Problemas comuns
+## 14. Nuvem de palavras com scielo_wordcloud.py
+
+Gera nuvens de palavras a partir do `resultado.csv` do scraping. Útil para visualizar os termos mais frequentes nos títulos, resumos ou palavras-chave dos artigos.
+
+### Uso básico
+
+```bash
+# Gera wordcloud de título + keywords (padrão) para artigos criterio_ok
+uv run python scielo_wordcloud.py sc_ts_s_ts_api+html/resultado.csv
+
+# Apenas um campo
+uv run python scielo_wordcloud.py resultado.csv --field abstract
+
+# Todos os artigos extraídos (não só criterio_ok)
+uv run python scielo_wordcloud.py resultado.csv --corpus all
+```
+
+### Opções principais
+
+```bash
+uv run python scielo_wordcloud.py resultado.csv --field title        # campo: title | abstract | keywords (default: title + keywords)
+uv run python scielo_wordcloud.py resultado.csv --lang pt            # idioma das stopwords NLTK (default: pt)
+uv run python scielo_wordcloud.py resultado.csv --stopwords extra.txt  # stopwords adicionais (1 por linha ou CSV key,value)
+uv run python scielo_wordcloud.py resultado.csv --no-domain-stopwords  # desativa stopwords acadêmicas do domínio
+uv run python scielo_wordcloud.py resultado.csv --mask forma.png     # shape personalizada (PNG/JPG; pixels escuros = área)
+uv run python scielo_wordcloud.py resultado.csv --width 1200         # largura em pixels (default: 800; height = width/2)
+uv run python scielo_wordcloud.py resultado.csv --height 600         # altura em pixels (width = height*2 se omitido)
+uv run python scielo_wordcloud.py resultado.csv --colormap plasma    # colormap matplotlib (default: viridis)
+uv run python scielo_wordcloud.py resultado.csv --max-words 100      # máx. palavras (default: 200)
+uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/  # pasta de saída
+uv run python scielo_wordcloud.py resultado.csv --dry-run            # mostrar config sem gerar arquivos
+uv run python scielo_wordcloud.py --list-langs                       # listar idiomas NLTK disponíveis
+uv run python scielo_wordcloud.py --list-colormaps                   # listar colormaps disponíveis
+uv run python scielo_wordcloud.py --version                          # mostrar versão
+uv run python scielo_wordcloud.py -?                                 # ajuda
+```
+
+### Saída
+
+- `wordcloud_{campo}_{lang}_{ts}.png` — uma imagem por campo processado
+- `wordcloud_stats_{ts}.json` — metadados: campo, idioma, corpus, n artigos, n tokens, palavras mais frequentes
+
+### Stopwords
+
+O script combina três fontes de stopwords (por padrão):
+1. **NLTK** — lista geral do idioma (português: 207 palavras; inglês: 198; espanhol: 313). Baixada automaticamente na primeira execução.
+2. **Domínio acadêmico** — termos do contexto SciELO/avaliação educacional (ex: "artigo", "estudo", "resultado"). Desative com `--no-domain-stopwords`.
+3. **Arquivo personalizado** — via `--stopwords ARQ` (uma palavra por linha, ou CSV com coluna `word`).
+
+---
+
+## 15. Diagrama PRISMA 2020 com prisma_workflow.py
+
+Gera um PDF A4 preenchível com o Diagrama de Fluxo PRISMA 2020. A fase de **Identificação** é auto-preenchida a partir do `results_report.json` gerado pelo `results_report.py`. As fases de **Triagem** e **Inclusão** ficam como campos editáveis para preenchimento após curadoria humana.
+
+> **Nota:** o pipeline automatiza apenas a fase de Identificação. Triagem e Inclusão dependem de revisão humana dos artigos.
+
+### Uso básico
+
+```bash
+# Geração básica (campos humanos ficam em branco no PDF para preencher no leitor)
+uv run python prisma_workflow.py runs/2026/results_*/results_report.json
+
+# Passando campos humanos pela linha de comando
+uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523
+
+# Modo interativo (terminal pergunta cada campo humano)
+uv run python prisma_workflow.py results_report.json -i
+
+# Campos humanos de arquivo JSON
+uv run python prisma_workflow.py results_report.json --human-data campos_humanos.json
+```
+
+### Campos auto-preenchidos (da fase de Identificação)
+
+| Campo | Fonte |
+|---|---|
+| Total buscado (n) | `total_buscado` do JSON |
+| Registros para triagem (n) | Calculado: buscado − duplicatas − automação − erros |
+| Registros de automação (n) | Artigos marcados inelegíveis automaticamente |
+| Erros/outros (n) | `erro_extracao` + `erro_pid_invalido` |
+
+### Campos humanos (Triagem e Inclusão)
+
+Preencher no PDF após curadoria, ou passar via CLI/arquivo:
+
+| Flag | Campo PRISMA |
+|---|---|
+| `--duplicates N` | Registros duplicados removidos |
+| `--sought N` | Relatórios buscados para recuperação |
+| `--not-retrieved N` | Relatórios não recuperados |
+| `--assessed N` | Relatórios avaliados para elegibilidade |
+| `--excluded-screening N` | Registros excluídos na triagem (título/resumo) |
+| `--excluded-eligibility N` | Relatórios excluídos por elegibilidade |
+| `--included N` | Estudos incluídos na revisão |
+| `--included-reports N` | Relatórios dos estudos incluídos |
+
+### Opções completas
+
+```bash
+uv run python prisma_workflow.py results_report.json --lang en          # PDF em inglês (default: pt)
+uv run python prisma_workflow.py results_report.json --output-dir pdfs/ # pasta de saída
+uv run python prisma_workflow.py results_report.json --dry-run          # mostrar dados sem gerar PDF
+uv run python prisma_workflow.py --version                              # mostrar versão
+uv run python prisma_workflow.py -?                                     # ajuda
+```
+
+### Formato do arquivo `--human-data`
+
+**JSON:**
+```json
+{
+  "duplicates": 12,
+  "sought": 687,
+  "not_retrieved": 5,
+  "assessed": 682,
+  "excluded_screening": 523,
+  "excluded_eligibility": 85,
+  "included": 80,
+  "included_reports": 80
+}
+```
+
+**CSV:**
+```
+key,value
+duplicates,12
+sought,687
+included,80
+```
+
+### Saída
+
+- `prisma_<stem>_<lang>_<ts>.pdf` — PDF preenchível, abrível em qualquer leitor (Acrobat Reader, Edge, Foxit, LibreOffice)
+
+---
+
+## 16. Problemas comuns
 
 ### "PID inválido"
 
@@ -808,7 +973,7 @@ uv run python scielo_scraper.py lista.csv
 
 ---
 
-## 15. Dicionário de dados e termos
+## 17. Dicionário de dados e termos
 
 ### Conceitos e terminologia
 

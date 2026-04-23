@@ -172,6 +172,13 @@ Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use
 | `tqdm` | Barra de progresso |
 | `wakepy` | Impede sleep do sistema durante execução longa |
 | `brotli` | Descompressão Brotli (obrigatório para o CDN do SciELO) |
+| `matplotlib` | Gráficos (`process_charts.py`, `results_report.py`) |
+| `matplotlib-venn` | Diagramas de Venn (`results_report.py`) |
+| `upsetplot` | UpSet plots para ≥4 termos (`results_report.py`) |
+| `wordcloud` | Nuvem de palavras (`scielo_wordcloud.py`) |
+| `nltk` | Stopwords multilíngues (`scielo_wordcloud.py`) |
+| `pillow` | Máscara/shape da wordcloud (`scielo_wordcloud.py`) |
+| `reportlab` | Geração de PDF preenchível (`prisma_workflow.py`) |
 
 ## Workflow típico
 
@@ -228,7 +235,60 @@ uv run python results_report.py --list-colormaps      # listar colormaps dispon�
 uv run python results_report.py -?                    # ajuda
 ```
 
-Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos), tabelas CSV, texto Markdown publication-ready (`results_text_pt.md` / `results_text_en.md`) com Metodologia enriquecida, Nota técnica com URL da busca, e descrição textual de cada figura — e JSON de metadados.
+Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos, diagrama Venn/UpSet), tabelas CSV, texto Markdown publication-ready (`results_text_pt.md` / `results_text_en.md`) com Metodologia enriquecida, Nota técnica com URL da busca, e descrição textual de cada figura — e JSON de metadados.
+
+## scielo_wordcloud.py — Nuvem de palavras
+
+Gera nuvens de palavras a partir do `resultado.csv` do scraping. Suporta filtragem por corpus, stopwords por idioma via NLTK, stopwords de domínio acadêmico e máscara/shape personalizada.
+
+```bash
+uv run python scielo_wordcloud.py sc_ts_s_ts_api+html/resultado.csv   # title + keywords, corpus criterio_ok
+uv run python scielo_wordcloud.py resultado.csv --field abstract        # apenas resumos
+uv run python scielo_wordcloud.py resultado.csv --corpus all            # todos os artigos extraídos
+uv run python scielo_wordcloud.py resultado.csv --lang en               # stopwords em inglês
+uv run python scielo_wordcloud.py resultado.csv --stopwords extras.txt  # stopwords adicionais
+uv run python scielo_wordcloud.py resultado.csv --mask forma.png        # shape personalizada
+uv run python scielo_wordcloud.py resultado.csv --colormap plasma        # colormap
+uv run python scielo_wordcloud.py resultado.csv --max-words 100         # limitar palavras
+uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/  # pasta de saída
+uv run python scielo_wordcloud.py resultado.csv --dry-run               # sem gerar arquivos
+uv run python scielo_wordcloud.py --list-langs                          # listar idiomas NLTK
+uv run python scielo_wordcloud.py --list-colormaps                      # listar colormaps
+uv run python scielo_wordcloud.py -?                                    # ajuda
+```
+
+Gera `wordcloud_{campo}_{lang}_{ts}.png` por campo e `wordcloud_stats_{ts}.json` com metadados.
+
+## prisma_workflow.py — Diagrama PRISMA 2020
+
+Gera um PDF A4 preenchível com o diagrama de fluxo PRISMA 2020. Os campos da fase de Identificação são auto-preenchidos a partir do `results_report.json` (gerado pelo `results_report.py`). Os campos das fases de Triagem e Inclusão ficam como campos editáveis AcroForm para preenchimento humano após curadoria.
+
+```bash
+# Geração básica (campos humanos ficam em branco para preencher no PDF)
+uv run python prisma_workflow.py runs/2025/results_*/results_report.json
+
+# Com campos humanos passados pela linha de comando
+uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523
+
+# Modo interativo (terminal pergunta os valores)
+uv run python prisma_workflow.py results_report.json -i
+
+# Campos humanos de um arquivo JSON ou CSV
+uv run python prisma_workflow.py results_report.json --human-data human_fields.json
+
+# Em inglês
+uv run python prisma_workflow.py results_report.json --lang en
+
+# Pasta de saída específica
+uv run python prisma_workflow.py results_report.json --output-dir pdfs/
+
+# Simular sem gerar PDF
+uv run python prisma_workflow.py results_report.json --dry-run
+```
+
+Gera `prisma_<stem>_<lang>_<ts>.pdf` — PDF abrível em qualquer leitor de PDF; campos editáveis preenchíveis diretamente no Acrobat Reader, Foxit, Edge, etc.
+
+> **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. As fases de Triagem e Inclusão requerem curadoria humana após o processamento automático.
 
 ## terms_matcher.py — Detecção de termos por campo
 

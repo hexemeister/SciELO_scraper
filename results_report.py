@@ -64,7 +64,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.6"
+__version__ = "1.7"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -176,6 +176,46 @@ STRINGS: dict[str, dict[str, str]] = {
         "pt": "criterio_ok: todos os termos presentes em pelo menos um campo required (padrão: título ou palavras-chave).",
         "en": "criterio_ok: all terms present in at least one required field (default: title or keywords).",
     },
+    # Venn
+    "titulo_venn": {
+        "pt": "Sobreposição de termos por campo — corpus completo",
+        "en": "Term overlap by field — full corpus",
+    },
+    "titulo_upset": {
+        "pt": "Sobreposição de termos por campo (UpSet) — corpus completo",
+        "en": "Term overlap by field (UpSet) — full corpus",
+    },
+    "nota_venn": {
+        "pt": (
+            "Base: todos os artigos extraídos (n={n_total}). "
+            "Cada painel mostra a sobreposição dos termos de busca no campo indicado. "
+            "Nota: o resumo é coletado mas não é usado no critério de matching padrão."
+        ),
+        "en": (
+            "Base: all extracted articles (n={n_total}). "
+            "Each panel shows the overlap of search terms in the indicated field. "
+            "Note: abstract is collected but not used in the default matching criterion."
+        ),
+    },
+    "nota_upset": {
+        "pt": (
+            "Base: todos os artigos extraídos (n={n_total}). UpSet plot usado porque há {n_termos} termos "
+            "(Venn legível apenas para ≤3 termos). Cada coluna representa uma intersecção de conjuntos."
+        ),
+        "en": (
+            "Base: all extracted articles (n={n_total}). UpSet plot used because there are {n_termos} terms "
+            "(Venn readable only for ≤3 terms). Each column represents a set intersection."
+        ),
+    },
+    "venn_apenas_a": {
+        "pt": "só {t}",
+        "en": "only {t}",
+    },
+    "venn_nenhum": {
+        "pt": "nenhum\nn={n}",
+        "en": "none\nn={n}",
+    },
+    "arquivo_venn":     {"pt": "results_venn",           "en": "results_venn"},
     # Arquivos de saída
     "arquivo_funnel":   {"pt": "results_funnel",         "en": "results_funnel"},
     "arquivo_trend":    {"pt": "results_trend",          "en": "results_trend"},
@@ -345,6 +385,27 @@ ARTEFATOS_CATALOGO = [
         ),
         "termos_usados_pt": "Nenhum termo — periódicos dos artigos com criterio_ok=True.",
         "termos_usados_en": "No terms — journals of articles with criterio_ok=True.",
+    },
+    {
+        "nome":     "results_venn",
+        "tipo":     "gráfico PNG",
+        "arquivo":  "results_venn_<lang>.png",
+        "descricao_pt": (
+            "Diagrama de Venn (≤3 termos) ou UpSet plot (≥4 termos) mostrando a sobreposição "
+            "dos termos de busca por campo (título, resumo, palavras-chave). "
+            "Base: corpus completo (todos os artigos extraídos, não apenas criterio_ok). "
+            "Com 2 termos: um painel por campo disponível. "
+            "Com ≥4 termos: substituído por UpSet plot com aviso ao usuário."
+        ),
+        "descricao_en": (
+            "Venn diagram (≤3 terms) or UpSet plot (≥4 terms) showing the overlap "
+            "of search terms by field (title, abstract, keywords). "
+            "Base: full corpus (all extracted articles, not only criterio_ok). "
+            "With 2 terms: one panel per available field. "
+            "With ≥4 terms: replaced by UpSet plot with user notice."
+        ),
+        "termos_usados_pt": "Todos os termos de busca detectados no CSV.",
+        "termos_usados_en": "All search terms detected in the CSV.",
     },
     {
         "nome":     "results_text",
@@ -1035,6 +1096,225 @@ def grafico_coverage(stats: dict, output: Path, lang: str = "pt", lang_suf: str 
 
     plt.tight_layout()
     dest = output / f"{s('arquivo_coverage', lang)}{lang_suf}.png"
+    plt.savefig(dest, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"  ✓ {dest}")
+
+
+# ---------------------------------------------------------------------------
+# Venn / UpSet — sobreposição de termos por campo
+# ---------------------------------------------------------------------------
+
+_CAMPO_COL_BOOL = {
+    "titulo":   "titulo",
+    "resumo":   "resumo",
+    "keywords": "keywords",
+}
+
+_CAMPO_LABEL = {
+    "titulo":   {"pt": "Título",        "en": "Title"},
+    "resumo":   {"pt": "Resumo",        "en": "Abstract"},
+    "keywords": {"pt": "Palavras-chave","en": "Keywords"},
+}
+
+_UPSET_THRESHOLD = 4   # ≥ N termos → UpSet em vez de Venn
+
+
+def _venn_sets_por_campo(
+    todas_rows: list[dict],
+    termos: list[str],
+    campos: list[str],
+) -> dict[str, list[set]]:
+    """
+    Para cada campo, retorna uma lista de sets (um por termo) com os índices
+    dos artigos em que o termo aparece naquele campo.
+    """
+    resultado: dict[str, list[set]] = {}
+    for campo in campos:
+        sets_campo = []
+        for termo in termos:
+            col = f"{termo}_{campo}"
+            s_idx = {
+                i for i, r in enumerate(todas_rows)
+                if _bool(r.get(col, "False"))
+            }
+            sets_campo.append(s_idx)
+        resultado[campo] = sets_campo
+    return resultado
+
+
+def _grafico_venn2(ax, sets: list[set], termos: list[str], n_total: int, lang: str):
+    """Renderiza Venn de 2 conjuntos em `ax`."""
+    from matplotlib_venn import venn2, venn2_circles  # importação local
+
+    A, B = sets[0], sets[1]
+    v = venn2(subsets=(len(A - B), len(B - A), len(A & B)),
+              set_labels=(termos[0], termos[1]),
+              ax=ax,
+              set_colors=(_cycle_colors(2)[0], _cycle_colors(2)[1]),
+              alpha=0.55)
+
+    # Estilização
+    for label_id, label_txt in [("10", f"n={len(A-B)}"),
+                                 ("01", f"n={len(B-A)}"),
+                                 ("11", f"n={len(A&B)}")]:
+        lbl = v.get_label_by_id(label_id)
+        if lbl:
+            lbl.set_text(label_txt)
+            lbl.set_fontsize(9)
+
+    # Artigos sem nenhum dos termos
+    nenhum = n_total - len(A | B)
+    ax.text(0.5, -0.08, f"nenhum: n={nenhum}", transform=ax.transAxes,
+            ha="center", va="top", fontsize=8, color="gray")
+
+
+def _grafico_venn3(ax, sets: list[set], termos: list[str], n_total: int, lang: str):
+    """Renderiza Venn de 3 conjuntos em `ax`."""
+    from matplotlib_venn import venn3  # importação local
+
+    A, B, C = sets[0], sets[1], sets[2]
+    cores = _cycle_colors(3)
+    v = venn3(subsets=(
+                len(A - B - C),
+                len(B - A - C),
+                len(A & B - C),
+                len(C - A - B),
+                len(A & C - B),
+                len(B & C - A),
+                len(A & B & C),
+              ),
+              set_labels=tuple(termos[:3]),
+              ax=ax,
+              set_colors=tuple(cores[:3]),
+              alpha=0.55)
+
+    # n absoluto em cada região
+    regions = {
+        "100": len(A - B - C), "010": len(B - A - C),
+        "110": len(A & B - C), "001": len(C - A - B),
+        "101": len(A & C - B), "011": len(B & C - A),
+        "111": len(A & B & C),
+    }
+    for region_id, n_val in regions.items():
+        lbl = v.get_label_by_id(region_id)
+        if lbl:
+            lbl.set_text(f"n={n_val}")
+            lbl.set_fontsize(8.5)
+
+    nenhum = n_total - len(A | B | C)
+    ax.text(0.5, -0.08, f"nenhum: n={nenhum}", transform=ax.transAxes,
+            ha="center", va="top", fontsize=8, color="gray")
+
+
+def grafico_venn(
+    todas_rows: list[dict],
+    termos: list[str],
+    campos: list[str],
+    stats: dict,
+    output: Path,
+    lang: str = "pt",
+    lang_suf: str = "",
+):
+    """
+    Gera results_venn_<lang>.png.
+
+    • ≤3 termos → Venn (matplotlib-venn), um painel por campo
+    • ≥4 termos → UpSet plot (upsetplot), único painel
+    Base: corpus completo (todas_rows), não só criterio_ok.
+    """
+    n_total = len(todas_rows)
+    n_termos = len(termos)
+    dest = output / f"{s('arquivo_venn', lang)}{lang_suf}.png"
+
+    # ---- UpSet (≥ _UPSET_THRESHOLD termos) -----------------------------------
+    if n_termos >= _UPSET_THRESHOLD:
+        try:
+            from upsetplot import UpSet, from_memberships  # importação local
+        except ImportError:
+            print(f"  ⚠  upsetplot não instalado — pulando {dest.name}. "
+                  "Execute: uv pip install upsetplot")
+            return
+
+        print(f"  ⚠  {n_termos} termos detectados: usando UpSet plot em vez de Venn.")
+
+        # Para UpSet: memberships por artigo (quais termos × campos estão True)
+        # Agrupa: artigo pertence a conjunto "termo_campo" se booleana for True
+        # Usamos a union sobre campos (any campo) para não explodir dimensões
+        memberships = []
+        for r in todas_rows:
+            grupos = []
+            for termo in termos:
+                em_algum_campo = any(
+                    _bool(r.get(f"{termo}_{campo}", "False"))
+                    for campo in campos
+                )
+                if em_algum_campo:
+                    grupos.append(termo)
+            memberships.append(grupos)
+
+        data = from_memberships(memberships, data=[1] * n_total)
+        upset = UpSet(data, subset_size="count", show_counts=True,
+                      sort_by="cardinality", totals_plot_elements=3)
+
+        fig = upset.plot()
+        nota = s("nota_upset", lang).format(n_total=n_total, n_termos=n_termos)
+        fig["matrix"].set_title(s("titulo_upset", lang), fontsize=11, fontweight="bold")
+        fig["matrix"].annotate(nota, xy=(0.5, -0.25), xycoords="axes fraction",
+                               ha="center", fontsize=7.5, color="gray",
+                               wrap=True)
+        plt.savefig(dest, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"  ✓ {dest}")
+        return
+
+    # ---- Venn (2 ou 3 termos) ------------------------------------------------
+    try:
+        import matplotlib_venn  # noqa: F401 — só testa disponibilidade
+    except ImportError:
+        print(f"  ⚠  matplotlib-venn não instalado — pulando {dest.name}. "
+              "Execute: uv pip install matplotlib-venn")
+        return
+
+    sets_por_campo = _venn_sets_por_campo(todas_rows, termos, campos)
+
+    # Filtra campos sem dados (nenhum artigo com qualquer termo)
+    campos_com_dados = [
+        c for c in campos
+        if any(len(s_) > 0 for s_ in sets_por_campo[c])
+    ]
+    if not campos_com_dados:
+        print(f"  ⚠  Nenhum dado para Venn — pulando {dest.name}.")
+        return
+
+    n_paineis = len(campos_com_dados)
+    fig_w = max(4.5, 4.5 * n_paineis)
+    fig, axes = plt.subplots(1, n_paineis, figsize=(fig_w, 4.8))
+    if n_paineis == 1:
+        axes = [axes]
+
+    fig.suptitle(s("titulo_venn", lang), fontsize=12, fontweight="bold", y=1.01)
+
+    for ax, campo in zip(axes, campos_com_dados):
+        campo_label = _CAMPO_LABEL.get(campo, {}).get(lang, campo)
+        ax.set_title(campo_label, fontsize=11, pad=10)
+
+        sets = sets_por_campo[campo]
+        if n_termos == 2:
+            _grafico_venn2(ax, sets, termos, n_total, lang)
+        else:  # 3
+            _grafico_venn3(ax, sets, termos, n_total, lang)
+
+    nota = s("nota_venn", lang).format(n_total=n_total)
+    # Nota de rodapé: só mostra aviso sobre resumo se "resumo" está nos campos
+    if "resumo" not in campos_com_dados:
+        nota = nota.split("Nota:")[0].split("Note:")[0].strip()
+
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.15)
+    fig.text(0.5, 0.02, nota, ha="center", fontsize=7.5, color="gray",
+             wrap=True, transform=fig.transFigure)
+
     plt.savefig(dest, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✓ {dest}")
@@ -2532,6 +2812,7 @@ def main():
             f"{s('arquivo_heatmap',  lang)}{suf}.png",
             f"{s('arquivo_journals', lang)}{suf}.png",
             f"{s('arquivo_coverage', lang)}{suf}.png",
+            f"{s('arquivo_venn',     lang)}{suf}.png",
             f"results_text{suf}.md",
         ]
     artefatos += [
@@ -2551,6 +2832,8 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     print()
 
+    todas_rows = [r for rows in rows_por_ano.values() for r in rows]
+
     for lang in langs_a_gerar:
         suf = _make_suf(lang)
         if len(langs_a_gerar) > 1:
@@ -2560,6 +2843,7 @@ def main():
         grafico_heatmap(stats, output, lang, suf)
         grafico_journals(stats, output, args.top_journals, lang, suf)
         grafico_coverage(stats, output, lang, suf)
+        grafico_venn(todas_rows, termos, campos, stats, output, lang, suf)
         gerar_texto(stats, output, lang, suf)
 
     salvar_table_summary(stats, output)
