@@ -966,6 +966,439 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
 
 
 # ---------------------------------------------------------------------------
+# PDF artístico — Systemic Passage
+# ---------------------------------------------------------------------------
+
+def gerar_pdf_artistico(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
+    """
+    Gera o PDF PRISMA 2020 no estilo artístico 'Systemic Passage'.
+
+    Campos automáticos: texto fixo desenhado no canvas (não editável).
+    Campos humanos: label fixo no canvas + AcroForm textfield apenas para o n=
+      posicionado exatamente sobre o placeholder, fundo transparente.
+    """
+    try:
+        from reportlab.pdfgen import canvas as rl_canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.colors import HexColor, white, Color
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+    except ImportError:
+        print("❌  reportlab não instalado. Execute: uv pip install reportlab",
+              file=sys.stderr)
+        sys.exit(1)
+
+    from datetime import datetime as DT
+
+    # ── Fontes ───────────────────────────────────────────────────────────────
+    # Tenta carregar fontes do diretório canvas-design; cai em Helvetica se ausentes
+    _canvas_fonts = Path(__file__).parent.parent / "AppData/Roaming/Claude/local-agent-mode-sessions"
+    # Busca genérica em pastas comuns
+    _font_search = [
+        Path.home() / "AppData/Roaming/Claude/local-agent-mode-sessions",
+        Path(__file__).parent / "canvas-fonts",
+        Path.home() / ".claude/skills/canvas-design/canvas-fonts",
+    ]
+    # Encontra a primeira pasta com os arquivos
+    _font_dir: Path | None = None
+    for _fd in _font_search:
+        if (_fd / "GeistMono-Regular.ttf").exists():
+            _font_dir = _fd
+            break
+    # Se não encontrar busca recursiva mais ampla (skills-plugin)
+    if _font_dir is None:
+        for _base in [Path.home() / "AppData/Roaming/Claude"]:
+            for _fp in _base.rglob("GeistMono-Regular.ttf"):
+                _font_dir = _fp.parent
+                break
+            if _font_dir:
+                break
+
+    def _reg(name, fname, fallback="Helvetica"):
+        if _font_dir and (_font_dir / fname).exists():
+            try:
+                pdfmetrics.registerFont(TTFont(name, str(_font_dir / fname)))
+                return name
+            except Exception:
+                pass
+        return fallback
+
+    F_MONO     = _reg("ArtMono",    "GeistMono-Regular.ttf")
+    F_MONOB    = _reg("ArtMonoB",   "GeistMono-Bold.ttf")
+    F_SERIF    = _reg("ArtSerif",   "IBMPlexSerif-Regular.ttf")
+    F_SERIFIT  = _reg("ArtSerifIt", "IBMPlexSerif-Italic.ttf")
+    F_SANS     = _reg("ArtSans",    "InstrumentSans-Regular.ttf")
+    F_SANSB    = _reg("ArtSansB",   "InstrumentSans-Bold.ttf")
+    F_JURA     = _reg("ArtJura",    "Jura-Light.ttf")
+    F_JURAB    = _reg("ArtJuraB",   "Jura-Medium.ttf")
+
+    # ── Paleta ───────────────────────────────────────────────────────────────
+    C_INK      = HexColor("#18243a")
+    C_KEPT     = HexColor("#1a3d6e")
+    C_KEPT_LT  = HexColor("#eaf0f8")
+    C_EXCL     = HexColor("#7a8fa8")
+    C_EXCL_LT  = HexColor("#f2f5f9")
+    C_AMBER    = HexColor("#b07d10")
+    C_AMBER_LT = HexColor("#fdf6e3")
+    C_LINE     = HexColor("#2c5282")
+    C_RULE     = HexColor("#d0dae6")
+    C_BG       = HexColor("#f8fafc")
+    C_HUMAN    = HexColor("#4a7ab5")   # tint for editable number placeholder
+
+    PAGE_W, PAGE_H = A4
+
+    # ── Helpers de desenho ───────────────────────────────────────────────────
+
+    def rbox(c, x, y, w, h, fill, stroke, sw=0.75, r=2.5):
+        c.setFillColor(fill); c.setStrokeColor(stroke); c.setLineWidth(sw)
+        c.roundRect(x, y, w, h, r, fill=1, stroke=1)
+
+    def vline(c, x, y1, y2, color=None, w=0.65):
+        c.setStrokeColor(color or C_LINE); c.setLineWidth(w)
+        c.line(x, y1, x, y2)
+
+    def hline(c, x1, x2, y, color=None, w=0.65):
+        c.setStrokeColor(color or C_EXCL); c.setLineWidth(w)
+        c.line(x1, y, x2, y)
+
+    def arrow_down(c, x, y_from, y_to, color=None):
+        col = color or C_LINE
+        c.setStrokeColor(col); c.setFillColor(col); c.setLineWidth(0.75)
+        c.line(x, y_from, x, y_to + 5)
+        aw = 3.5
+        p = c.beginPath()
+        p.moveTo(x, y_to); p.lineTo(x - aw, y_to + 7); p.lineTo(x + aw, y_to + 7)
+        p.close(); c.drawPath(p, fill=1, stroke=0)
+
+    def arr_right(c, x_from, x_to, y, color=None):
+        col = color or C_EXCL
+        c.setStrokeColor(col); c.setFillColor(col); c.setLineWidth(0.65)
+        c.line(x_from, y, x_to - 5, y)
+        aw = 3.2
+        p = c.beginPath()
+        p.moveTo(x_to, y); p.lineTo(x_to - 7, y - aw); p.lineTo(x_to - 7, y + aw)
+        p.close(); c.drawPath(p, fill=1, stroke=0)
+
+    def phase_band(c, x, y_bot, w, h, label):
+        c.setFillColor(HexColor("#dce8f4"))
+        c.setStrokeColor(C_RULE); c.setLineWidth(0.3)
+        c.roundRect(x, y_bot, w, h, 2, fill=1, stroke=1)
+        c.saveState()
+        c.setFont(F_JURAB, 6.2); c.setFillColor(C_KEPT)
+        c.translate(x + w / 2, y_bot + h / 2)
+        c.rotate(90)
+        c.drawCentredString(0, -2, label.upper())
+        c.restoreState()
+
+    # ── Campo AcroForm para número humano ────────────────────────────────────
+    def acro_n(c, cx, cy, value, field_name, w=40, h=14, auto=False):
+        """
+        Desenha o número n= na posição (cx, cy).
+        auto=True: texto fixo no canvas (azul escuro).
+        auto=False: label 'n =' fixo + AcroForm textfield sobre o '?'.
+        """
+        if auto:
+            c.setFont(F_MONOB, 9); c.setFillColor(C_KEPT)
+            txt = f"n  =  {value}" if value is not None else "n  =  ?"
+            c.drawCentredString(cx, cy, txt)
+        else:
+            # Label fixo
+            c.setFont(F_MONO, 8); c.setFillColor(C_HUMAN)
+            c.drawCentredString(cx - 10, cy, "n  =")
+            # AcroForm field para o número — posicionado à direita do "n ="
+            fx = cx - 10 + 22
+            fy = cy - 3
+            fw, fh = w, h
+            _sanitize = lambda v: str(v).replace("\u2014", "-").replace("\u2013", "-") if v else ""
+            val_str = _sanitize(value) if value is not None else ""
+            try:
+                c.acroForm.textfield(
+                    name=field_name,
+                    tooltip=f"Preencher: {field_name}",
+                    x=fx, y=fy, width=fw, height=fh,
+                    value=val_str,
+                    fontSize=8,
+                    fontName="Helvetica",
+                    fillColor=Color(0, 0, 0, 0),   # transparente
+                    borderColor=C_HUMAN,
+                    borderWidth=0.5,
+                    textColor=C_KEPT,
+                )
+            except Exception:
+                # Fallback: só texto
+                c.setFont(F_MONO, 8); c.setFillColor(C_HUMAN)
+                c.drawString(fx, fy + 3, val_str or "?")
+
+    # ── Caixa principal ──────────────────────────────────────────────────────
+    def main_box(c, x, y, w, h, label_lines, value, field_name, auto=True):
+        rbox(c, x, y, w, h, C_KEPT_LT, C_KEPT, 0.9)
+        cx = x + w / 2
+        lh = 8.5; n_h = 10
+        total = len(label_lines) * lh + 5 + n_h
+        top = y + h / 2 + total / 2 - lh * 0.8
+        c.setFont(F_SANS, 6.6); c.setFillColor(C_INK)
+        for i, txt in enumerate(label_lines):
+            c.drawCentredString(cx, top - i * lh, txt)
+        n_cy = top - len(label_lines) * lh - 5
+        acro_n(c, cx, n_cy, value, field_name, auto=auto)
+
+    # ── Caixa de exclusão ────────────────────────────────────────────────────
+    def excl_box(c, x, y, w, h, label_lines, value, field_name, auto=False):
+        rbox(c, x, y, w, h, C_EXCL_LT, C_EXCL, 0.6)
+        cx = x + w / 2
+        lh = 7.5
+        n_lines = len(label_lines)
+        label_top = y + h / 2 + (n_lines * lh) / 2
+        c.setFont(F_SANS, 5.9); c.setFillColor(C_EXCL)
+        for i, txt in enumerate(label_lines):
+            c.drawCentredString(cx, label_top - i * lh, txt)
+        n_cy = y + h / 2 - 10
+        acro_n(c, cx, n_cy, value, field_name, auto=auto, w=36, h=13)
+
+    # ── Caixa amber (outras fontes) ──────────────────────────────────────────
+    def amber_box(c, x, y, w, h, label_lines, value, field_name, auto=True):
+        rbox(c, x, y, w, h, C_AMBER_LT, C_AMBER, 0.75)
+        cx = x + w / 2
+        lh = 8; n_h = 10
+        total = len(label_lines) * lh + 5 + n_h
+        top = y + h / 2 + total / 2 - lh * 0.8
+        c.setFont(F_SANS, 6); c.setFillColor(HexColor("#7a5800"))
+        for i, txt in enumerate(label_lines):
+            c.drawCentredString(cx, top - i * lh, txt)
+        n_cy = top - len(label_lines) * lh - 5
+        c.setFont(F_MONOB if auto else F_MONO, 8)
+        c.setFillColor(C_AMBER if auto else C_HUMAN)
+        txt = f"n  =  {value}" if value is not None else "n  =  ?"
+        c.drawCentredString(cx, n_cy, txt)
+
+    # ── Layout ───────────────────────────────────────────────────────────────
+    ML    = 13; BW = 14.5; GAP_B = 3
+    COL_X = ML + BW + GAP_B
+    COL_W = 96
+    CX    = COL_X + COL_W / 2
+    EXCL_GAP = 7
+    EXCL_X   = COL_X + COL_W + EXCL_GAP
+    EXCL_W   = 53
+    EXCL_CX  = EXCL_X + EXCL_W / 2
+
+    # Converter mm → pt
+    mm = 2.8346
+    COL_X *= mm; COL_W *= mm; CX *= mm
+    EXCL_X *= mm; EXCL_W *= mm; EXCL_CX *= mm
+    ML *= mm; BW *= mm; GAP_B *= mm
+
+    TOP_MARGIN = 14 * mm; BOT_MARGIN = 13 * mm; TITLE_H = 17 * mm
+    USABLE_H = PAGE_H - TOP_MARGIN - BOT_MARGIN - TITLE_H
+    BH = USABLE_H / 9.5; ARROW = BH * 0.45; BH_INC = BH * 1.5
+
+    def _y(i):
+        base = PAGE_H - TOP_MARGIN - TITLE_H
+        if i == 0:
+            return base - BH
+        elif i < 5:
+            return _y(i - 1) - ARROW - BH
+        else:
+            return _y(4) - ARROW - BH_INC
+
+    # ── Dados ────────────────────────────────────────────────────────────────
+    d = dados
+    _n = lambda k, default=None: d.get(k, default)
+
+    lang_lbl = {
+        "pt": {
+            "title":    "PRISMA 2020",
+            "subtitle": "Preferential Reporting Items for Systematic Reviews and Meta-Analyses",
+            "id":       "IDENTIFICAÇÃO",
+            "scr":      "TRIAGEM",
+            "inc":      "INCLUSÃO",
+            "databases":    ["Registros identificados", "nas bases de dados"],
+            "other_src":    ["Registros de", "outras fontes"],
+            "deduped":      ["Registros após remoção", "de duplicatas"],
+            "duplicates":   ["Duplicatas removidas"],
+            "screened":     ["Registros selecionados", "para triagem"],
+            "excl_scr":     ["Registros excluídos", "(título / resumo)"],
+            "sought":       ["Relatórios buscados", "para recuperação"],
+            "not_retr":     ["Relatórios não", "recuperados"],
+            "assessed":     ["Relatórios avaliados", "para elegibilidade"],
+            "excl_elig":    ["Relatórios excluídos", "por elegibilidade"],
+            "included":     ["Estudos incluídos", "na revisão"],
+            "colophon":     "Page & Moher et al. (2021). BMJ 372:n71  ·  prisma-statement.org",
+        },
+        "en": {
+            "title":    "PRISMA 2020",
+            "subtitle": "Preferred Reporting Items for Systematic Reviews and Meta-Analyses",
+            "id":       "IDENTIFICATION",
+            "scr":      "SCREENING",
+            "inc":      "INCLUDED",
+            "databases":    ["Records identified", "from databases"],
+            "other_src":    ["Records from", "other sources"],
+            "deduped":      ["Records after", "duplicates removed"],
+            "duplicates":   ["Duplicates removed"],
+            "screened":     ["Records screened"],
+            "excl_scr":     ["Records excluded", "(title / abstract)"],
+            "sought":       ["Reports sought", "for retrieval"],
+            "not_retr":     ["Reports not retrieved"],
+            "assessed":     ["Reports assessed", "for eligibility"],
+            "excl_elig":    ["Reports excluded", "— reasons"],
+            "included":     ["Studies included", "in review"],
+            "colophon":     "Page & Moher et al. (2021). BMJ 372:n71  ·  prisma-statement.org",
+        },
+    }
+    L = lang_lbl.get(lang, lang_lbl["pt"])
+
+    # ── Canvas ───────────────────────────────────────────────────────────────
+    c = rl_canvas.Canvas(str(output_path), pagesize=A4)
+
+    # Background
+    c.setFillColor(C_BG); c.rect(0, 0, PAGE_W, PAGE_H, fill=1, stroke=0)
+
+    # Grid faint
+    c.setStrokeColor(C_RULE); c.setLineWidth(0.18)
+    step = int(14 * mm)
+    for gy in range(0, int(PAGE_H) + step, step):
+        c.line(0, gy, PAGE_W, gy)
+
+    # Watermark
+    c.saveState()
+    c.setFont(F_SERIFIT, 60); c.setFillColor(HexColor("#dde7f3"))
+    c.translate(PAGE_W - 10 * mm, PAGE_H - 15 * mm)
+    c.rotate(-12)
+    c.drawRightString(0, 0, "EVIDENCE")
+    c.restoreState()
+
+    # Título
+    ty = PAGE_H - TOP_MARGIN
+    c.setFont(F_SERIF, 10.5); c.setFillColor(C_INK)
+    c.drawString(COL_X, ty, L["title"])
+    c.setFont(F_SERIFIT, 6.4); c.setFillColor(C_EXCL)
+    c.drawString(COL_X, ty - 10, L["subtitle"])
+    c.setStrokeColor(C_LINE); c.setLineWidth(0.85)
+    c.line(COL_X, ty - 14, COL_X + COL_W, ty - 14)
+
+    # Phase bands
+    PAD = 2 * mm
+    id_top  = _y(0) + BH + PAD;  id_bot  = _y(1) - PAD
+    scr_top = _y(2) + BH + PAD;  scr_bot = _y(4) - PAD
+    inc_top = _y(5) + BH_INC + PAD; inc_bot = _y(5) - PAD
+    phase_band(c, ML, id_bot,  BW, id_top  - id_bot,  L["id"])
+    phase_band(c, ML, scr_bot, BW, scr_top - scr_bot, L["scr"])
+    phase_band(c, ML, inc_bot, BW, inc_top - inc_bot,  L["inc"])
+
+    # ── BOX 0: databases ──────────────────────────────────────────────────
+    b0 = _y(0)
+    main_box(c, COL_X, b0, COL_W, BH, L["databases"],
+             _n("total_buscado"), "total_buscado", auto=True)
+
+    # Amber box: outras fontes (n editável se quiser, aqui fixo 0)
+    amber_box(c, EXCL_X, b0, EXCL_W, BH, L["other_src"], None, "other_sources", auto=False)
+
+    # Merge arrow
+    join_y = b0 - ARROW * 0.5
+    vline(c, EXCL_CX, b0, join_y, color=C_AMBER, w=0.55)
+    hline(c, EXCL_CX, CX, join_y, color=C_AMBER, w=0.55)
+    arrow_down(c, CX, b0, _y(0) - ARROW)
+
+    # ── BOX 1: deduped ────────────────────────────────────────────────────
+    b1 = _y(1)
+    screened_auto = _n("screened")
+    main_box(c, COL_X, b1, COL_W, BH, L["deduped"],
+             screened_auto, "screened_auto", auto=True)
+
+    mid1 = b1 + BH / 2
+    arr_right(c, COL_X + COL_W, EXCL_X + EXCL_W, mid1)
+    excl_box(c, EXCL_X, mid1 - BH / 2, EXCL_W, BH,
+             L["duplicates"], _n("duplicates", 0), "duplicates", auto=False)
+
+    arrow_down(c, CX, b1, _y(1) - ARROW)
+
+    # ── BOX 2: screened ───────────────────────────────────────────────────
+    b2 = _y(2)
+    main_box(c, COL_X, b2, COL_W, BH, L["screened"],
+             screened_auto, "screened_display", auto=True)
+
+    mid2 = b2 + BH / 2
+    arr_right(c, COL_X + COL_W, EXCL_X + EXCL_W, mid2)
+    excl_box(c, EXCL_X, mid2 - BH / 2, EXCL_W, BH,
+             L["excl_scr"], _n("excluded_screening"), "excluded_screening", auto=False)
+
+    arrow_down(c, CX, b2, _y(2) - ARROW)
+
+    # ── BOX 3: sought ─────────────────────────────────────────────────────
+    b3 = _y(3)
+    main_box(c, COL_X, b3, COL_W, BH, L["sought"],
+             _n("sought"), "sought", auto=False)
+
+    mid3 = b3 + BH / 2
+    arr_right(c, COL_X + COL_W, EXCL_X + EXCL_W, mid3)
+    excl_box(c, EXCL_X, mid3 - BH / 2, EXCL_W, BH,
+             L["not_retr"], _n("not_retrieved"), "not_retrieved", auto=False)
+
+    arrow_down(c, CX, b3, _y(3) - ARROW)
+
+    # ── BOX 4: assessed ───────────────────────────────────────────────────
+    b4 = _y(4)
+    main_box(c, COL_X, b4, COL_W, BH, L["assessed"],
+             _n("assessed"), "assessed", auto=False)
+
+    mid4 = b4 + BH / 2
+    EXCL_H4 = BH * 2.1
+    arr_right(c, COL_X + COL_W, EXCL_X + EXCL_W, mid4)
+    rbox(c, EXCL_X, mid4 - EXCL_H4 / 2, EXCL_W, EXCL_H4, C_EXCL_LT, C_EXCL, 0.6)
+    # Label "excluídos — razões" fixo + campo único para n total
+    c.setFont(F_SANSB, 5.8); c.setFillColor(C_EXCL)
+    c.drawCentredString(EXCL_CX, mid4 + EXCL_H4 / 2 - 9, L["excl_elig"][0])
+    # Sub-itens: 4 razões editáveis individualmente
+    reasons_labels = [
+        ("excl_wrong_population",  "  Pop. inadequada"),
+        ("excl_wrong_intervention","  Interv. inadequada"),
+        ("excl_wrong_outcome",     "  Desfecho inadequado"),
+        ("excl_other",             "  Outros motivos"),
+    ]
+    ry0 = mid4 + EXCL_H4 / 2 - 18
+    for i, (fname, lbl) in enumerate(reasons_labels):
+        ry = ry0 - i * 13
+        c.setFont(F_MONO, 5); c.setFillColor(C_EXCL)
+        c.drawString(EXCL_X + 4, ry + 3, lbl)
+        # Campo AcroForm inline
+        try:
+            c.acroForm.textfield(
+                name=fname, tooltip=lbl,
+                x=EXCL_X + EXCL_W - 26, y=ry,
+                width=22, height=11,
+                value="", fontSize=7, fontName="Helvetica",
+                fillColor=Color(0, 0, 0, 0),
+                borderColor=C_HUMAN, borderWidth=0.4,
+                textColor=C_KEPT,
+            )
+        except Exception:
+            pass
+
+    arrow_down(c, CX, b4, _y(4) - ARROW)
+
+    # ── BOX 5: included ───────────────────────────────────────────────────
+    b5 = _y(5)
+    rbox(c, COL_X, b5, COL_W, BH_INC, C_KEPT_LT, C_KEPT, 1.1)
+    c.setFont(F_SANSB, 8.5); c.setFillColor(C_KEPT)
+    inc_label = " ".join(L["included"])
+    c.drawCentredString(CX, b5 + BH_INC / 2 + 6, inc_label)
+    acro_n(c, CX, b5 + BH_INC / 2 - 8, _n("included_studies"), "included_studies",
+           auto=False, w=50, h=14)
+
+    # ── Colophon ──────────────────────────────────────────────────────────
+    FOOT = BOT_MARGIN - 3 * mm
+    c.setStrokeColor(C_RULE); c.setLineWidth(0.4)
+    c.line(ML, FOOT + 7, PAGE_W - ML, FOOT + 7)
+    c.setFont(F_JURA, 4.8); c.setFillColor(C_EXCL)
+    c.drawString(ML, FOOT, L["colophon"])
+    c.setFont(F_MONO, 4.8)
+    c.drawRightString(PAGE_W - ML, FOOT, f"Systemic Passage  v{__version__}  {lang.upper()}")
+
+    c.showPage()
+    c.save()
+    print(f"  ✓ {output_path}")
+
+
+# ---------------------------------------------------------------------------
 # Descoberta automática de JSON
 # ---------------------------------------------------------------------------
 
@@ -992,22 +1425,33 @@ def _descobrir_json(input_arg: str | None, interativo: bool) -> Path:
             sys.exit(1)
         return p
 
-    # Auto-descoberta
+    # Auto-descoberta — ordena por data de modificação (mais recente primeiro)
+    def _mtime(p: Path) -> float:
+        try:
+            return p.stat().st_mtime
+        except OSError:
+            return 0.0
+
+    vistos: set[Path] = set()
     candidatos: list[Path] = []
+
+    def _add(paths):
+        for p in sorted(paths, key=_mtime, reverse=True):
+            rp = p.resolve()
+            if rp not in vistos:
+                vistos.add(rp)
+                candidatos.append(p)
 
     # 1. Diretório corrente
     local = Path("results_report.json")
     if local.exists():
-        candidatos.append(local)
+        _add([local])
 
-    # 2. runs/*/results_*/
-    for p in sorted(Path(".").glob("runs/*/results_*/results_report.json"), reverse=True):
-        candidatos.append(p)
+    # 2. runs/*/results_*/  (mais recente por mtime)
+    _add(Path(".").glob("runs/*/results_*/results_report.json"))
 
-    # 3. results_*/
-    for p in sorted(Path(".").glob("results_*/results_report.json"), reverse=True):
-        if p not in candidatos:
-            candidatos.append(p)
+    # 3. results_*/  (pastas ao lado do diretório corrente)
+    _add(Path(".").glob("results_*/results_report.json"))
 
     if not candidatos:
         print("❌  Nenhum results_report.json encontrado.", file=sys.stderr)
@@ -1104,6 +1548,15 @@ def main():
                         help="Idioma do PDF: pt (default) | en.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Mostra os dados que seriam usados sem gerar o PDF.")
+    parser.add_argument(
+        "--style", choices=["default", "artistic"], default="default",
+        help=(
+            "Estilo visual do PDF: "
+            "'default' (diagrama funcional clássico, padrão) | "
+            "'artistic' (layout Systemic Passage — tipografia refinada, paleta institucional, "
+            "campos editáveis apenas nos números n=)."
+        ),
+    )
     parser.add_argument("--version", action="version",
                         version=f"prisma_workflow.py v{__version__}")
 
@@ -1175,8 +1628,11 @@ def main():
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     pdf_path = output_dir / f"prisma_{stem}_{args.lang}_{ts}.pdf"
 
-    print(f"\n  Gerando PDF...")
-    gerar_pdf(dados, pdf_path, lang=args.lang)
+    print(f"\n  Gerando PDF... (estilo: {args.style})")
+    if args.style == "artistic":
+        gerar_pdf_artistico(dados, pdf_path, lang=args.lang)
+    else:
+        gerar_pdf(dados, pdf_path, lang=args.lang)
     print(f"\nPronto. PDF em: {pdf_path.resolve()}")
 
 
