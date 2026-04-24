@@ -132,6 +132,7 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
 | Auto-descoberta do JSON (sem parâmetro) | `uv run python prisma_workflow.py` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
+| Estilo artístico (tipografia refinada) | `uv run python prisma_workflow.py results_report.json --style artistic` | `prisma_<stem>_pt_<ts>.pdf` (layout Systemic Passage) | Diretório do JSON |
 | Gerar PDF PRISMA (campos humanos em branco) | `uv run python prisma_workflow.py results_report.json` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
 | Com campos humanos via CLI | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem |
 | Modo interativo (terminal pergunta cada campo) | `uv run python prisma_workflow.py results_report.json -i` | Idem | Idem |
@@ -945,12 +946,22 @@ Preencher no PDF após curadoria, ou passar via CLI/arquivo:
 ### Opções completas
 
 ```bash
+uv run python prisma_workflow.py results_report.json --style artistic   # estilo artístico (Systemic Passage)
 uv run python prisma_workflow.py results_report.json --lang en          # PDF em inglês (default: pt)
 uv run python prisma_workflow.py results_report.json --output-dir pdfs/ # pasta de saída
 uv run python prisma_workflow.py results_report.json --dry-run          # mostrar dados sem gerar PDF
 uv run python prisma_workflow.py --version                              # mostrar versão
 uv run python prisma_workflow.py -?                                     # ajuda
 ```
+
+### Estilos de PDF
+
+| Estilo | Flag | Visual | Campos editáveis |
+|---|---|---|---|
+| `default` | (padrão) | Diagrama funcional clássico, caixas azuis/cinzas com borda tracejada | Todos os campos humanos via AcroForm |
+| `artistic` | `--style artistic` | *Systemic Passage*: GeistMono + IBMPlexSerif, paleta azul institucional, watermark "EVIDENCE", grid faint | Campos AcroForm transparentes sobrepostos exatamente nos números n= |
+
+No estilo `artistic`: dados automáticos (total buscado, triagem calculada) aparecem em texto fixo bold; campos humanos mostram `n =` fixo e um campo editável discreto apenas para o número. O PDF tem aparência publication-ready mesmo antes do preenchimento.
 
 ### Formato do arquivo `--human-data`
 

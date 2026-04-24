@@ -151,10 +151,10 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Validação de CSV:** se colunas esperadas não existirem, exibe quais colunas o arquivo tem e sugere o CSV correto (`resultado.csv` do scraper).
 - **Saída:** `wordcloud_{campo}_{lang}_{ts}.png` + `wordcloud_stats_{ts}.json`.
 
-## Comportamento do prisma_workflow.py (v1.1)
+## Comportamento do prisma_workflow.py (v1.2)
 
 - **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Fase de Identificação auto-preenchida; Triagem e Inclusão com campos AcroForm editáveis.
-- **Auto-descoberta de JSON:** se `results_report.json` não for passado, busca automaticamente no CWD → `runs/*/results_*/` → `results_*/`. Com múltiplos candidatos, lista opções e pede escolha.
+- **Auto-descoberta de JSON:** se `results_report.json` não for passado, busca automaticamente no CWD → `runs/*/results_*/` → `results_*/`, ordenando por data de modificação (mais recente primeiro). Com múltiplos candidatos, lista opções e pede escolha.
 - **Entrada:** `results_report.json` gerado pelo `results_report.py` (path opcional, auto-descoberto se omitido).
 - **Campos auto-preenchidos:** total buscado, registros de automação, erros, registros para triagem (calculados do JSON). Exibidos como texto fixo no canvas (não editáveis).
 - **Campos editáveis (AcroForm):** apenas os valores `n = ?` nas fases de Triagem e Inclusão — as labels descritivas são fixas.
@@ -163,6 +163,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **`--human-data ARQ`:** JSON ou CSV (key,value) com campos humanos pré-preenchidos.
 - **Flags de campos humanos:** `--duplicates`, `--excluded-screening`, `--sought`, `--not-retrieved`, `--assessed`, `--excluded-eligibility`, `--included`, `--included-reports`.
 - **`--output-dir DIR`:** pasta de saída. Padrão: diretório do JSON.
+- **`--style default|artistic`:** estilo visual do PDF. `default` = diagrama funcional clássico. `artistic` = estilo *Systemic Passage* (tipografia GeistMono/IBMPlexSerif, paleta azul institucional, watermark "EVIDENCE", grid faint) — campos AcroForm transparentes sobrepostos exatamente nos números editáveis; dados automáticos fixos no canvas.
 - **`--dry-run`:** mostra dados calculados sem gerar PDF.
 - **Saída:** `prisma_<stem>_<lang>_<ts>.pdf`
 - **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. Triagem e Inclusão requerem curadoria humana após o processamento.
