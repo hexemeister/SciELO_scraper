@@ -107,6 +107,8 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Estilo de gráficos alternativo | `uv run python results_report.py --style grayscale` | Idem (gráficos em escala de cinza) | Idem |
 | Colormap do heatmap alternativo | `uv run python results_report.py --colormap plasma` | Idem (heatmap em plasma; default: viridis) | Idem |
 | Ver artefatos no terminal (sem regerar) | `uv run python results_report.py --show-report runs/.../results_report.json` | Nada (imprime no terminal) | — |
+| Gerar apenas artefatos selecionados | `uv run python results_report.py --artifacts funnel,trend,heatmap` | Apenas os artefatos listados | `results_<stem>/` |
+| Pular artefatos específicos | `uv run python results_report.py --skip-artifacts text,report` | Todos exceto os listados | `results_<stem>/` |
 | Listar todos os artefatos com descrição | `uv run python results_report.py --help-artifacts` | Nada (imprime no terminal) | — |
 | Descrição detalhada de um artefato | `uv run python results_report.py --help-artifact results_funnel` | Nada (imprime no terminal) | — |
 
@@ -114,22 +116,25 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
-| Gerar wordcloud de title + keywords (padrão, criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv` | `wordcloud_title_pt_<ts>.png`, `wordcloud_keywords_pt_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório do CSV |
-| Apenas um campo | `uv run python scielo_wordcloud.py resultado.csv --field abstract` | `wordcloud_abstract_pt_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório do CSV |
+| Auto-descoberta do CSV (sem parâmetro) | `uv run python scielo_wordcloud.py` | `wordcloud_title_ptbr_<ts>.png`, `wordcloud_keywords_ptbr_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório atual |
+| Gerar wordcloud de title + keywords (padrão, criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv` | Idem | Diretório atual |
+| Apenas um campo | `uv run python scielo_wordcloud.py resultado.csv --field abstract` | `wordcloud_abstract_ptbr_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório atual |
 | Todos os artigos extraídos (não só criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv --corpus all` | Idem | Idem |
 | Shape personalizada | `uv run python scielo_wordcloud.py resultado.csv --mask forma.png` | Idem (recortado na forma) | Idem |
 | Pasta de saída específica | `uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/` | Idem | `graficos/` |
 | Stopwords extras | `uv run python scielo_wordcloud.py resultado.csv --stopwords extra.txt` | Idem | Idem |
 | Colormap alternativo | `uv run python scielo_wordcloud.py resultado.csv --colormap plasma` | Idem (cores plasma) | Idem |
+| Estilo matplotlib alternativo | `uv run python scielo_wordcloud.py resultado.csv --style ggplot` | Idem (estilo diferente) | Idem |
 | Simular sem gerar arquivos | `uv run python scielo_wordcloud.py resultado.csv --dry-run` | Nada (imprime config) | — |
 
 ### Diagrama PRISMA 2020
 
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
+| Auto-descoberta do JSON (sem parâmetro) | `uv run python prisma_workflow.py` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
 | Gerar PDF PRISMA (campos humanos em branco) | `uv run python prisma_workflow.py results_report.json` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
 | Com campos humanos via CLI | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem |
-| Modo interativo (terminal pergunta os valores) | `uv run python prisma_workflow.py results_report.json -i` | Idem | Idem |
+| Modo interativo (terminal pergunta cada campo) | `uv run python prisma_workflow.py results_report.json -i` | Idem | Idem |
 | Campos humanos de arquivo | `uv run python prisma_workflow.py results_report.json --human-data campos.json` | Idem | Idem |
 | PDF em inglês | `uv run python prisma_workflow.py results_report.json --lang en` | `prisma_<stem>_en_<ts>.pdf` | Idem |
 | Pasta de saída específica | `uv run python prisma_workflow.py results_report.json --output-dir pdfs/` | Idem | `pdfs/` |
@@ -717,7 +722,7 @@ uv run python results_report.py --lang all
 | `results_terms_heatmap.png` | Heatmap termos × campos: % de artigos (base: criterio_ok=True) onde cada termo aparece em cada campo |
 | `results_journals.png` | Top N periódicos com mais artigos criterio_ok |
 | `results_coverage.png` | % de artigos com título / resumo / palavras-chave em PT presentes, por ano |
-| `results_venn[_en].png` | Diagrama de Venn (≤3 termos) ou UpSet (≥4 termos) — sobreposição de termos por campo no corpus completo |
+| `results_venn[_en].png` | Diagrama de Venn (≤3 termos) ou UpSet (≥4 termos) — sobreposição de termos por campo no corpus completo. Inclui legenda colorida identificando qual cor = qual termo. |
 
 **Tabelas:**
 
@@ -758,14 +763,32 @@ uv run python results_report.py --style seaborn-v0_8      # estilo matplotlib (d
 uv run python results_report.py --list-styles             # listar estilos disponíveis
 uv run python results_report.py --colormap plasma         # colormap do heatmap (default: viridis)
 uv run python results_report.py --list-colormaps          # listar colormaps disponíveis
+uv run python results_report.py --artifacts funnel,trend  # gerar apenas estes artefatos (aliases curtos)
+uv run python results_report.py --skip-artifacts text,report  # pular estes artefatos
 uv run python results_report.py --dry-run                 # simula sem gravar
 uv run python results_report.py --version                 # mostrar versão
 uv run python results_report.py -?                        # ajuda
 uv run python results_report.py --show-report             # renderiza results_report.json existente no terminal
 uv run python results_report.py --show-report outro/caminho/results_report.json  # arquivo específico
-uv run python results_report.py --help-artifacts          # lista resumida de todos os artefatos
+uv run python results_report.py --help-artifacts          # lista resumida de todos os artefatos com aliases
 uv run python results_report.py --help-artifact results_funnel  # descrição detalhada de um artefato
 ```
+
+**Aliases de artefatos disponíveis** (para `--artifacts` e `--skip-artifacts`):
+
+| Alias | Artefato completo |
+|---|---|
+| `funnel` | `results_funnel` |
+| `trend` | `results_trend` |
+| `heatmap` | `results_terms_heatmap` |
+| `journals` | `results_journals` |
+| `coverage` | `results_coverage` |
+| `venn` | `results_venn` |
+| `text` | `results_text` |
+| `table_summary` | `results_table_summary` |
+| `table_terms` | `results_table_terms` |
+| `table_journals` | `results_table_journals` |
+| `report` | `results_report` |
 
 ### Consultando artefatos gerados
 
@@ -806,7 +829,10 @@ Gera nuvens de palavras a partir do `resultado.csv` do scraping. Útil para visu
 ### Uso básico
 
 ```bash
-# Gera wordcloud de título + keywords (padrão) para artigos criterio_ok
+# Auto-descobre o resultado.csv (busca no diretório atual e pastas padrão)
+uv run python scielo_wordcloud.py
+
+# CSV explícito
 uv run python scielo_wordcloud.py sc_ts_s_ts_api+html/resultado.csv
 
 # Apenas um campo
@@ -816,22 +842,30 @@ uv run python scielo_wordcloud.py resultado.csv --field abstract
 uv run python scielo_wordcloud.py resultado.csv --corpus all
 ```
 
+> **Auto-descoberta:** se o CSV não for passado, o script busca automaticamente:
+> `resultado.csv` no diretório atual → `*_s_*_api+html/resultado.csv` → `*_s_*_api/` → `runs/*/`.
+> Com múltiplos candidatos, usa o mais recente e avisa.
+
 ### Opções principais
 
 ```bash
 uv run python scielo_wordcloud.py resultado.csv --field title        # campo: title | abstract | keywords (default: title + keywords)
-uv run python scielo_wordcloud.py resultado.csv --lang pt            # idioma das stopwords NLTK (default: pt)
+uv run python scielo_wordcloud.py resultado.csv --field title+abstract  # múltiplos campos separados por +
+uv run python scielo_wordcloud.py resultado.csv --field all          # todos os três campos
+uv run python scielo_wordcloud.py resultado.csv --lang pt-br         # idioma das stopwords NLTK (default: pt-br)
 uv run python scielo_wordcloud.py resultado.csv --stopwords extra.txt  # stopwords adicionais (1 por linha ou CSV key,value)
 uv run python scielo_wordcloud.py resultado.csv --no-domain-stopwords  # desativa stopwords acadêmicas do domínio
 uv run python scielo_wordcloud.py resultado.csv --mask forma.png     # shape personalizada (PNG/JPG; pixels escuros = área)
 uv run python scielo_wordcloud.py resultado.csv --width 1200         # largura em pixels (default: 800; height = width/2)
 uv run python scielo_wordcloud.py resultado.csv --height 600         # altura em pixels (width = height*2 se omitido)
 uv run python scielo_wordcloud.py resultado.csv --colormap plasma    # colormap matplotlib (default: viridis)
+uv run python scielo_wordcloud.py resultado.csv --style ggplot       # estilo matplotlib para o gráfico
 uv run python scielo_wordcloud.py resultado.csv --max-words 100      # máx. palavras (default: 200)
 uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/  # pasta de saída
 uv run python scielo_wordcloud.py resultado.csv --dry-run            # mostrar config sem gerar arquivos
 uv run python scielo_wordcloud.py --list-langs                       # listar idiomas NLTK disponíveis
 uv run python scielo_wordcloud.py --list-colormaps                   # listar colormaps disponíveis
+uv run python scielo_wordcloud.py --list-styles                      # listar estilos matplotlib disponíveis
 uv run python scielo_wordcloud.py --version                          # mostrar versão
 uv run python scielo_wordcloud.py -?                                 # ajuda
 ```
@@ -839,7 +873,7 @@ uv run python scielo_wordcloud.py -?                                 # ajuda
 ### Saída
 
 - `wordcloud_{campo}_{lang}_{ts}.png` — uma imagem por campo processado
-- `wordcloud_stats_{ts}.json` — metadados: campo, idioma, corpus, n artigos, n tokens, palavras mais frequentes
+- `wordcloud_stats_{ts}.json` — metadados: campo, idioma, corpus, colormap, estilo, n artigos, n tokens, palavras mais frequentes
 
 ### Stopwords
 
@@ -847,6 +881,13 @@ O script combina três fontes de stopwords (por padrão):
 1. **NLTK** — lista geral do idioma (português: 207 palavras; inglês: 198; espanhol: 313). Baixada automaticamente na primeira execução.
 2. **Domínio acadêmico** — termos do contexto SciELO/avaliação educacional (ex: "artigo", "estudo", "resultado"). Desative com `--no-domain-stopwords`.
 3. **Arquivo personalizado** — via `--stopwords ARQ` (uma palavra por linha, ou CSV com coluna `word`).
+
+### Validação de CSV
+
+Se as colunas esperadas (`Titulo_PT`, `Resumo_PT`, `Palavras_Chave_PT`) não existirem no arquivo, o script:
+- Exibe a lista de colunas encontradas
+- Avisa se o arquivo não parece ser um `resultado.csv` do scraper
+- Indica o comando para gerar o arquivo correto
 
 ---
 
@@ -859,18 +900,23 @@ Gera um PDF A4 preenchível com o Diagrama de Fluxo PRISMA 2020. A fase de **Ide
 ### Uso básico
 
 ```bash
-# Geração básica (campos humanos ficam em branco no PDF para preencher no leitor)
+# Auto-descobre o results_report.json (busca no diretório atual e runs/*/results_*/)
+uv run python prisma_workflow.py
+
+# JSON explícito
 uv run python prisma_workflow.py runs/2026/results_*/results_report.json
 
 # Passando campos humanos pela linha de comando
 uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523
 
-# Modo interativo (terminal pergunta cada campo humano)
+# Modo interativo (terminal pergunta cada campo humano um a um)
 uv run python prisma_workflow.py results_report.json -i
 
 # Campos humanos de arquivo JSON
 uv run python prisma_workflow.py results_report.json --human-data campos_humanos.json
 ```
+
+> **Auto-descoberta:** se o JSON não for passado, o script busca automaticamente no diretório atual → `runs/*/results_*/` → `results_*/`. Com múltiplos candidatos, lista as opções e pede que o usuário escolha.
 
 ### Campos auto-preenchidos (da fase de Identificação)
 

@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `run_pipeline.py` | Pipeline completo (v2.1): busca → 3×scraping → análise → 3×match → gráficos → relatório → cópia | `--year` | `runs/<ano>/` |
+| `run_pipeline.py` | Pipeline completo (v2.2): busca → 3×scraping → análise → 3×match → gráficos → relatório → cópia | `--year` | `runs/<ano>/` |
 | `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png`, `chart_stats.json` |
 | `results_report.py` | Artefatos científicos publication-ready dos resultados | `[--base]`, `[--scrape-dir]`, `--years`, `--mode`, `--output-dir`, `--lang`, `--top-journals` | `results_*/` (gráficos + CSVs + Markdown + JSON) |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
@@ -34,7 +34,7 @@
 - **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
 - **`--list-collections`:** lista as 36 coleções SciELO e sai
 
-## Comportamento do run_pipeline.py (v2.1)
+## Comportamento do run_pipeline.py (v2.2)
 
 **Etapas do pipeline** (10 no total por ano):
 1. Busca (`scielo_search.py`)
@@ -97,7 +97,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
   - *Fallback HTML* — API não retornou nada; extração inteiramente via HTML
   - *Falha de acesso* — erro HTTP (ex: 404)
 
-## Comportamento do results_report.py
+## Comportamento do results_report.py (v1.8)
 
 - **Propósito:** artefatos científicos publication-ready sobre os resultados — O QUE foi encontrado, não como o processo correu.
 - **Lê:** `terms_<ts>.csv` gerado pelo `terms_matcher.py` dentro de cada pasta de scraping.
@@ -105,9 +105,14 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **`--scrape-dir DIR`:** aponta diretamente para uma pasta de scraping (ex: `sc_<ts>_s_<ts>_api+html/`). Usado pelo pipeline antes da cópia para `runs/`.
 - **`--output-dir DIR`:** pasta de saída explícita. Sem esta flag, cria `results_<stem>/` ao lado da pasta de scraping.
 - **`--lang pt|en|all`:** idioma dos artefatos. Gráficos e textos Markdown são gerados por idioma.
+- **`--artifacts LISTA`:** gera apenas os artefatos listados (aliases curtos separados por vírgula ou espaço). Ex: `--artifacts funnel,trend,heatmap`.
+- **`--skip-artifacts LISTA`:** pula os artefatos listados.
+- **Aliases de artefatos:** `funnel`, `trend`, `heatmap`, `journals`, `coverage`, `venn`, `text`, `table_summary`, `table_terms`, `table_journals`, `report`.
 - **`--show-report [JSON]`:** renderiza `results_report.json` no terminal sem regerar artefatos. Mostra: resumo por ano, termos × campos e top 10 periódicos.
-- **`--help-artifacts`:** lista resumida de todos os artefatos (nome, tipo, arquivo).
+- **`--help-artifacts`:** lista resumida de todos os artefatos com aliases.
 - **`--help-artifact <nome>`:** descrição detalhada de um artefato, em PT-BR e EN.
+- **Venn com legenda:** diagrama Venn/UpSet inclui legenda colorida indicando qual cor = qual termo (substituindo a notação ambígua "nenhum: n=X").
+- **Verificação de deps:** avisa sobre matplotlib-venn/upsetplot faltantes antes de tentar gerar Venn.
 - **Subpasta de saída:** `results_<stem_scraping>/` — ex: `results_sc_20260418_132349_s_20260418_132356_api+html/`
 
 **Artefatos gerados:**
@@ -125,31 +130,36 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 | `results_table_journals.csv` | Todos os periódicos com contagem e % |
 | `results_report.json` | Todos os dados calculados (para reúso/consulta) |
 
-## Comportamento do scielo_wordcloud.py
+## Comportamento do scielo_wordcloud.py (v1.1)
 
 - **Propósito:** gera nuvem de palavras a partir do CSV de scraping (`resultado.csv`).
+- **Auto-descoberta:** se nenhum CSV for passado, busca automaticamente: `resultado.csv` no CWD → `*_s_*_api+html/resultado.csv` → `*_s_*_api/` → `runs/*/`.
 - **Campos disponíveis:** `title` (Titulo_PT), `keywords` (Palavras_Chave_PT), `abstract` (Resumo_PT). Padrão: `title` + `keywords`.
-- **`--field CAMPO`:** um campo por chamada. Gera um PNG por campo.
+- **`--field CAMPO`:** campo(s) separados por `+` (ex: `title+abstract`). Ou `all` para os três.
 - **`--custom-field COL`:** nome bruto da coluna no CSV (para campos não-padrão).
-- **`--lang pt|en|es|...`:** idioma para stopwords NLTK. Padrão: `pt`.
+- **`--lang pt|en|es|...`:** idioma para stopwords NLTK. Padrão: `pt-br`. Ver `--list-langs`.
 - **`--corpus criterio_ok|all`:** filtra artigos por status. Padrão: `criterio_ok`.
 - **`--stopwords ARQ`:** arquivo com stopwords adicionais (uma por linha ou CSV key,value).
 - **`--no-domain-stopwords`:** desativa lista de stopwords acadêmicas do domínio.
 - **`--mask IMG`:** imagem PNG/JPG para definir shape da nuvem (pixels escuros = área preenchível).
 - **`--width / --height`:** dimensões em pixels. Se só `--width` → height = width/2. Se só `--height` → width = height×2. Padrão: 800×400.
 - **`--colormap NOME`:** colormap matplotlib. Padrão: `viridis`. Ver `--list-colormaps`.
+- **`--style NOME`:** estilo matplotlib para o gráfico (ex: `ggplot`, `bmh`). Ver `--list-styles`.
 - **`--max-words N`:** número máximo de palavras. Padrão: 200.
-- **`--output-dir DIR`:** pasta de saída. Padrão: diretório do CSV.
+- **`--output-dir DIR`:** pasta de saída. Padrão: diretório atual.
 - **`--dry-run`:** mostra configuração sem gerar arquivos.
+- **Validação de CSV:** se colunas esperadas não existirem, exibe quais colunas o arquivo tem e sugere o CSV correto (`resultado.csv` do scraper).
 - **Saída:** `wordcloud_{campo}_{lang}_{ts}.png` + `wordcloud_stats_{ts}.json`.
 
-## Comportamento do prisma_workflow.py
+## Comportamento do prisma_workflow.py (v1.1)
 
 - **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Fase de Identificação auto-preenchida; Triagem e Inclusão com campos AcroForm editáveis.
-- **Entrada obrigatória:** `results_report.json` gerado pelo `results_report.py`.
-- **Campos auto-preenchidos:** total buscado, registros de automação, erros, registros para triagem (calculados do JSON).
+- **Auto-descoberta de JSON:** se `results_report.json` não for passado, busca automaticamente no CWD → `runs/*/results_*/` → `results_*/`. Com múltiplos candidatos, lista opções e pede escolha.
+- **Entrada:** `results_report.json` gerado pelo `results_report.py` (path opcional, auto-descoberto se omitido).
+- **Campos auto-preenchidos:** total buscado, registros de automação, erros, registros para triagem (calculados do JSON). Exibidos como texto fixo no canvas (não editáveis).
+- **Campos editáveis (AcroForm):** apenas os valores `n = ?` nas fases de Triagem e Inclusão — as labels descritivas são fixas.
 - **`--lang pt|en`:** idioma do PDF. Padrão: `pt`.
-- **`-i / --interactive`:** modo interativo no terminal para preencher campos humanos.
+- **`-i / --interactive`:** modo interativo no terminal — lista campos humanos e solicita valores um a um.
 - **`--human-data ARQ`:** JSON ou CSV (key,value) com campos humanos pré-preenchidos.
 - **Flags de campos humanos:** `--duplicates`, `--excluded-screening`, `--sought`, `--not-retrieved`, `--assessed`, `--excluded-eligibility`, `--included`, `--included-reports`.
 - **`--output-dir DIR`:** pasta de saída. Padrão: diretório do JSON.
