@@ -47,6 +47,7 @@ Uso:
 
 import argparse
 import csv
+import importlib.util
 import json
 import re
 import sys
@@ -58,13 +59,36 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# ---------------------------------------------------------------------------
+# Verificação de dependências (antes de qualquer import externo)
+# ---------------------------------------------------------------------------
+
+_DEPS_REQUERIDAS = {
+    "matplotlib": "matplotlib",
+    "numpy":      "numpy",
+}
+_DEPS_OPCIONAIS = {
+    "matplotlib_venn": "matplotlib-venn",
+    "upsetplot":       "upsetplot",
+}
+
+def _verificar_deps():
+    ausentes = [pkg for mod, pkg in _DEPS_REQUERIDAS.items()
+                if importlib.util.find_spec(mod) is None]
+    if ausentes:
+        print("❌  Dependências ausentes. Execute:")
+        print(f"    uv pip install {' '.join(ausentes)}")
+        sys.exit(1)
+
+_verificar_deps()
+
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.7"
+__version__ = "1.8"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -212,8 +236,12 @@ STRINGS: dict[str, dict[str, str]] = {
         "en": "only {t}",
     },
     "venn_nenhum": {
-        "pt": "nenhum\nn={n}",
-        "en": "none\nn={n}",
+        "pt": "sem nenhum dos termos: n={n}",
+        "en": "with none of the terms: n={n}",
+    },
+    "venn_legenda_titulo": {
+        "pt": "Termos",
+        "en": "Terms",
     },
     "arquivo_venn":     {"pt": "results_venn",           "en": "results_venn"},
     # Arquivos de saída
@@ -448,13 +476,56 @@ ARTEFATOS_CATALOGO = [
 ]
 
 
+# Aliases curtos para --artifacts / --skip-artifacts
+ARTEFATO_ALIASES = {
+    "funnel":         "results_funnel",
+    "trend":          "results_trend",
+    "heatmap":        "results_terms_heatmap",
+    "journals":       "results_journals",
+    "coverage":       "results_coverage",
+    "venn":           "results_venn",
+    "text":           "results_text",
+    "table_summary":  "results_table_summary",
+    "table_terms":    "results_table_terms",
+    "table_journals": "results_table_journals",
+    "report":         "results_report",
+}
+# Inclui também o nome completo como alias de si mesmo
+for _a in ARTEFATOS_CATALOGO:
+    ARTEFATO_ALIASES[_a["nome"]] = _a["nome"]
+
+_TODOS_NOMES = {a["nome"] for a in ARTEFATOS_CATALOGO}
+
+
+def _resolver_artefatos(nomes: list[str]) -> set[str]:
+    """Converte lista de aliases/nomes para o conjunto de nomes canônicos."""
+    resolvidos = set()
+    invalidos  = []
+    for n in nomes:
+        if n in ARTEFATO_ALIASES:
+            resolvidos.add(ARTEFATO_ALIASES[n])
+        else:
+            invalidos.append(n)
+    if invalidos:
+        validos_str = ", ".join(sorted(ARTEFATO_ALIASES.keys()))
+        print(f"❌  Artefato(s) desconhecido(s): {', '.join(invalidos)}")
+        print(f"    Disponíveis: {validos_str}")
+        sys.exit(1)
+    return resolvidos
+
+
 def _mostrar_help_artifacts():
     """--help-artifacts: lista resumida de todos os artefatos."""
     print("\nArtefatos gerados por results_report.py\n")
-    print(f"  {'Nome':<30} {'Tipo':<18} {'Arquivo'}")
-    print("  " + "-" * 75)
+    print(f"  {'Alias curto':<22} {'Nome completo':<30} {'Tipo':<18} {'Arquivo'}")
+    print("  " + "-" * 95)
+    alias_inv = {v: k for k, v in ARTEFATO_ALIASES.items() if k != v}
     for a in ARTEFATOS_CATALOGO:
-        print(f"  {a['nome']:<30} {a['tipo']:<18} {a['arquivo']}")
+        alias = alias_inv.get(a["nome"], "—")
+        print(f"  {alias:<22} {a['nome']:<30} {a['tipo']:<18} {a['arquivo']}")
+    print()
+    print("  Use --artifacts <alias> [alias ...] para gerar apenas esses artefatos.")
+    print("  Use --skip-artifacts <alias> [alias ...] para pular artefatos específicos.")
     print()
     print("Use --help-artifact <nome> para descrição detalhada de cada artefato.")
     print("Use --lang para escolher idioma dos artefatos: pt (default) | en | all\n")
@@ -1143,18 +1214,37 @@ def _venn_sets_por_campo(
     return resultado
 
 
+def _venn_legenda(ax, termos: list[str], cores: list, lang: str):
+    """Adiciona legenda de cores (termo → cor) ao eixo do Venn."""
+    import matplotlib.patches as mpatches
+    patches = [mpatches.Patch(color=c, alpha=0.6, label=t)
+               for t, c in zip(termos, cores)]
+    ax.legend(
+        handles=patches,
+        title=s("venn_legenda_titulo", lang),
+        fontsize=8,
+        title_fontsize=8,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=len(termos),
+        frameon=True,
+        framealpha=0.8,
+    )
+
+
 def _grafico_venn2(ax, sets: list[set], termos: list[str], n_total: int, lang: str):
     """Renderiza Venn de 2 conjuntos em `ax`."""
-    from matplotlib_venn import venn2, venn2_circles  # importação local
+    from matplotlib_venn import venn2  # importação local
 
     A, B = sets[0], sets[1]
+    cores = _cycle_colors(2)
     v = venn2(subsets=(len(A - B), len(B - A), len(A & B)),
-              set_labels=(termos[0], termos[1]),
+              set_labels=("", ""),   # ocultamos labels do venn (usamos legenda)
               ax=ax,
-              set_colors=(_cycle_colors(2)[0], _cycle_colors(2)[1]),
+              set_colors=(cores[0], cores[1]),
               alpha=0.55)
 
-    # Estilização
+    # n absoluto em cada região
     for label_id, label_txt in [("10", f"n={len(A-B)}"),
                                  ("01", f"n={len(B-A)}"),
                                  ("11", f"n={len(A&B)}")]:
@@ -1163,10 +1253,14 @@ def _grafico_venn2(ax, sets: list[set], termos: list[str], n_total: int, lang: s
             lbl.set_text(label_txt)
             lbl.set_fontsize(9)
 
-    # Artigos sem nenhum dos termos
+    # Artigos sem nenhum dos termos — texto acima da legenda
     nenhum = n_total - len(A | B)
-    ax.text(0.5, -0.08, f"nenhum: n={nenhum}", transform=ax.transAxes,
-            ha="center", va="top", fontsize=8, color="gray")
+    txt = s("venn_nenhum", lang).format(n=nenhum)
+    ax.text(0.5, -0.06, txt, transform=ax.transAxes,
+            ha="center", va="top", fontsize=8, color="#555555")
+
+    # Legenda de cores por termo
+    _venn_legenda(ax, termos, cores, lang)
 
 
 def _grafico_venn3(ax, sets: list[set], termos: list[str], n_total: int, lang: str):
@@ -1184,7 +1278,7 @@ def _grafico_venn3(ax, sets: list[set], termos: list[str], n_total: int, lang: s
                 len(B & C - A),
                 len(A & B & C),
               ),
-              set_labels=tuple(termos[:3]),
+              set_labels=("", "", ""),   # ocultamos labels do venn (usamos legenda)
               ax=ax,
               set_colors=tuple(cores[:3]),
               alpha=0.55)
@@ -1203,8 +1297,12 @@ def _grafico_venn3(ax, sets: list[set], termos: list[str], n_total: int, lang: s
             lbl.set_fontsize(8.5)
 
     nenhum = n_total - len(A | B | C)
-    ax.text(0.5, -0.08, f"nenhum: n={nenhum}", transform=ax.transAxes,
-            ha="center", va="top", fontsize=8, color="gray")
+    txt = s("venn_nenhum", lang).format(n=nenhum)
+    ax.text(0.5, -0.06, txt, transform=ax.transAxes,
+            ha="center", va="top", fontsize=8, color="#555555")
+
+    # Legenda de cores por termo
+    _venn_legenda(ax, termos, cores, lang)
 
 
 def grafico_venn(
@@ -1289,7 +1387,7 @@ def grafico_venn(
 
     n_paineis = len(campos_com_dados)
     fig_w = max(4.5, 4.5 * n_paineis)
-    fig, axes = plt.subplots(1, n_paineis, figsize=(fig_w, 4.8))
+    fig, axes = plt.subplots(1, n_paineis, figsize=(fig_w, 5.4))
     if n_paineis == 1:
         axes = [axes]
 
@@ -1311,8 +1409,8 @@ def grafico_venn(
         nota = nota.split("Nota:")[0].split("Note:")[0].strip()
 
     plt.tight_layout()
-    fig.subplots_adjust(bottom=0.15)
-    fig.text(0.5, 0.02, nota, ha="center", fontsize=7.5, color="gray",
+    fig.subplots_adjust(bottom=0.22)   # espaço para legenda de cores + nota
+    fig.text(0.5, 0.01, nota, ha="center", fontsize=7.5, color="gray",
              wrap=True, transform=fig.transFigure)
 
     plt.savefig(dest, dpi=150, bbox_inches="tight")
@@ -2618,6 +2716,15 @@ def main():
         "--list-colormaps", action="store_true",
         help="Lista os colormaps disponíveis e sai.",
     )
+    _aliases_str = ", ".join(sorted(k for k in ARTEFATO_ALIASES if not k.startswith("results_")))
+    parser.add_argument(
+        "--artifacts", nargs="+", metavar="ALIAS",
+        help=f"Gera APENAS estes artefatos. Aliases: {_aliases_str}",
+    )
+    parser.add_argument(
+        "--skip-artifacts", nargs="+", metavar="ALIAS",
+        help="Pula estes artefatos (gera todos os demais).",
+    )
     parser.add_argument(
         "--dry-run", action="store_true",
         help="Mostra o que faria sem gravar nenhum arquivo",
@@ -2834,21 +2941,41 @@ def main():
 
     todas_rows = [r for rows in rows_por_ano.values() for r in rows]
 
+    # Filtro de artefatos (--artifacts / --skip-artifacts)
+    _ativos = _todos_ativos = _TODOS_NOMES.copy()
+    if getattr(args, "artifacts", None):
+        _ativos = _resolver_artefatos(args.artifacts)
+    if getattr(args, "skip_artifacts", None):
+        _ativos = _ativos - _resolver_artefatos(args.skip_artifacts)
+
+    def _ativo(nome: str) -> bool:
+        return ARTEFATO_ALIASES.get(nome, nome) in _ativos
+
     for lang in langs_a_gerar:
         suf = _make_suf(lang)
         if len(langs_a_gerar) > 1:
             print(f"  [{lang.upper()}]")
-        grafico_funnel(stats, output, lang, suf)
-        grafico_trend(stats, output, lang, suf)
-        grafico_heatmap(stats, output, lang, suf)
-        grafico_journals(stats, output, args.top_journals, lang, suf)
-        grafico_coverage(stats, output, lang, suf)
-        grafico_venn(todas_rows, termos, campos, stats, output, lang, suf)
-        gerar_texto(stats, output, lang, suf)
+        if _ativo("funnel"):
+            grafico_funnel(stats, output, lang, suf)
+        if _ativo("trend"):
+            grafico_trend(stats, output, lang, suf)
+        if _ativo("heatmap"):
+            grafico_heatmap(stats, output, lang, suf)
+        if _ativo("journals"):
+            grafico_journals(stats, output, args.top_journals, lang, suf)
+        if _ativo("coverage"):
+            grafico_coverage(stats, output, lang, suf)
+        if _ativo("venn"):
+            grafico_venn(todas_rows, termos, campos, stats, output, lang, suf)
+        if _ativo("text"):
+            gerar_texto(stats, output, lang, suf)
 
-    salvar_table_summary(stats, output)
-    salvar_table_terms(stats, output)
-    salvar_table_journals(stats, output)
+    if _ativo("table_summary"):
+        salvar_table_summary(stats, output)
+    if _ativo("table_terms"):
+        salvar_table_terms(stats, output)
+    if _ativo("table_journals"):
+        salvar_table_journals(stats, output)
     stats["estilo_grafico"] = estilo_ativo
     stats["colormap"]       = colormap_ativo
     stats["origem"] = _origem(args)

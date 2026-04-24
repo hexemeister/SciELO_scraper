@@ -22,6 +22,7 @@ Uso:
 
 import argparse
 import csv
+import importlib.util
 import json
 import sys
 from datetime import datetime
@@ -31,12 +32,30 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
+__version__ = "1.1"
 
-__version__ = "1.0"
+# ---------------------------------------------------------------------------
+# Verificação de dependências
+# ---------------------------------------------------------------------------
+
+_DEPS_REQUERIDAS = {
+    "matplotlib": "matplotlib",
+    "numpy":      "numpy",
+    "wordcloud":  "wordcloud",
+    "nltk":       "nltk",
+    "PIL":        "pillow",
+}
+
+def _verificar_deps():
+    """Verifica dependências e avisa com o comando de instalação correto."""
+    ausentes = [pkg for mod, pkg in _DEPS_REQUERIDAS.items()
+                if importlib.util.find_spec(mod) is None]
+    if ausentes:
+        print("❌  Dependências ausentes. Execute:")
+        print(f"    uv pip install {' '.join(ausentes)}")
+        sys.exit(1)
+
+_verificar_deps()
 
 # ---------------------------------------------------------------------------
 # Mapeamento de campos
@@ -258,6 +277,7 @@ def gerar_wordcloud(
     max_words: int,
     dest: Path,
     titulo: str,
+    style: str | None = None,
 ) -> bool:
     """Gera e salva wordcloud como PNG. Retorna True se bem-sucedido."""
     if not freq:
@@ -294,13 +314,15 @@ def gerar_wordcloud(
     fig_w = width  / dpi
     fig_h = height / dpi + 0.5   # espaço para título
 
-    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
-    ax.imshow(wc, interpolation="bilinear")
-    ax.axis("off")
-    fig.suptitle(titulo, fontsize=10, fontweight="bold", y=0.98)
-    fig.tight_layout(pad=0.3)
-    plt.savefig(dest, dpi=dpi, bbox_inches="tight")
-    plt.close()
+    ctx = plt.style.context(style) if style else plt.style.context("default")
+    with ctx:
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+        ax.imshow(wc, interpolation="bilinear")
+        ax.axis("off")
+        fig.suptitle(titulo, fontsize=10, fontweight="bold", y=0.98)
+        fig.tight_layout(pad=0.3)
+        plt.savefig(dest, dpi=dpi, bbox_inches="tight")
+        plt.close()
     print(f"  ✓ {dest}  ({len(freq)} tokens únicos)")
     return True
 
@@ -345,35 +367,113 @@ def _list_colormaps():
     sys.exit(0)
 
 
+def _descobrir_csv(input_arg: str | None) -> Path:
+    """
+    Resolve o CSV de entrada.
+    Se não passado, busca automaticamente:
+      1. resultado.csv no diretório corrente
+      2. CSV mais recente em *_s_*_api+html/resultado.csv
+      3. CSV mais recente em runs/*/resultado.csv
+    """
+    if input_arg is not None:
+        p = Path(input_arg)
+        if not p.exists():
+            print(f"❌  Arquivo não encontrado: {p}", file=sys.stderr)
+            print(f"    Este script aceita o resultado.csv gerado pelo scielo_scraper.py",
+                  file=sys.stderr)
+            print(f"    ou o terms_*.csv gerado pelo terms_matcher.py.", file=sys.stderr)
+            print(f"    Localização padrão: <sc_ts>_s_<ts>_api+html/resultado.csv",
+                  file=sys.stderr)
+            print(f"    Gere com: uv run python scielo_scraper.py sc_<ts>.csv", file=sys.stderr)
+            sys.exit(1)
+        return p
+
+    # Auto-descoberta
+    candidatos: list[Path] = []
+
+    local = Path("resultado.csv")
+    if local.exists():
+        candidatos.append(local)
+
+    for p in sorted(Path(".").glob("*_s_*_api+html/resultado.csv"), reverse=True):
+        candidatos.append(p)
+    for p in sorted(Path(".").glob("*_s_*_api/resultado.csv"), reverse=True):
+        if p not in candidatos:
+            candidatos.append(p)
+    for p in sorted(Path(".").glob("runs/*/resultado.csv"), reverse=True):
+        if p not in candidatos:
+            candidatos.append(p)
+
+    if not candidatos:
+        print("❌  Nenhum resultado.csv encontrado.", file=sys.stderr)
+        print(f"    Gere com: uv run python scielo_scraper.py sc_<ts>.csv", file=sys.stderr)
+        print(f"    O arquivo fica em: sc_<ts>_s_<ts>_api+html/resultado.csv", file=sys.stderr)
+        print(f"    Ou passe o caminho diretamente: scielo_wordcloud.py <caminho/resultado.csv>",
+              file=sys.stderr)
+        sys.exit(1)
+
+    if len(candidatos) == 1:
+        print(f"  CSV descoberto: {candidatos[0]}")
+        return candidatos[0]
+
+    # Múltiplos: usa o mais recente e avisa
+    print(f"  Múltiplos CSVs encontrados. Usando o mais recente: {candidatos[0]}")
+    print(f"  (Passe o caminho explicitamente para usar outro)")
+    return candidatos[0]
+
+
+def _list_styles():
+    """Lista estilos matplotlib disponíveis."""
+    import matplotlib.pyplot as plt
+    print("\nEstilos matplotlib disponíveis (--style):\n")
+    styles = sorted(plt.style.available)
+    col = 0
+    for style in styles:
+        print(f"  {style:<35}", end="")
+        col += 1
+        if col % 3 == 0:
+            print()
+    if col % 3 != 0:
+        print()
+    print(f"\n  Default: default (sem estilo especial)\n")
+    sys.exit(0)
+
+
 def main():
     # Flags especiais antes do parser
     if "--list-langs" in sys.argv:
         _list_langs()
     if "--list-colormaps" in sys.argv:
         _list_colormaps()
+    if "--list-styles" in sys.argv:
+        _list_styles()
     if "-?" in sys.argv:
         sys.argv[sys.argv.index("-?")] = "--help"
 
     parser = argparse.ArgumentParser(
         prog="scielo_wordcloud.py",
         description=(
-            "Gera nuvens de palavras (wordclouds) a partir de CSVs do SciELO Scraper. "
+            "Gera nuvens de palavras (wordclouds) a partir de CSVs do SciELO Scraper.\n"
+            "Entrada: resultado.csv (scielo_scraper.py) ou terms_*.csv (terms_matcher.py).\n"
             "Processa Titulo_PT, Resumo_PT, Palavras_Chave_PT ou qualquer coluna do CSV."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Exemplos:\n"
-            "  uv run python scielo_wordcloud.py resultado.csv\n"
-            "  uv run python scielo_wordcloud.py terms.csv --field all --lang en\n"
+            "  uv run python scielo_wordcloud.py                          # auto-descobre resultado.csv\n"
+            "  uv run python scielo_wordcloud.py sc_ts_s_ts_api+html/resultado.csv\n"
+            "  uv run python scielo_wordcloud.py resultado.csv --field abstract\n"
             "  uv run python scielo_wordcloud.py resultado.csv --corpus all\n"
             "  uv run python scielo_wordcloud.py resultado.csv --mask shape.png\n"
-            "  uv run python scielo_wordcloud.py resultado.csv --width 1200\n"
+            "  uv run python scielo_wordcloud.py resultado.csv --style ggplot\n"
             "  uv run python scielo_wordcloud.py --list-langs\n"
+            "  uv run python scielo_wordcloud.py --list-styles\n"
         ),
     )
 
-    parser.add_argument("input", metavar="CSV",
-                        help="CSV de entrada (resultado.csv ou terms_*.csv)")
+    parser.add_argument("input", metavar="CSV", nargs="?", default=None,
+                        help="resultado.csv (scielo_scraper.py) ou terms_*.csv (terms_matcher.py). "
+                             "Se omitido, busca automaticamente no diretório atual e em pastas padrão.")
     parser.add_argument(
         "--field", metavar="CAMPO", default=None,
         help=(
@@ -436,6 +536,15 @@ def main():
         help="Lista colormaps recomendados e sai.",
     )
     parser.add_argument(
+        "--style", metavar="NOME", default=None,
+        help="Estilo matplotlib para o gráfico (ex: ggplot, seaborn-v0_8, bmh). "
+             "Use --list-styles para ver todos os disponíveis.",
+    )
+    parser.add_argument(
+        "--list-styles", action="store_true",
+        help="Lista todos os estilos matplotlib disponíveis e sai.",
+    )
+    parser.add_argument(
         "--max-words", metavar="N", type=int, default=200,
         help="Número máximo de palavras na nuvem (default: 200).",
     )
@@ -479,11 +588,8 @@ def main():
         print("❌  Nenhum campo selecionado.", file=sys.stderr)
         sys.exit(1)
 
-    # --- Validar input --------------------------------------------------------
-    input_path = Path(args.input)
-    if not input_path.exists():
-        print(f"❌  Arquivo não encontrado: {input_path}", file=sys.stderr)
-        sys.exit(1)
+    # --- Descoberta automática do CSV -----------------------------------------
+    input_path = _descobrir_csv(args.input)
 
     # --- Carregar dados -------------------------------------------------------
     rows = carregar_csv(input_path)
@@ -497,9 +603,18 @@ def main():
 
     # Verificar colunas disponíveis
     colunas_csv = set(rows[0].keys())
+    _colunas_scraper = {"Titulo_PT", "Resumo_PT", "Palavras_Chave_PT"}
+    _eh_scraper_csv  = bool(_colunas_scraper & colunas_csv)
     for field_key, col_name in campos_para_processar:
         if col_name not in colunas_csv:
-            print(f"❌  Coluna '{col_name}' não encontrada no CSV.", file=sys.stderr)
+            print(f"❌  Coluna '{col_name}' não encontrada em: {input_path}", file=sys.stderr)
+            if not _eh_scraper_csv:
+                print(f"    ⚠  Este CSV parece não ser um resultado.csv do scielo_scraper.py.",
+                      file=sys.stderr)
+                print(f"    O resultado.csv fica em: <sc_ts>_s_<ts>_api+html/resultado.csv",
+                      file=sys.stderr)
+                print(f"    Gere com: uv run python scielo_scraper.py sc_<ts>.csv",
+                      file=sys.stderr)
             print(f"    Colunas disponíveis: {', '.join(sorted(colunas_csv))}", file=sys.stderr)
             sys.exit(1)
 
@@ -533,6 +648,7 @@ def main():
           f"{' + domínio' if domain_ativo else ''}")
     print(f"Dimensões        : {width}×{height}px")
     print(f"Colormap         : {args.colormap}")
+    print(f"Estilo           : {args.style or 'default'}")
     print(f"Max words        : {args.max_words}")
     print(f"Máscara          : {args.mask or 'nenhuma (retangular)'}")
     print(f"Pasta de saída   : {output.resolve()}")
@@ -598,6 +714,7 @@ def main():
             max_words=args.max_words,
             dest=dest,
             titulo=titulo,
+            style=args.style,
         )
         if ok:
             arquivos_gerados.append(str(dest))
@@ -620,6 +737,7 @@ def main():
         "lang":             args.lang,
         "n_stopwords":      len(stopwords),
         "colormap":         args.colormap,
+        "style":            args.style or "default",
         "width":            width,
         "height":           height,
         "max_words":        args.max_words,

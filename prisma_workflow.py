@@ -39,6 +39,7 @@ Uso:
 """
 
 import argparse
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -47,7 +48,21 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-__version__ = "1.0"
+# ---------------------------------------------------------------------------
+# Verificação de dependências (antes de qualquer import externo)
+# ---------------------------------------------------------------------------
+
+def _verificar_deps():
+    ausentes = [pkg for mod, pkg in {"reportlab": "reportlab"}.items()
+                if importlib.util.find_spec(mod) is None]
+    if ausentes:
+        print("❌  Dependências ausentes. Execute:")
+        print(f"    uv pip install {' '.join(ausentes)}")
+        sys.exit(1)
+
+_verificar_deps()
+
+__version__ = "1.1"
 
 # ---------------------------------------------------------------------------
 # Strings i18n
@@ -59,35 +74,37 @@ STRINGS = {
     "fase_triagem":        {"pt": "TRIAGEM",         "en": "SCREENING"},
     "fase_inclusao":       {"pt": "INCLUSÃO",        "en": "INCLUDED"},
 
-    # Caixas — Identificação
-    "id_databases":        {"pt": "Registros identificados nas bases de dados\n(n = {n})",
-                            "en": "Records identified from databases\n(n = {n})"},
-    "id_duplicates":       {"pt": "Registros duplicados removidos\n(n = {n})",
-                            "en": "Duplicate records removed\n(n = {n})"},
-    "id_automation":       {"pt": "Registros marcados como inelegíveis\npor ferramentas de automação\n(n = {n})",
-                            "en": "Records marked as ineligible\nby automation tools\n(n = {n})"},
-    "id_other":            {"pt": "Registros removidos por outros motivos\n(erros de acesso, PID inválido)\n(n = {n})",
-                            "en": "Records removed for other reasons\n(access errors, invalid PID)\n(n = {n})"},
-    "id_screened":         {"pt": "Registros selecionados para triagem\n(n = {n})",
-                            "en": "Records screened\n(n = {n})"},
+    # Labels (sem número) — Identificação
+    "id_databases_label":     {"pt": "Registros identificados nas bases de dados",
+                               "en": "Records identified from databases"},
+    "id_removed_label":       {"pt": "Registros removidos antes da triagem:",
+                               "en": "Records removed before screening:"},
+    "id_duplicates_label":    {"pt": "Registros duplicados removidos",
+                               "en": "Duplicate records removed"},
+    "id_automation_label":    {"pt": "Marcados inelegíveis por automação",
+                               "en": "Marked ineligible by automation tools"},
+    "id_other_label":         {"pt": "Removidos por outros motivos (erros, PID inválido)",
+                               "en": "Removed for other reasons (errors, invalid PID)"},
+    "id_screened_label":      {"pt": "Registros selecionados para triagem",
+                               "en": "Records screened"},
 
-    # Caixas — Triagem
-    "scr_excluded":        {"pt": "Registros excluídos na triagem\n(título/resumo)\n(n = {n})",
-                            "en": "Records excluded\n(title/abstract screening)\n(n = {n})"},
-    "scr_sought":          {"pt": "Relatórios buscados para recuperação\n(n = {n})",
-                            "en": "Reports sought for retrieval\n(n = {n})"},
-    "scr_not_retrieved":   {"pt": "Relatórios não recuperados\n(n = {n})",
-                            "en": "Reports not retrieved\n(n = {n})"},
-    "scr_assessed":        {"pt": "Relatórios avaliados para elegibilidade\n(n = {n})",
-                            "en": "Reports assessed for eligibility\n(n = {n})"},
-    "scr_excl_reasons":    {"pt": "Relatórios excluídos\ncom razões:\n{reasons}",
-                            "en": "Reports excluded\nwith reasons:\n{reasons}"},
+    # Labels — Triagem
+    "scr_excluded_label":     {"pt": "Registros excluídos na triagem (título/resumo)",
+                               "en": "Records excluded (title/abstract screening)"},
+    "scr_sought_label":       {"pt": "Relatórios buscados para recuperação",
+                               "en": "Reports sought for retrieval"},
+    "scr_not_retrieved_label":{"pt": "Relatórios não recuperados",
+                               "en": "Reports not retrieved"},
+    "scr_assessed_label":     {"pt": "Relatórios avaliados para elegibilidade",
+                               "en": "Reports assessed for eligibility"},
+    "scr_excl_reasons_label": {"pt": "Relatórios excluídos — razões:",
+                               "en": "Reports excluded — reasons:"},
 
-    # Caixas — Inclusão
-    "inc_studies":         {"pt": "Estudos incluídos na revisão\n(n = {n})",
-                            "en": "Studies included in review\n(n = {n})"},
-    "inc_reports":         {"pt": "Relatórios dos estudos incluídos\n(n = {n})",
-                            "en": "Reports of included studies\n(n = {n})"},
+    # Labels — Inclusão
+    "inc_studies_label":      {"pt": "Estudos incluídos na revisão",
+                               "en": "Studies included in review"},
+    "inc_reports_label":      {"pt": "Relatórios dos estudos incluídos",
+                               "en": "Reports of included studies"},
 
     # Rótulos de campos editáveis
     "campo_editavel":      {"pt": "Campo a preencher após curadoria humana",
@@ -444,8 +461,17 @@ def _wrap_text(c, txt: str, x: float, y: float, max_w: float,
     return y  # retorna y após a última linha
 
 
-def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
-    """Gera o PDF PRISMA 2020 A4 com reportlab."""
+def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
+    """
+    Gera o PDF PRISMA 2020 A4.
+
+    Design de campos:
+      - Campos automáticos (auto=True): caixa azul sólida, texto branco no canvas, não editável.
+      - Campos humanos (auto=False): caixa cinza com borda tracejada.
+        O label (descrição) é desenhado no canvas (não editável).
+        Um campo AcroForm pequeno é criado APENAS para o número (n = ?).
+        O usuário vê o texto descritivo sempre e edita apenas o número.
+    """
     try:
         from reportlab.pdfgen import canvas as rl_canvas
         from reportlab.lib.pagesizes import A4
@@ -555,57 +581,109 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         # fallback: strip anything still outside latin-1
         return txt.encode("latin-1", errors="replace").decode("latin-1")
 
-    def draw_box(txt: str, x: float, y_top: float, w: float,
+    def draw_box(label: str, n_val, x: float, y_top: float, w: float,
                  auto: bool, field_name: str = "") -> float:
         """
         Desenha caixa e retorna y_bottom.
-        auto=True  → azul, texto branco, não editável
-        auto=False → cinza claro, borda tracejada, campo AcroForm editável
-                     (valor inicial = txt para guiar o usuário)
-        """
-        from reportlab.lib.colors import Color
-        font      = "Helvetica-Bold" if auto else "Helvetica"
-        cor_fundo = _rgb(_COR_AUTO    if auto else _COR_HUMANO)
-        cor_texto = _rgb(_COR_TEXTO_AUTO if auto else _COR_TEXTO_HUMANO)
-        cor_borda = _rgb(_COR_AUTO    if auto else _COR_BORDA)
 
-        h = _box_h(txt, w, font)
+        Parâmetros:
+          label     — texto descritivo da caixa (sem o número)
+          n_val     — valor numérico (int/None). None = campo humano não preenchido.
+          auto      — True: caixa azul não editável. False: caixa cinza com campo numérico editável.
+          field_name— nome do campo AcroForm (usado se auto=False)
+
+        Design:
+          - auto=True : texto completo "label (n = N)" em branco no canvas
+          - auto=False: label descritivo em cinza no canvas (fixo) +
+                        campo AcroForm pequeno apenas para o número
+        """
+        N_FIELD_W  = 38.0   # largura do campo numérico
+        N_FIELD_H  = 14.0   # altura do campo numérico
+        FONT_LABEL = "Helvetica"
+        FONT_AUTO  = "Helvetica-Bold"
+
+        # Texto completo para calcular altura
+        n_str = str(n_val) if n_val is not None else "?"
+        if auto:
+            full_txt = f"{label}\n(n = {n_str})"
+            font = FONT_AUTO
+        else:
+            full_txt = label  # só o label para calcular altura (número ocupa linha extra)
+            font = FONT_LABEL
+
+        h = max(34.0, _box_h(full_txt, w, font) + (0 if auto else N_FIELD_H + PAD_V))
+
+        cor_fundo = _rgb(_COR_AUTO if auto else _COR_HUMANO)
+        cor_borda = _rgb(_COR_AUTO if auto else _COR_BORDA)
+        cor_texto = _rgb(_COR_TEXTO_AUTO if auto else _COR_TEXTO_HUMANO)
 
         # --- Retângulo de fundo ---
+        c.setLineWidth(1.2 if auto else 0.7)
         c.setStrokeColor(cor_borda)
         c.setFillColor(cor_fundo)
-        c.setLineWidth(1.2 if auto else 0.7)
         if auto:
             c.roundRect(x, y_top - h, w, h, 4, fill=1, stroke=1)
         else:
-            # Caixas humanas: borda tracejada + fundo cinza claro
             c.roundRect(x, y_top - h, w, h, 4, fill=1, stroke=0)
             c.setDash(3, 2)
             c.roundRect(x, y_top - h, w, h, 4, fill=0, stroke=1)
             c.setDash()
 
         if auto:
-            # Texto desenhado diretamente (não editável)
-            _draw_text_in_box(txt, x, y_top, w, h, font, cor_texto)
+            _draw_text_in_box(full_txt, x, y_top, w, h, FONT_AUTO, cor_texto)
         else:
-            # Campo AcroForm editável: valor inicial = label para orientar o usuário
-            # O label explica o que preencher; o usuário apaga e digita o número
-            _txt_safe = _sanitize_acroform(txt)
+            # Desenhar label descritivo no canvas (texto fixo, não editável)
+            label_h = _box_h(label, w, FONT_LABEL)
+            label_area_h = h - N_FIELD_H - PAD_V
+            lines_raw = label.split("\n")
+            all_lines = []
+            for line in lines_raw:
+                words = line.split()
+                if not words:
+                    all_lines.append("")
+                    continue
+                cur = ""
+                for word in words:
+                    test = (cur + " " + word).strip()
+                    if stringWidth(test, FONT_LABEL, FONT_SIZE) <= w - 2 * PAD_H:
+                        cur = test
+                    else:
+                        if cur:
+                            all_lines.append(cur)
+                        cur = word
+                if cur:
+                    all_lines.append(cur)
+
+            c.setFont(FONT_LABEL, FONT_SIZE)
+            c.setFillColor(cor_texto)
+            total_lh = len(all_lines) * LINE_H
+            y_txt = y_top - PAD_V - FONT_SIZE + 1
+            for line in all_lines:
+                c.drawCentredString(x + w / 2, y_txt, line)
+                y_txt -= LINE_H
+
+            # Campo AcroForm apenas para o número — no rodapé da caixa
+            field_y = y_top - h + PAD_V
+            field_x = x + (w - N_FIELD_W) / 2
+            _val_safe = _sanitize_acroform(str(n_val) if n_val is not None else "")
             c.acroForm.textfield(
-                name=field_name,
-                tooltip=_txt_safe,     # aparece ao passar o mouse
-                x=x + 3,
-                y=y_top - h + 3,
-                width=w - 6,
-                height=h - 6,
-                fontSize=FONT_SIZE,
+                name=field_name or f"field_{label[:10]}",
+                tooltip=_sanitize_acroform(f"n = {n_str}"),
+                x=field_x,
+                y=field_y,
+                width=N_FIELD_W,
+                height=N_FIELD_H,
+                fontSize=FONT_SIZE + 1,
                 borderColor=_rgb(_COR_BORDA),
-                fillColor=_rgb((0.97, 0.97, 0.97)),
-                textColor=_rgb(_COR_TEXTO_HUMANO),
-                value=_txt_safe,       # texto inicial orientativo
+                fillColor=_rgb((1.0, 1.0, 1.0)),
+                textColor=_rgb((0.1, 0.1, 0.6)),
+                value=_val_safe,
                 forceBorder=True,
-                fieldFlags="multiline",
             )
+            # Label "n = " à esquerda do campo
+            c.setFont(FONT_LABEL, FONT_SIZE)
+            c.setFillColor(cor_texto)
+            c.drawRightString(field_x - 2, field_y + 3, "n =")
 
         return y_top - h
 
@@ -681,101 +759,164 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
 
     # =========================================================================
     # FASE 1 — IDENTIFICAÇÃO
+    # Layout oficial PRISMA 2020:
+    #   Esq: "Records identified from databases (n=X)"
+    #   Dir: caixa única "Records removed before screening" com 3 sub-itens:
+    #        • Duplicate records removed (n=?)
+    #        • Marked ineligible by automation tools (n=X)
+    #        • Removed for other reasons (n=X)
+    #   Seta horizontal: esq → dir (meio da esq)
+    #   ↓
+    #   Esq: "Records screened (n=X)"
     # =========================================================================
     y = draw_fase(s("fase_identificacao", lang), y)
 
-    # Caixa: buscados
-    txt_id = s("id_databases", lang, n=_n(dados["total_buscado"]))
-    y0 = y
-    y_id_bot = draw_box(txt_id, COL_L_X, y0, COL_L_W, auto=True)
+    # --- Coluna esquerda: identificados ---
+    lbl_id = s("id_databases_label", lang)
+    y0       = y
+    y_id_bot = draw_box(lbl_id, dados["total_buscado"], COL_L_X, y0, COL_L_W, auto=True)
 
-    # Sub-caixas de remoção (coluna direita) — alinhadas com y0
-    y_r = y0
+    # --- Coluna direita: caixa multi-item "removidos antes da triagem" ---
+    # Esta caixa é composta (3 sub-items com marcador); 2 são auto, 1 é editável
+    # Desenhamos como uma única caixa com texto canvas e um campo AcroForm para duplicatas
+    dup    = dados.get("duplicates")   # pode ser None (editável)
+    n_aut  = dados.get("automation_removed", 0)
+    n_out  = dados.get("erros_outros", 0)
 
-    # duplicatas (editável se não informado)
-    dup = dados.get("duplicates")
-    txt_dup = s("id_duplicates", lang, n=_n(dup if dup is not None else None))
-    y_dup_bot = draw_box(txt_dup, COL_R_X, y_r, COL_R_W,
-                         auto=(dup is not None),
-                         field_name="duplicates")
-    y_r = y_dup_bot - GAP
+    lbl_removed = s("id_removed_label", lang)
+    lbl_dup     = s("id_duplicates_label", lang)
+    lbl_aut     = s("id_automation_label", lang)
+    lbl_out     = s("id_other_label", lang)
 
-    # automação
-    txt_aut = s("id_automation", lang, n=_n(dados.get("automation_removed", 0)))
-    y_aut_bot = draw_box(txt_aut, COL_R_X, y_r, COL_R_W, auto=True)
-    y_r = y_aut_bot - GAP
+    # Calcula altura: título + 3 sub-itens (cada um ~2 linhas) + campo numérico para dup
+    removed_lines = (
+        f"{lbl_removed}\n"
+        f"  • {lbl_dup}\n"
+        f"  • {lbl_aut} (n = {_n(n_aut)})\n"
+        f"  • {lbl_out} (n = {_n(n_out)})"
+    )
+    N_FIELD_W = 38.0
+    N_FIELD_H = 14.0
+    h_removed = max(60.0, _box_h(removed_lines, COL_R_W, "Helvetica") + N_FIELD_H + PAD_V * 2)
 
-    # outros
-    txt_out = s("id_other", lang, n=_n(dados.get("erros_outros", 0)))
-    y_out_bot = draw_box(txt_out, COL_R_X, y_r, COL_R_W, auto=True)
+    # Desenhar fundo cinza tracejado (duplicatas é editável) ou azul (se já preenchido)
+    if dup is not None:
+        c.setFillColor(_rgb(_COR_AUTO))
+        c.setStrokeColor(_rgb(_COR_AUTO))
+        c.setLineWidth(1.2)
+        c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=1, stroke=1)
+    else:
+        c.setFillColor(_rgb(_COR_HUMANO))
+        c.setStrokeColor(_rgb(_COR_BORDA))
+        c.setLineWidth(0.7)
+        c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=1, stroke=0)
+        c.setDash(3, 2)
+        c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=0, stroke=1)
+        c.setDash()
 
-    # Seta horizontal (fluxo → exclusões)
-    mid_h = (y0 + y_out_bot) / 2
-    seta_h(COL_L_X + COL_L_W, COL_R_X, mid_h)
+    # Texto canvas: título + sub-itens fixos
+    cor_txt_r = _rgb(_COR_TEXTO_AUTO if dup is not None else _COR_TEXTO_HUMANO)
+    c.setFont("Helvetica-Bold", FONT_SIZE)
+    c.setFillColor(cor_txt_r)
+    c.drawCentredString(COL_R_X + COL_R_W / 2, y0 - PAD_V - FONT_SIZE, lbl_removed)
 
-    # Colchete vertical ligando as 3 caixas de remoção
-    c.setStrokeColor(_rgb(_COR_BORDA))
-    c.setLineWidth(0.6)
-    c.line(COL_R_X - 5, y0, COL_R_X - 5, y_out_bot)
+    c.setFont("Helvetica", FONT_SIZE)
+    y_sub = y0 - PAD_V - FONT_SIZE - LINE_H
+    c.drawString(COL_R_X + PAD_H, y_sub, f"• {lbl_dup}")
+    y_sub -= LINE_H
 
-    # Caixa screened — abaixo do mais baixo entre col_l e col_r
-    y_scr_top = min(y_id_bot, y_out_bot) - GAP
-    txt_scr = s("id_screened", lang, n=_n(dados.get("screened")))
-    y_scr_bot = draw_box(txt_scr, COL_L_X, y_scr_top, COL_L_W, auto=True)
+    # Campo AcroForm para duplicatas (pequeno, só o número)
+    field_x_dup = COL_R_X + PAD_H + stringWidth(f"• {lbl_dup}  n = ", "Helvetica", FONT_SIZE)
+    field_y_dup = y_sub
+    c.drawString(COL_R_X + PAD_H + stringWidth(f"• {lbl_dup} ", "Helvetica", FONT_SIZE),
+                 y_sub + 1, "n =")
+    _dup_val_safe = _sanitize_acroform(str(dup) if dup is not None else "")
+    c.acroForm.textfield(
+        name="duplicates",
+        tooltip="Registros duplicados removidos",
+        x=COL_R_X + PAD_H + stringWidth(f"• {lbl_dup}  n =  ", "Helvetica", FONT_SIZE),
+        y=field_y_dup - 2,
+        width=N_FIELD_W,
+        height=N_FIELD_H,
+        fontSize=FONT_SIZE + 1,
+        borderColor=_rgb(_COR_BORDA),
+        fillColor=_rgb((1.0, 1.0, 1.0)),
+        textColor=_rgb((0.1, 0.1, 0.6)),
+        value=_dup_val_safe,
+        forceBorder=True,
+    )
+    y_sub -= (LINE_H + 2)
+    c.drawString(COL_R_X + PAD_H, y_sub,
+                 f"• {lbl_aut} (n = {_n(n_aut)})")
+    y_sub -= LINE_H
+    c.drawString(COL_R_X + PAD_H, y_sub,
+                 f"• {lbl_out} (n = {_n(n_out)})")
 
-    # Seta vertical: buscados → screened
+    y_removed_bot = y0 - h_removed
+
+    # Seta horizontal: esq → dir (ao nível do meio da caixa esq)
+    mid_id = (y0 + y_id_bot) / 2
+    seta_h(COL_L_X + COL_L_W, COL_R_X, mid_id)
+
+    # Caixa screened — abaixo do mais baixo
+    y_scr_top = min(y_id_bot, y_removed_bot) - GAP
+    lbl_scr   = s("id_screened_label", lang)
+    y_scr_bot = draw_box(lbl_scr, dados.get("screened"), COL_L_X, y_scr_top, COL_L_W, auto=True)
     seta_v(CX_L, y_id_bot, y_scr_top)
 
     y = y_scr_bot - GAP
 
     # =========================================================================
     # FASE 2 — TRIAGEM
+    # Layout oficial:
+    #   Linha 1: "Records screened" → seta → Linha 1:
+    #     Esq: "Reports sought for retrieval"  Dir: "Records excluded (n=?)"
+    #   ↓
+    #   Linha 2:
+    #     Esq: "Reports assessed for eligibility"  Dir: "Reports not retrieved (n=?)"
+    #   ↓
+    #   Linha 3 (só Dir):
+    #     Dir: "Reports excluded: Reason1 (n=?), ..."
     # =========================================================================
     y = draw_fase(s("fase_triagem", lang), y)
 
-    # Linha 1: sought (esq) | excluded_screening (dir)
     val_excl_scr = dados.get("excluded_screening")
     val_sought   = dados.get("sought")
+    val_nr       = dados.get("not_retrieved")
+    val_assessed = dados.get("assessed")
+    val_excl_elig = dados.get("excluded_eligibility")
+    reasons       = dados.get("excluded_reasons", [])
 
-    txt_sought    = s("scr_sought",   lang, n=_n(val_sought))
-    txt_excl_scr  = s("scr_excluded", lang, n=_n(val_excl_scr))
-
+    # Linha 1: sought (esq) | excluded_screening (dir)
     y_t1 = y
-    y_sought_bot   = draw_box(txt_sought,   COL_L_X, y_t1, COL_L_W,
-                               auto=(val_sought is not None),
-                               field_name="sought")
-    y_excl_scr_bot = draw_box(txt_excl_scr, COL_R_X, y_t1, COL_R_W,
-                               auto=(val_excl_scr is not None),
-                               field_name="excluded_screening")
-    seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t1 + y_excl_scr_bot) / 2)
+    y_sought_bot   = draw_box(s("scr_sought_label", lang),   val_sought,
+                               COL_L_X, y_t1, COL_L_W,
+                               auto=(val_sought is not None), field_name="sought")
+    y_excl_scr_bot = draw_box(s("scr_excluded_label", lang), val_excl_scr,
+                               COL_R_X, y_t1, COL_R_W,
+                               auto=(val_excl_scr is not None), field_name="excluded_screening")
+    seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t1 + min(y_sought_bot, y_excl_scr_bot)) / 2)
     seta_v(CX_L, y_scr_bot, y_t1)
 
     # Linha 2: assessed (esq) | not_retrieved (dir)
-    val_nr       = dados.get("not_retrieved")
-    val_assessed = dados.get("assessed")
-
-    txt_nr       = s("scr_not_retrieved", lang, n=_n(val_nr))
-    txt_assessed = s("scr_assessed",      lang, n=_n(val_assessed))
-
     y_t2 = min(y_sought_bot, y_excl_scr_bot) - GAP
-    y_assessed_bot  = draw_box(txt_assessed, COL_L_X, y_t2, COL_L_W,
-                                auto=(val_assessed is not None),
-                                field_name="assessed")
-    y_nr_bot        = draw_box(txt_nr, COL_R_X, y_t2, COL_R_W,
-                                auto=(val_nr is not None),
-                                field_name="not_retrieved")
-    seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t2 + y_nr_bot) / 2)
+    y_assessed_bot = draw_box(s("scr_assessed_label", lang),     val_assessed,
+                               COL_L_X, y_t2, COL_L_W,
+                               auto=(val_assessed is not None), field_name="assessed")
+    y_nr_bot       = draw_box(s("scr_not_retrieved_label", lang), val_nr,
+                               COL_R_X, y_t2, COL_R_W,
+                               auto=(val_nr is not None), field_name="not_retrieved")
+    seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t2 + min(y_assessed_bot, y_nr_bot)) / 2)
     seta_v(CX_L, y_sought_bot, y_t2)
 
-    # Linha 3: excl_elig + razões (dir), abaixo de assessed
-    val_excl_elig = dados.get("excluded_eligibility")
-    reasons       = dados.get("excluded_reasons", [])
-    reasons_txt   = "\n".join(reasons) if reasons else ""
-    txt_excl_elig = s("scr_excl_reasons", lang,
-                      n=_n(val_excl_elig), reasons=reasons_txt or "—")
-
+    # Linha 3: excl_elig (dir) — razões listadas
+    reasons_txt = "; ".join(reasons) if reasons else ""
     y_t3 = min(y_assessed_bot, y_nr_bot) - GAP
-    y_excl_elig_bot = draw_box(txt_excl_elig, COL_R_X, y_t3, COL_R_W,
+    lbl_excl_elig = s("scr_excl_reasons_label", lang)
+    if reasons_txt:
+        lbl_excl_elig += f"\n{reasons_txt}"
+    y_excl_elig_bot = draw_box(lbl_excl_elig, val_excl_elig,
+                                COL_R_X, y_t3, COL_R_W,
                                 auto=(val_excl_elig is not None),
                                 field_name="excluded_eligibility")
     seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t3 + y_excl_elig_bot) / 2)
@@ -785,25 +926,23 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
 
     # =========================================================================
     # FASE 3 — INCLUSÃO
+    # Layout oficial: caixa única com "Studies included (n=X)" + "Reports of included (n=X)"
     # =========================================================================
     y = draw_fase(s("fase_inclusao", lang), y)
 
     val_inc = dados.get("included_studies")
     val_rep = dados.get("included_reports")
 
-    txt_inc = s("inc_studies",  lang, n=_n(val_inc))
-    txt_rep = s("inc_reports",  lang, n=_n(val_rep))
-
-    y_inc_bot = draw_box(txt_inc, COL_L_X, y, COL_L_W,
-                         auto=(val_inc is not None),
-                         field_name="included_studies")
-    seta_v(CX_L, y_t3 if val_inc is None else y_t3, y)  # seta de assessed → included
-    seta_v(CX_L, y_inc_bot, y_inc_bot - GAP)
+    y_inc_bot = draw_box(s("inc_studies_label", lang), val_inc,
+                         COL_L_X, y, COL_L_W,
+                         auto=(val_inc is not None), field_name="included_studies")
+    seta_v(CX_L, y_t3, y)
 
     y_rep_top = y_inc_bot - GAP
-    draw_box(txt_rep, COL_L_X, y_rep_top, COL_L_W,
-             auto=(val_rep is not None),
-             field_name="included_reports")
+    draw_box(s("inc_reports_label", lang), val_rep,
+             COL_L_X, y_rep_top, COL_L_W,
+             auto=(val_rep is not None), field_name="included_reports")
+    seta_v(CX_L, y_inc_bot, y_rep_top)
 
     # =========================================================================
     # Rodapé
@@ -824,6 +963,83 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     c.showPage()
     c.save()
     print(f"  ✓ {output_path}")
+
+
+# ---------------------------------------------------------------------------
+# Descoberta automática de JSON
+# ---------------------------------------------------------------------------
+
+def _descobrir_json(input_arg: str | None, interativo: bool) -> Path:
+    """
+    Resolve o caminho para results_report.json.
+    Ordem de busca (se não passado):
+      1. results_report.json no diretório corrente
+      2. Mais recente em runs/*/results_*/results_report.json
+      3. Mais recente em results_*/results_report.json
+    Em modo interativo, lista as opções e pergunta ao usuário.
+    """
+    if input_arg is not None:
+        p = Path(input_arg)
+        if not p.exists():
+            print(f"❌  Arquivo não encontrado: {p}", file=sys.stderr)
+            print(f"    Este script precisa do results_report.json gerado pelo results_report.py.",
+                  file=sys.stderr)
+            print(f"    Gere-o com:", file=sys.stderr)
+            print(f"      uv run python results_report.py --scrape-dir <pasta_scraping>/",
+                  file=sys.stderr)
+            print(f"    O arquivo fica em: <pasta_scraping>/results_<stem>/results_report.json",
+                  file=sys.stderr)
+            sys.exit(1)
+        return p
+
+    # Auto-descoberta
+    candidatos: list[Path] = []
+
+    # 1. Diretório corrente
+    local = Path("results_report.json")
+    if local.exists():
+        candidatos.append(local)
+
+    # 2. runs/*/results_*/
+    for p in sorted(Path(".").glob("runs/*/results_*/results_report.json"), reverse=True):
+        candidatos.append(p)
+
+    # 3. results_*/
+    for p in sorted(Path(".").glob("results_*/results_report.json"), reverse=True):
+        if p not in candidatos:
+            candidatos.append(p)
+
+    if not candidatos:
+        print("❌  Nenhum results_report.json encontrado.", file=sys.stderr)
+        print(f"    Gere-o primeiro com:", file=sys.stderr)
+        print(f"      uv run python results_report.py --scrape-dir <pasta_scraping>/",
+              file=sys.stderr)
+        print(f"    O arquivo fica em: <pasta_scraping>/results_<stem>/results_report.json",
+              file=sys.stderr)
+        print(f"    Ou passe o caminho diretamente: prisma_workflow.py <caminho/results_report.json>",
+              file=sys.stderr)
+        sys.exit(1)
+
+    if len(candidatos) == 1 and not interativo:
+        print(f"  JSON descoberto: {candidatos[0]}")
+        return candidatos[0]
+
+    # Múltiplos candidatos ou modo interativo: pergunta ao usuário
+    print("\nresults_report.json encontrados:\n")
+    for i, c in enumerate(candidatos[:10], 1):
+        print(f"  {i}. {c}")
+    print()
+    while True:
+        resp = input("  Qual usar? (número, ou Enter para o mais recente [1]): ").strip()
+        if not resp:
+            return candidatos[0]
+        try:
+            idx = int(resp) - 1
+            if 0 <= idx < len(candidatos):
+                return candidatos[idx]
+        except ValueError:
+            pass
+        print("  Opção inválida.")
 
 
 # ---------------------------------------------------------------------------
@@ -852,8 +1068,9 @@ def main():
         ),
     )
 
-    parser.add_argument("input", metavar="JSON",
-                        help="results_report.json gerado pelo results_report.py")
+    parser.add_argument("input", metavar="JSON", nargs="?", default=None,
+                        help="results_report.json gerado pelo results_report.py. "
+                             "Se omitido, busca automaticamente no diretório atual e em runs/.")
     parser.add_argument(
         "--human-data", metavar="ARQUIVO", default=None,
         help="JSON ou CSV com dados das fases humanas (key=campo, value=n). "
@@ -892,11 +1109,8 @@ def main():
 
     args = parser.parse_args()
 
-    # --- Validar input --------------------------------------------------------
-    json_path = Path(args.input)
-    if not json_path.exists():
-        print(f"❌  Arquivo não encontrado: {json_path}", file=sys.stderr)
-        sys.exit(1)
+    # --- Descoberta automática do JSON ----------------------------------------
+    json_path = _descobrir_json(args.input, args.interactive)
 
     # --- Carregar dados automáticos -------------------------------------------
     print(f"\nprisma_workflow.py v{__version__}")
@@ -904,6 +1118,11 @@ def main():
 
     try:
         auto = carregar_dados_automaticos(json_path)
+    except KeyError as e:
+        print(f"❌  JSON inválido ou incompleto: chave ausente {e}", file=sys.stderr)
+        print(f"    Verifique se o arquivo é um results_report.json gerado pelo results_report.py.",
+              file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
         print(f"❌  Erro ao ler JSON: {e}", file=sys.stderr)
         sys.exit(1)

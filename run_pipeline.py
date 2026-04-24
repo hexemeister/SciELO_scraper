@@ -82,13 +82,22 @@ if hasattr(sys.stdout, "reconfigure"):
 HERE = Path(__file__).parent
 
 DEPS = {
-    "requests":       "requests",
-    "bs4":            "beautifulsoup4",
-    "lxml":           "lxml",
-    "pandas":         "pandas",
-    "tqdm":           "tqdm",
-    "brotli":         "brotli",
-    "matplotlib":     "matplotlib",
+    "requests":         "requests",
+    "bs4":              "beautifulsoup4",
+    "lxml":             "lxml",
+    "pandas":           "pandas",
+    "tqdm":             "tqdm",
+    "brotli":           "brotli",
+    "matplotlib":       "matplotlib",
+    # results_report.py (Venn/UpSet)
+    "matplotlib_venn":  "matplotlib-venn",
+    "upsetplot":        "upsetplot",
+    # scielo_wordcloud.py
+    "wordcloud":        "wordcloud",
+    "nltk":             "nltk",
+    "PIL":              "pillow",
+    # prisma_workflow.py
+    "reportlab":        "reportlab",
 }
 
 ESTRATEGIAS = [
