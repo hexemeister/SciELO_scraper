@@ -132,6 +132,7 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
 | Auto-descoberta do JSON (sem parâmetro) | `uv run python prisma_workflow.py` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
+| Estilo fiel ao template oficial PRISMA | `uv run python prisma_workflow.py results_report.json --style template` | `prisma_<stem>_pt_<ts>.pdf` (layout template oficial) | Diretório do JSON |
 | Estilo artístico (tipografia refinada) | `uv run python prisma_workflow.py results_report.json --style artistic` | `prisma_<stem>_pt_<ts>.pdf` (layout Systemic Passage) | Diretório do JSON |
 | Gerar PDF PRISMA (campos humanos em branco) | `uv run python prisma_workflow.py results_report.json` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
 | Com campos humanos via CLI | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem |
@@ -946,6 +947,7 @@ Preencher no PDF após curadoria, ou passar via CLI/arquivo:
 ### Opções completas
 
 ```bash
+uv run python prisma_workflow.py results_report.json --style template   # template oficial PRISMA 2020
 uv run python prisma_workflow.py results_report.json --style artistic   # estilo artístico (Systemic Passage)
 uv run python prisma_workflow.py results_report.json --lang en          # PDF em inglês (default: pt)
 uv run python prisma_workflow.py results_report.json --output-dir pdfs/ # pasta de saída
@@ -956,12 +958,13 @@ uv run python prisma_workflow.py -?                                     # ajuda
 
 ### Estilos de PDF
 
-| Estilo | Flag | Visual | Campos editáveis |
+| Estilo | Flag | Visual | Campos n= |
 |---|---|---|---|
-| `default` | (padrão) | Diagrama funcional clássico, caixas azuis/cinzas com borda tracejada | Todos os campos humanos via AcroForm |
-| `artistic` | `--style artistic` | *Systemic Passage*: GeistMono + IBMPlexSerif, paleta azul institucional, watermark "EVIDENCE", grid faint | Campos AcroForm transparentes sobrepostos exatamente nos números n= |
+| `default` | (padrão) | Diagrama funcional, faixas de fase coloridas, caixas azuis (auto) e cinzas tracejadas (humano) | Todos como AcroForm — automáticos pré-preenchidos (fundo azul), humanos em branco (fundo branco) |
+| `template` | `--style template` | Replica fiel ao layout oficial PRISMA 2020 Word/PDF: fundo branco, bordas pretas, bandas de fase verticais à esquerda | Todos como AcroForm — automáticos pré-preenchidos (fundo azul claro), humanos em branco (fundo amarelo claro) |
+| `artistic` | `--style artistic` | *Systemic Passage*: GeistMono + IBMPlexSerif, paleta azul institucional, watermark "EVIDENCE", grid faint | AcroForm transparentes sobrepostos nos números n= (automáticos em bold fixo, humanos editáveis) |
 
-No estilo `artistic`: dados automáticos (total buscado, triagem calculada) aparecem em texto fixo bold; campos humanos mostram `n =` fixo e um campo editável discreto apenas para o número. O PDF tem aparência publication-ready mesmo antes do preenchimento.
+Em todos os estilos: os dados automáticos (total buscado, screened, automation, erros) ficam pré-preenchidos nos campos AcroForm — o usuário pode corrigi-los se necessário. Os campos humanos ficam em branco (ou com valor se passado via CLI/arquivo), prontos para preenchimento no Adobe Acrobat ou qualquer leitor PDF com suporte a formulários.
 
 ### Formato do arquivo `--human-data`
 

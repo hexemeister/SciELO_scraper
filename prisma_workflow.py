@@ -62,7 +62,7 @@ def _verificar_deps():
 
 _verificar_deps()
 
-__version__ = "1.1"
+__version__ = "1.3"
 
 # ---------------------------------------------------------------------------
 # Strings i18n
@@ -463,18 +463,16 @@ def _wrap_text(c, txt: str, x: float, y: float, max_w: float,
 
 def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
     """
-    Gera o PDF PRISMA 2020 A4.
+    Gera o PDF PRISMA 2020 A4 — estilo 'default'.
 
-    Design de campos:
-      - Campos automáticos (auto=True): caixa azul sólida, texto branco no canvas, não editável.
-      - Campos humanos (auto=False): caixa cinza com borda tracejada.
-        O label (descrição) é desenhado no canvas (não editável).
-        Um campo AcroForm pequeno é criado APENAS para o número (n = ?).
-        O usuário vê o texto descritivo sempre e edita apenas o número.
+    Todos os campos numéricos são AcroForm editáveis.
+    Campos automáticos: fundo azul, pré-preenchidos (editáveis caso necessário).
+    Campos humanos: fundo cinza tracejado, valor pré-preenchido se disponível, em branco caso contrário.
     """
     try:
         from reportlab.pdfgen import canvas as rl_canvas
         from reportlab.lib.pagesizes import A4
+        from reportlab.lib.colors import Color
     except ImportError:
         print("❌  reportlab não instalado. Execute: uv pip install reportlab",
               file=sys.stderr)
@@ -495,129 +493,106 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
     LINE_H       = 8.5
     FASE_H       = 16.0     # altura do cabeçalho de fase
     COL_GAP      = 14.0     # gap horizontal entre col_l e col_r
+    N_FIELD_W    = 40.0     # largura campo AcroForm numérico
+    N_FIELD_H    = 13.0     # altura campo AcroForm numérico
 
     AREA_W  = W - 2 * MARGEM
-    COL_L_W = AREA_W * 0.52          # coluna esquerda (fluxo principal)
-    COL_R_W = AREA_W - COL_L_W - COL_GAP  # coluna direita (exclusões)
+    COL_L_W = AREA_W * 0.52
+    COL_R_W = AREA_W - COL_L_W - COL_GAP
     COL_L_X = MARGEM
     COL_R_X = MARGEM + COL_L_W + COL_GAP
-    CX_L    = COL_L_X + COL_L_W / 2  # centro horizontal coluna esq
+    CX_L    = COL_L_X + COL_L_W / 2
 
     c = rl_canvas.Canvas(str(output_path), pagesize=A4)
 
     # ---- helpers internos ---------------------------------------------------
 
-    def _n(val) -> str:
-        return str(val) if val is not None else "?"
+    def _sanitize(txt: str) -> str:
+        replacements = {
+            "\u2014": "-", "\u2013": "-",
+            "\u2018": "'", "\u2019": "'",
+            "\u201c": '"', "\u201d": '"',
+            "\u2026": "...",
+        }
+        for ch, rep in replacements.items():
+            txt = txt.replace(ch, rep)
+        return txt.encode("latin-1", errors="replace").decode("latin-1")
 
-    def _count_lines(txt: str, max_w: float, font: str = "Helvetica",
-                     size: float = FONT_SIZE) -> int:
-        """Conta linhas necessárias para caber txt em max_w."""
+    def _count_lines(txt: str, max_w: float, font: str = "Helvetica") -> int:
         n = 0
         for line in txt.split("\n"):
             words = line.split()
             if not words:
-                n += 1
-                continue
+                n += 1; continue
             cur = ""
             for word in words:
                 test = (cur + " " + word).strip()
-                if stringWidth(test, font, size) <= max_w - 2 * PAD_H:
+                if stringWidth(test, font, FONT_SIZE) <= max_w - 2 * PAD_H:
                     cur = test
                 else:
-                    if cur:
-                        n += 1
+                    if cur: n += 1
                     cur = word
-            if cur:
-                n += 1
+            if cur: n += 1
         return max(1, n)
 
     def _box_h(txt: str, w: float, font: str = "Helvetica") -> float:
-        n = _count_lines(txt, w, font)
-        return max(26.0, n * LINE_H + 2 * PAD_V)
+        return max(30.0, _count_lines(txt, w, font) * LINE_H + 2 * PAD_V + N_FIELD_H + PAD_V)
 
-    def _draw_text_in_box(txt: str, x: float, y_top: float, w: float,
-                           h: float, font: str, cor_texto):
-        """Desenha texto centrado verticalmente dentro da caixa."""
-        lines_raw = txt.split("\n")
-        # Expande quebras automáticas
-        all_lines = []
-        for line in lines_raw:
+    def _wrap_lines(txt: str, max_w: float, font: str = "Helvetica") -> list[str]:
+        result = []
+        for line in txt.split("\n"):
             words = line.split()
             if not words:
-                all_lines.append("")
-                continue
+                result.append(""); continue
             cur = ""
             for word in words:
                 test = (cur + " " + word).strip()
-                if stringWidth(test, font, FONT_SIZE) <= w - 2 * PAD_H:
+                if stringWidth(test, font, FONT_SIZE) <= max_w - 2 * PAD_H:
                     cur = test
                 else:
-                    if cur:
-                        all_lines.append(cur)
+                    if cur: result.append(cur)
                     cur = word
-            if cur:
-                all_lines.append(cur)
+            if cur: result.append(cur)
+        return result
 
-        total_text_h = len(all_lines) * LINE_H
-        # Centraliza verticalmente
-        y_start = y_top - (h - total_text_h) / 2 - FONT_SIZE + 1
-
-        c.setFont(font, FONT_SIZE)
-        c.setFillColor(cor_texto)
-        for i, line in enumerate(all_lines):
-            c.drawCentredString(x + w / 2, y_start - i * LINE_H, line)
-
-    def _sanitize_acroform(txt: str) -> str:
-        """Remove/substitui caracteres fora do latin-1 que o AcroForm não aceita."""
-        replacements = {
-            "\u2014": "-", "\u2013": "-",  # em dash, en dash
-            "\u2018": "'", "\u2019": "'",  # curly apostrophes
-            "\u201c": '"', "\u201d": '"',  # curly quotes
-            "\u2026": "...",               # ellipsis
-        }
-        for ch, rep in replacements.items():
-            txt = txt.replace(ch, rep)
-        # fallback: strip anything still outside latin-1
-        return txt.encode("latin-1", errors="replace").decode("latin-1")
+    def _acro_num(field_name: str, value, x: float, y: float,
+                  auto: bool, tooltip: str = ""):
+        """Cria campo AcroForm numérico. auto=True → fundo azul claro; False → branco."""
+        val_str = _sanitize(str(value)) if value is not None else ""
+        bg = _rgb((0.88, 0.93, 0.98)) if auto else _rgb((1.0, 1.0, 1.0))
+        border = _rgb(_COR_AUTO) if auto else _rgb(_COR_BORDA)
+        text_c = _rgb((0.06, 0.25, 0.55)) if auto else _rgb((0.1, 0.1, 0.6))
+        c.acroForm.textfield(
+            name=field_name,
+            tooltip=_sanitize(tooltip or field_name),
+            x=x, y=y,
+            width=N_FIELD_W, height=N_FIELD_H,
+            fontSize=FONT_SIZE + 1.5,
+            borderColor=border,
+            fillColor=bg,
+            textColor=text_c,
+            value=val_str,
+            forceBorder=True,
+            borderWidth=0.8 if auto else 0.6,
+        )
 
     def draw_box(label: str, n_val, x: float, y_top: float, w: float,
                  auto: bool, field_name: str = "") -> float:
         """
-        Desenha caixa e retorna y_bottom.
-
-        Parâmetros:
-          label     — texto descritivo da caixa (sem o número)
-          n_val     — valor numérico (int/None). None = campo humano não preenchido.
-          auto      — True: caixa azul não editável. False: caixa cinza com campo numérico editável.
-          field_name— nome do campo AcroForm (usado se auto=False)
-
-        Design:
-          - auto=True : texto completo "label (n = N)" em branco no canvas
-          - auto=False: label descritivo em cinza no canvas (fixo) +
-                        campo AcroForm pequeno apenas para o número
+        Desenha caixa com label fixo no canvas + campo AcroForm para o número.
+        auto=True: fundo azul (automático, pré-preenchido).
+        auto=False: fundo cinza tracejado (humano).
+        Retorna y_bottom.
         """
-        N_FIELD_W  = 38.0   # largura do campo numérico
-        N_FIELD_H  = 14.0   # altura do campo numérico
-        FONT_LABEL = "Helvetica"
-        FONT_AUTO  = "Helvetica-Bold"
-
-        # Texto completo para calcular altura
-        n_str = str(n_val) if n_val is not None else "?"
-        if auto:
-            full_txt = f"{label}\n(n = {n_str})"
-            font = FONT_AUTO
-        else:
-            full_txt = label  # só o label para calcular altura (número ocupa linha extra)
-            font = FONT_LABEL
-
-        h = max(34.0, _box_h(full_txt, w, font) + (0 if auto else N_FIELD_H + PAD_V))
+        font = "Helvetica-Bold" if auto else "Helvetica"
+        lines = _wrap_lines(label, w, font)
+        h = max(30.0, len(lines) * LINE_H + 2 * PAD_V + N_FIELD_H + PAD_V)
 
         cor_fundo = _rgb(_COR_AUTO if auto else _COR_HUMANO)
         cor_borda = _rgb(_COR_AUTO if auto else _COR_BORDA)
         cor_texto = _rgb(_COR_TEXTO_AUTO if auto else _COR_TEXTO_HUMANO)
 
-        # --- Retângulo de fundo ---
+        # Retângulo de fundo
         c.setLineWidth(1.2 if auto else 0.7)
         c.setStrokeColor(cor_borda)
         c.setFillColor(cor_fundo)
@@ -629,61 +604,32 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
             c.roundRect(x, y_top - h, w, h, 4, fill=0, stroke=1)
             c.setDash()
 
-        if auto:
-            _draw_text_in_box(full_txt, x, y_top, w, h, FONT_AUTO, cor_texto)
-        else:
-            # Desenhar label descritivo no canvas (texto fixo, não editável)
-            label_h = _box_h(label, w, FONT_LABEL)
-            label_area_h = h - N_FIELD_H - PAD_V
-            lines_raw = label.split("\n")
-            all_lines = []
-            for line in lines_raw:
-                words = line.split()
-                if not words:
-                    all_lines.append("")
-                    continue
-                cur = ""
-                for word in words:
-                    test = (cur + " " + word).strip()
-                    if stringWidth(test, FONT_LABEL, FONT_SIZE) <= w - 2 * PAD_H:
-                        cur = test
-                    else:
-                        if cur:
-                            all_lines.append(cur)
-                        cur = word
-                if cur:
-                    all_lines.append(cur)
+        # Texto do label — centralizado no topo da caixa
+        total_lh = len(lines) * LINE_H
+        # Posiciona texto: ocupa a parte superior, número fica na parte inferior
+        area_texto_h = h - N_FIELD_H - PAD_V
+        y_txt = y_top - (area_texto_h - total_lh) / 2 - FONT_SIZE
+        c.setFont(font, FONT_SIZE)
+        c.setFillColor(cor_texto)
+        for line in lines:
+            c.drawCentredString(x + w / 2, y_txt, line)
+            y_txt -= LINE_H
 
-            c.setFont(FONT_LABEL, FONT_SIZE)
-            c.setFillColor(cor_texto)
-            total_lh = len(all_lines) * LINE_H
-            y_txt = y_top - PAD_V - FONT_SIZE + 1
-            for line in all_lines:
-                c.drawCentredString(x + w / 2, y_txt, line)
-                y_txt -= LINE_H
+        # "n =" label à esquerda do campo
+        field_y  = y_top - h + PAD_V
+        field_x  = x + (w - N_FIELD_W) / 2
+        label_n_x = field_x - 3
+        c.setFont("Helvetica", FONT_SIZE)
+        c.setFillColor(cor_texto)
+        c.drawRightString(label_n_x, field_y + (N_FIELD_H - FONT_SIZE) / 2, "n =")
 
-            # Campo AcroForm apenas para o número — no rodapé da caixa
-            field_y = y_top - h + PAD_V
-            field_x = x + (w - N_FIELD_W) / 2
-            _val_safe = _sanitize_acroform(str(n_val) if n_val is not None else "")
-            c.acroForm.textfield(
-                name=field_name or f"field_{label[:10]}",
-                tooltip=_sanitize_acroform(f"n = {n_str}"),
-                x=field_x,
-                y=field_y,
-                width=N_FIELD_W,
-                height=N_FIELD_H,
-                fontSize=FONT_SIZE + 1,
-                borderColor=_rgb(_COR_BORDA),
-                fillColor=_rgb((1.0, 1.0, 1.0)),
-                textColor=_rgb((0.1, 0.1, 0.6)),
-                value=_val_safe,
-                forceBorder=True,
-            )
-            # Label "n = " à esquerda do campo
-            c.setFont(FONT_LABEL, FONT_SIZE)
-            c.setFillColor(cor_texto)
-            c.drawRightString(field_x - 2, field_y + 3, "n =")
+        # Campo AcroForm
+        _acro_num(
+            field_name or f"f_{label[:12].replace(' ', '_')}",
+            n_val, field_x, field_y,
+            auto=auto,
+            tooltip=label,
+        )
 
         return y_top - h
 
@@ -739,7 +685,6 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
         aviso = s("aviso_parcial", lang)
         c.setFont("Helvetica-Oblique", 6.5)
         c.setFillColor(_rgb((0.7, 0.3, 0.0)))
-        # Quebra em 2 linhas se necessário
         if stringWidth(aviso, "Helvetica-Oblique", 6.5) > AREA_W:
             meio = len(aviso) // 2
             espaco = aviso.rfind(" ", 0, meio)
@@ -759,153 +704,117 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
 
     # =========================================================================
     # FASE 1 — IDENTIFICAÇÃO
-    # Layout oficial PRISMA 2020:
-    #   Esq: "Records identified from databases (n=X)"
-    #   Dir: caixa única "Records removed before screening" com 3 sub-itens:
-    #        • Duplicate records removed (n=?)
-    #        • Marked ineligible by automation tools (n=X)
-    #        • Removed for other reasons (n=X)
-    #   Seta horizontal: esq → dir (meio da esq)
-    #   ↓
-    #   Esq: "Records screened (n=X)"
     # =========================================================================
     y = draw_fase(s("fase_identificacao", lang), y)
 
-    # --- Coluna esquerda: identificados ---
-    lbl_id = s("id_databases_label", lang)
-    y0       = y
-    y_id_bot = draw_box(lbl_id, dados["total_buscado"], COL_L_X, y0, COL_L_W, auto=True)
-
-    # --- Coluna direita: caixa multi-item "removidos antes da triagem" ---
-    # Esta caixa é composta (3 sub-items com marcador); 2 são auto, 1 é editável
-    # Desenhamos como uma única caixa com texto canvas e um campo AcroForm para duplicatas
-    dup    = dados.get("duplicates")   # pode ser None (editável)
-    n_aut  = dados.get("automation_removed", 0)
-    n_out  = dados.get("erros_outros", 0)
+    dup   = dados.get("duplicates", 0)
+    n_aut = dados.get("automation_removed", 0)
+    n_out = dados.get("erros_outros", 0)
 
     lbl_removed = s("id_removed_label", lang)
     lbl_dup     = s("id_duplicates_label", lang)
     lbl_aut     = s("id_automation_label", lang)
     lbl_out     = s("id_other_label", lang)
 
-    # Calcula altura: título + 3 sub-itens (cada um ~2 linhas) + campo numérico para dup
-    removed_lines = (
+    # Coluna esquerda: identificados
+    y0       = y
+    y_id_bot = draw_box(s("id_databases_label", lang), dados["total_buscado"],
+                        COL_L_X, y0, COL_L_W, auto=True, field_name="total_buscado")
+
+    # Coluna direita: caixa "removidos antes da triagem" (composta)
+    # Calcula altura para 4 linhas de texto + 3 campos numéricos inline
+    sub_lines = (
         f"{lbl_removed}\n"
-        f"  • {lbl_dup}\n"
-        f"  • {lbl_aut} (n = {_n(n_aut)})\n"
-        f"  • {lbl_out} (n = {_n(n_out)})"
+        f"  {lbl_dup}\n"
+        f"  {lbl_aut}\n"
+        f"  {lbl_out}"
     )
-    N_FIELD_W = 38.0
-    N_FIELD_H = 14.0
-    h_removed = max(60.0, _box_h(removed_lines, COL_R_W, "Helvetica") + N_FIELD_H + PAD_V * 2)
+    h_removed = max(72.0, _count_lines(sub_lines, COL_R_W, "Helvetica") * LINE_H
+                    + 3 * (N_FIELD_H + 3) + 2 * PAD_V + 6)
 
-    # Desenhar fundo cinza tracejado (duplicatas é editável) ou azul (se já preenchido)
-    if dup is not None:
-        c.setFillColor(_rgb(_COR_AUTO))
-        c.setStrokeColor(_rgb(_COR_AUTO))
-        c.setLineWidth(1.2)
-        c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=1, stroke=1)
-    else:
-        c.setFillColor(_rgb(_COR_HUMANO))
-        c.setStrokeColor(_rgb(_COR_BORDA))
-        c.setLineWidth(0.7)
-        c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=1, stroke=0)
-        c.setDash(3, 2)
-        c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=0, stroke=1)
-        c.setDash()
+    # Fundo da caixa composta — sempre cinza (tem campos editáveis)
+    c.setFillColor(_rgb(_COR_HUMANO))
+    c.setStrokeColor(_rgb(_COR_BORDA))
+    c.setLineWidth(0.7)
+    c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=1, stroke=0)
+    c.setDash(3, 2)
+    c.roundRect(COL_R_X, y0 - h_removed, COL_R_W, h_removed, 4, fill=0, stroke=1)
+    c.setDash()
 
-    # Texto canvas: título + sub-itens fixos
-    cor_txt_r = _rgb(_COR_TEXTO_AUTO if dup is not None else _COR_TEXTO_HUMANO)
+    # Sub-itens com campo AcroForm inline para cada número
+    sub_items = [
+        (lbl_dup, dup,   "duplicates"),
+        (lbl_aut, n_aut, "automation_removed"),
+        (lbl_out, n_out, "other_removed"),
+    ]
+    # Layout da caixa composta: título no topo, depois sub-itens separados
+    titulo_lines = _wrap_lines(lbl_removed, COL_R_W, "Helvetica-Bold")
+    # y_tit_start: baseline da primeira linha do título
+    y_tit_start = y0 - PAD_V - FONT_SIZE
+
+    cor_txt_r = _rgb(_COR_TEXTO_HUMANO)
     c.setFont("Helvetica-Bold", FONT_SIZE)
     c.setFillColor(cor_txt_r)
-    c.drawCentredString(COL_R_X + COL_R_W / 2, y0 - PAD_V - FONT_SIZE, lbl_removed)
+    for _i, _tl in enumerate(titulo_lines):
+        c.drawCentredString(COL_R_X + COL_R_W / 2, y_tit_start - _i * LINE_H, _tl)
 
-    c.setFont("Helvetica", FONT_SIZE)
-    y_sub = y0 - PAD_V - FONT_SIZE - LINE_H
-    c.drawString(COL_R_X + PAD_H, y_sub, f"• {lbl_dup}")
-    y_sub -= LINE_H
+    # Sub-itens começam após o título completo + separação de 5pt
+    y_sub = y_tit_start - len(titulo_lines) * LINE_H - 5
 
-    # Campo AcroForm para duplicatas (pequeno, só o número)
-    field_x_dup = COL_R_X + PAD_H + stringWidth(f"• {lbl_dup}  n = ", "Helvetica", FONT_SIZE)
-    field_y_dup = y_sub
-    c.drawString(COL_R_X + PAD_H + stringWidth(f"• {lbl_dup} ", "Helvetica", FONT_SIZE),
-                 y_sub + 1, "n =")
-    _dup_val_safe = _sanitize_acroform(str(dup) if dup is not None else "")
-    c.acroForm.textfield(
-        name="duplicates",
-        tooltip="Registros duplicados removidos",
-        x=COL_R_X + PAD_H + stringWidth(f"• {lbl_dup}  n =  ", "Helvetica", FONT_SIZE),
-        y=field_y_dup - 2,
-        width=N_FIELD_W,
-        height=N_FIELD_H,
-        fontSize=FONT_SIZE + 1,
-        borderColor=_rgb(_COR_BORDA),
-        fillColor=_rgb((1.0, 1.0, 1.0)),
-        textColor=_rgb((0.1, 0.1, 0.6)),
-        value=_dup_val_safe,
-        forceBorder=True,
-    )
-    y_sub -= (LINE_H + 2)
-    c.drawString(COL_R_X + PAD_H, y_sub,
-                 f"• {lbl_aut} (n = {_n(n_aut)})")
-    y_sub -= LINE_H
-    c.drawString(COL_R_X + PAD_H, y_sub,
-                 f"• {lbl_out} (n = {_n(n_out)})")
+    for lbl_s, val_s, fname_s in sub_items:
+        # Label à esquerda, alinhado ao centro vertical do campo AcroForm
+        mid_field = y_sub + N_FIELD_H / 2
+        c.setFont("Helvetica", FONT_SIZE - 0.3)
+        c.setFillColor(cor_txt_r)
+        c.drawString(COL_R_X + PAD_H, mid_field - (FONT_SIZE - 0.3) / 2, f"• {lbl_s}")
+        # "n =" + campo AcroForm alinhados à direita
+        n_lbl_x = COL_R_X + COL_R_W - N_FIELD_W - PAD_H - 12
+        c.drawRightString(n_lbl_x, mid_field - FONT_SIZE / 2, "n =")
+        is_auto_sub = (fname_s != "duplicates")
+        _acro_num(fname_s, val_s, n_lbl_x + 2, y_sub, auto=is_auto_sub, tooltip=lbl_s)
+        y_sub -= N_FIELD_H + 5
 
     y_removed_bot = y0 - h_removed
 
-    # Seta horizontal: esq → dir (ao nível do meio da caixa esq)
+    # Seta horizontal: esq → dir
     mid_id = (y0 + y_id_bot) / 2
     seta_h(COL_L_X + COL_L_W, COL_R_X, mid_id)
 
-    # Caixa screened — abaixo do mais baixo
+    # Caixa screened
     y_scr_top = min(y_id_bot, y_removed_bot) - GAP
-    lbl_scr   = s("id_screened_label", lang)
-    y_scr_bot = draw_box(lbl_scr, dados.get("screened"), COL_L_X, y_scr_top, COL_L_W, auto=True)
+    y_scr_bot = draw_box(s("id_screened_label", lang), dados.get("screened"),
+                         COL_L_X, y_scr_top, COL_L_W, auto=True, field_name="screened")
     seta_v(CX_L, y_id_bot, y_scr_top)
 
     y = y_scr_bot - GAP
 
     # =========================================================================
     # FASE 2 — TRIAGEM
-    # Layout oficial:
-    #   Linha 1: "Records screened" → seta → Linha 1:
-    #     Esq: "Reports sought for retrieval"  Dir: "Records excluded (n=?)"
-    #   ↓
-    #   Linha 2:
-    #     Esq: "Reports assessed for eligibility"  Dir: "Reports not retrieved (n=?)"
-    #   ↓
-    #   Linha 3 (só Dir):
-    #     Dir: "Reports excluded: Reason1 (n=?), ..."
     # =========================================================================
     y = draw_fase(s("fase_triagem", lang), y)
 
-    val_excl_scr = dados.get("excluded_screening")
-    val_sought   = dados.get("sought")
-    val_nr       = dados.get("not_retrieved")
-    val_assessed = dados.get("assessed")
+    val_excl_scr  = dados.get("excluded_screening")
+    val_sought    = dados.get("sought")
+    val_nr        = dados.get("not_retrieved")
+    val_assessed  = dados.get("assessed")
     val_excl_elig = dados.get("excluded_eligibility")
     reasons       = dados.get("excluded_reasons", [])
 
     # Linha 1: sought (esq) | excluded_screening (dir)
     y_t1 = y
     y_sought_bot   = draw_box(s("scr_sought_label", lang),   val_sought,
-                               COL_L_X, y_t1, COL_L_W,
-                               auto=(val_sought is not None), field_name="sought")
+                               COL_L_X, y_t1, COL_L_W, auto=False, field_name="sought")
     y_excl_scr_bot = draw_box(s("scr_excluded_label", lang), val_excl_scr,
-                               COL_R_X, y_t1, COL_R_W,
-                               auto=(val_excl_scr is not None), field_name="excluded_screening")
+                               COL_R_X, y_t1, COL_R_W, auto=False, field_name="excluded_screening")
     seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t1 + min(y_sought_bot, y_excl_scr_bot)) / 2)
     seta_v(CX_L, y_scr_bot, y_t1)
 
     # Linha 2: assessed (esq) | not_retrieved (dir)
     y_t2 = min(y_sought_bot, y_excl_scr_bot) - GAP
     y_assessed_bot = draw_box(s("scr_assessed_label", lang),     val_assessed,
-                               COL_L_X, y_t2, COL_L_W,
-                               auto=(val_assessed is not None), field_name="assessed")
+                               COL_L_X, y_t2, COL_L_W, auto=False, field_name="assessed")
     y_nr_bot       = draw_box(s("scr_not_retrieved_label", lang), val_nr,
-                               COL_R_X, y_t2, COL_R_W,
-                               auto=(val_nr is not None), field_name="not_retrieved")
+                               COL_R_X, y_t2, COL_R_W, auto=False, field_name="not_retrieved")
     seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t2 + min(y_assessed_bot, y_nr_bot)) / 2)
     seta_v(CX_L, y_sought_bot, y_t2)
 
@@ -916,8 +825,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
     if reasons_txt:
         lbl_excl_elig += f"\n{reasons_txt}"
     y_excl_elig_bot = draw_box(lbl_excl_elig, val_excl_elig,
-                                COL_R_X, y_t3, COL_R_W,
-                                auto=(val_excl_elig is not None),
+                                COL_R_X, y_t3, COL_R_W, auto=False,
                                 field_name="excluded_eligibility")
     seta_h(COL_L_X + COL_L_W, COL_R_X, (y_t3 + y_excl_elig_bot) / 2)
     seta_v(CX_L, y_assessed_bot, y_t3)
@@ -926,7 +834,6 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
 
     # =========================================================================
     # FASE 3 — INCLUSÃO
-    # Layout oficial: caixa única com "Studies included (n=X)" + "Reports of included (n=X)"
     # =========================================================================
     y = draw_fase(s("fase_inclusao", lang), y)
 
@@ -934,14 +841,12 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
     val_rep = dados.get("included_reports")
 
     y_inc_bot = draw_box(s("inc_studies_label", lang), val_inc,
-                         COL_L_X, y, COL_L_W,
-                         auto=(val_inc is not None), field_name="included_studies")
+                         COL_L_X, y, COL_L_W, auto=False, field_name="included_studies")
     seta_v(CX_L, y_t3, y)
 
     y_rep_top = y_inc_bot - GAP
     draw_box(s("inc_reports_label", lang), val_rep,
-             COL_L_X, y_rep_top, COL_L_W,
-             auto=(val_rep is not None), field_name="included_reports")
+             COL_L_X, y_rep_top, COL_L_W, auto=False, field_name="included_reports")
     seta_v(CX_L, y_inc_bot, y_rep_top)
 
     # =========================================================================
@@ -951,7 +856,6 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
     nota = s("nota_prisma", lang, ver=__version__, data=data_hoje)
     c.setFont("Helvetica", 5.5)
     c.setFillColor(_rgb((0.55, 0.55, 0.55)))
-    # Quebra em 2 linhas se necessário
     metade = len(nota) // 2
     espaco = nota.rfind(" ", 0, metade)
     if espaco > 0 and stringWidth(nota, "Helvetica", 5.5) > AREA_W:
@@ -1399,6 +1303,463 @@ def gerar_pdf_artistico(dados: dict, output_path: Path, lang: str = "pt"):  # no
 
 
 # ---------------------------------------------------------------------------
+# PDF template — replica fiel ao layout oficial PRISMA 2020
+# ---------------------------------------------------------------------------
+
+def gerar_pdf_template(dados: dict, output_path: Path, lang: str = "pt"):  # noqa: C901
+    """
+    Gera o PDF PRISMA 2020 no estilo 'template'.
+
+    Layout replica fielmente o template oficial Word/PDF do PRISMA 2020:
+      - Fundo branco, bordas pretas finas, setas pretas
+      - Colunas de rótulo de fase à esquerda (vertical)
+      - Fluxo principal ao centro, exclusões à direita
+      - Todos os números são campos AcroForm (automáticos pré-preenchidos,
+        humanos em branco ou com valor se disponível)
+    """
+    try:
+        from reportlab.pdfgen import canvas as rl_canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.colors import Color, black, white, HexColor
+    except ImportError:
+        print("❌  reportlab não instalado. Execute: uv pip install reportlab",
+              file=sys.stderr)
+        sys.exit(1)
+
+    from datetime import datetime as DT
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    W, H = A4
+
+    # ── Paleta fiel ao template oficial ──────────────────────────────────────
+    C_BLACK   = HexColor("#000000")
+    C_WHITE   = white
+    C_FASE_BG = HexColor("#d6e4f0")   # azul muito claro — cabeçalhos de fase
+    C_BOX_BG  = C_WHITE
+    C_BOX_STR = C_BLACK
+    C_AUTO_BG = HexColor("#eaf3fb")   # levíssimo azul para campos auto
+    C_HUMN_BG = HexColor("#fff9ec")   # levíssimo amarelo para campos humanos
+    C_ACRO_AUTO = HexColor("#1a4a82") # azul escuro — números automáticos
+    C_ACRO_HUMN = HexColor("#7a3800") # âmbar — números humanos
+
+    # ── Dimensões ────────────────────────────────────────────────────────────
+    ML   = 18.0    # margem lateral
+    MV   = 22.0    # margem vertical
+    PW   = W - 2 * ML    # largura útil
+
+    # Coluna de fase (lateral esquerda) — fiel ao template oficial
+    FASE_W  = 28.0
+    FASE_GAP = 5.0
+
+    # Coluna principal (flow) e coluna de exclusão
+    FLOW_X  = ML + FASE_W + FASE_GAP
+    FLOW_W  = (PW - FASE_W - FASE_GAP) * 0.57
+    EXCL_GAP = 8.0
+    EXCL_X  = FLOW_X + FLOW_W + EXCL_GAP
+    EXCL_W  = PW - FASE_W - FASE_GAP - FLOW_W - EXCL_GAP
+
+    CX_FLOW = FLOW_X + FLOW_W / 2
+    CX_EXCL = EXCL_X + EXCL_W / 2
+
+    # Fontes
+    FN      = "Helvetica"
+    FNB     = "Helvetica-Bold"
+    FS_LBL  = 6.8    # label nas caixas
+    FS_FASE = 6.5    # texto de fase (vertical)
+    LINE_H  = 8.2
+    PAD_H   = 6.0
+    PAD_V   = 5.0
+
+    # AcroForm campo numérico
+    NW = 38.0; NH = 12.0
+
+    # Espaçamentos verticais entre caixas
+    GAP_BOX = 8.0
+    GAP_FASE = 4.0
+
+    c = rl_canvas.Canvas(str(output_path), pagesize=A4)
+    c.setTitle(f"PRISMA 2020 Flow Diagram — {lang.upper()}")
+
+    # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _san(txt: str) -> str:
+        for ch, r in {"\u2014":"-","\u2013":"-","\u2018":"'","\u2019":"'",
+                      "\u201c":'"',"\u201d":'"',"\u2026":"..."}.items():
+            txt = txt.replace(ch, r)
+        return txt.encode("latin-1", errors="replace").decode("latin-1")
+
+    def _wrap(txt: str, max_w: float, font=FN, fs=FS_LBL) -> list[str]:
+        out = []
+        for line in txt.split("\n"):
+            words = line.split()
+            if not words:
+                out.append(""); continue
+            cur = ""
+            for w in words:
+                t = (cur + " " + w).strip()
+                if stringWidth(t, font, fs) <= max_w - 2 * PAD_H:
+                    cur = t
+                else:
+                    if cur: out.append(cur)
+                    cur = w
+            if cur: out.append(cur)
+        return out or [""]
+
+    def _box_h(lines_n: int, has_acro: bool = True) -> float:
+        return max(24.0, lines_n * LINE_H + 2 * PAD_V + (NH + PAD_V if has_acro else 0))
+
+    def _draw_box_rect(x, y_bot, w, h, bg=C_BOX_BG, stroke=C_BOX_STR, lw=0.6):
+        c.setFillColor(bg); c.setStrokeColor(stroke); c.setLineWidth(lw)
+        c.rect(x, y_bot, w, h, fill=1, stroke=1)
+
+    def _acro(fname, value, x, y, auto: bool, tip=""):
+        val_s = _san(str(value)) if value is not None else ""
+        bg_c  = C_AUTO_BG if auto else C_HUMN_BG
+        tc    = C_ACRO_AUTO if auto else C_ACRO_HUMN
+        bc    = HexColor("#3a7abf") if auto else HexColor("#c07020")
+        try:
+            c.acroForm.textfield(
+                name=fname, tooltip=_san(tip or fname),
+                x=x, y=y, width=NW, height=NH,
+                fontSize=FS_LBL + 1.5,
+                borderColor=bc, fillColor=bg_c, textColor=tc,
+                value=val_s, forceBorder=True, borderWidth=0.7,
+            )
+        except Exception:
+            c.setFont(FN, FS_LBL); c.setFillColor(tc)
+            c.drawString(x + 2, y + (NH - FS_LBL) / 2, val_s or "?")
+
+    def flow_box(label: str, value, fname: str, y_top: float,
+                 auto: bool = False) -> float:
+        """Caixa no fluxo principal. Retorna y_bottom."""
+        lines = _wrap(label, FLOW_W)
+        h = _box_h(len(lines))
+        y_bot = y_top - h
+        bg = C_AUTO_BG if auto else C_BOX_BG
+        _draw_box_rect(FLOW_X, y_bot, FLOW_W, h, bg=bg)
+
+        # Label
+        font = FNB if auto else FN
+        total_lh = len(lines) * LINE_H
+        area_lbl = h - NH - PAD_V
+        y_txt = y_top - (area_lbl - total_lh) / 2 - FS_LBL
+        c.setFont(font, FS_LBL); c.setFillColor(C_BLACK)
+        for ln in lines:
+            c.drawCentredString(CX_FLOW, y_txt, ln)
+            y_txt -= LINE_H
+
+        # "n =" + AcroForm
+        acro_x = CX_FLOW - NW / 2
+        acro_y = y_bot + PAD_V
+        n_lbl_x = acro_x - 2
+        c.setFont(FN, FS_LBL); c.setFillColor(C_BLACK)
+        c.drawRightString(n_lbl_x, acro_y + (NH - FS_LBL) / 2, "n =")
+        _acro(fname, value, acro_x, acro_y, auto=auto, tip=label)
+        return y_bot
+
+    def excl_box(label: str, value, fname: str, y_center: float,
+                 auto: bool = False) -> tuple[float, float]:
+        """Caixa de exclusão à direita, centrada em y_center. Retorna (y_top, y_bot)."""
+        lines = _wrap(label, EXCL_W)
+        h = _box_h(len(lines))
+        y_bot = y_center - h / 2
+        y_top = y_center + h / 2
+        bg = C_AUTO_BG if auto else C_BOX_BG
+        _draw_box_rect(EXCL_X, y_bot, EXCL_W, h, bg=bg, lw=0.5)
+
+        total_lh = len(lines) * LINE_H
+        area_lbl = h - NH - PAD_V
+        y_txt = y_top - (area_lbl - total_lh) / 2 - FS_LBL
+        c.setFont(FN, FS_LBL); c.setFillColor(C_BLACK)
+        for ln in lines:
+            c.drawCentredString(CX_EXCL, y_txt, ln)
+            y_txt -= LINE_H
+
+        acro_x = CX_EXCL - NW / 2
+        acro_y = y_bot + PAD_V
+        c.setFont(FN, FS_LBL); c.setFillColor(C_BLACK)
+        c.drawRightString(acro_x - 2, acro_y + (NH - FS_LBL) / 2, "n =")
+        _acro(fname, value, acro_x, acro_y, auto=auto, tip=label)
+        return y_top, y_bot
+
+    def compound_excl_box(title: str, items: list[tuple[str,object,str,bool]],
+                          y_center: float) -> tuple[float, float]:
+        """
+        Caixa composta de exclusão com título + N sub-itens, cada um com AcroForm inline.
+        items = [(label, value, fname, auto), ...]
+        Retorna (y_top, y_bot).
+        """
+        title_lines = _wrap(title, EXCL_W, FNB)
+        # Cada sub-item: 1 linha de texto + campo AcroForm
+        sub_h = NH + 3
+        total_h = max(30.0,
+                      len(title_lines) * LINE_H + PAD_V
+                      + len(items) * sub_h + PAD_V)
+        y_bot = y_center - total_h / 2
+        y_top = y_center + total_h / 2
+        _draw_box_rect(EXCL_X, y_bot, EXCL_W, total_h, lw=0.5)
+
+        # Título
+        yt = y_top - PAD_V - FS_LBL
+        c.setFont(FNB, FS_LBL); c.setFillColor(C_BLACK)
+        for ln in title_lines:
+            c.drawCentredString(CX_EXCL, yt, ln)
+            yt -= LINE_H
+
+        # Sub-itens
+        yt -= 2
+        for lbl_s, val_s, fn_s, auto_s in items:
+            sub_lines = _wrap(lbl_s, EXCL_W * 0.55, FN, FS_LBL - 0.5)
+            c.setFont(FN, FS_LBL - 0.5); c.setFillColor(C_BLACK)
+            c.drawString(EXCL_X + 3, yt + (NH - (FS_LBL - 0.5)) / 2,
+                         sub_lines[0] if sub_lines else lbl_s)
+            ax = EXCL_X + EXCL_W - NW - 3
+            c.drawRightString(ax - 2, yt + (NH - FS_LBL) / 2, "n =")
+            _acro(fn_s, val_s, ax, yt, auto=auto_s, tip=lbl_s)
+            yt -= sub_h
+
+        return y_top, y_bot
+
+    def arrow_v(x, y_from, y_to):
+        """Seta vertical de y_from para y_to (y_to < y_from)."""
+        c.setStrokeColor(C_BLACK); c.setFillColor(C_BLACK); c.setLineWidth(0.75)
+        c.line(x, y_from, x, y_to + 5)
+        aw = 3.5
+        p = c.beginPath()
+        p.moveTo(x - aw, y_to + 6); p.lineTo(x + aw, y_to + 6); p.lineTo(x, y_to)
+        p.close(); c.drawPath(p, fill=1, stroke=0)
+
+    def arrow_h(x_from, x_to, y):
+        """Seta horizontal da esq para dir."""
+        c.setStrokeColor(C_BLACK); c.setFillColor(C_BLACK); c.setLineWidth(0.65)
+        c.line(x_from, y, x_to - 5, y)
+        aw = 3.0
+        p = c.beginPath()
+        p.moveTo(x_to, y); p.lineTo(x_to - 6, y - aw); p.lineTo(x_to - 6, y + aw)
+        p.close(); c.drawPath(p, fill=1, stroke=0)
+
+    def fase_band(x, y_bot, w, h, label):
+        """Faixa de fase vertical (coluna esquerda)."""
+        c.setFillColor(C_FASE_BG); c.setStrokeColor(C_BLACK); c.setLineWidth(0.5)
+        c.rect(x, y_bot, w, h, fill=1, stroke=1)
+        c.saveState()
+        c.setFont(FNB, FS_FASE); c.setFillColor(C_BLACK)
+        c.translate(x + w / 2, y_bot + h / 2)
+        c.rotate(90)
+        c.drawCentredString(0, -FS_FASE / 2, label.upper())
+        c.restoreState()
+
+    # ── Labels i18n ──────────────────────────────────────────────────────────
+    L_PT = {
+        "title":     "Diagrama de Fluxo PRISMA 2020",
+        "subtitle":  "Referência: Page MJ et al. PRISMA 2020. BMJ 2021;372:n71. prisma-statement.org",
+        "id":        "Identificação",
+        "scr":       "Triagem",
+        "inc":       "Inclusão",
+        "db":        "Registros identificados nas bases de dados",
+        "other":     "Registros identificados em outras fontes",
+        "removed":   "Registros removidos antes da triagem",
+        "dup":       "Registros duplicados removidos",
+        "auto":      "Marcados inelegíveis por automação",
+        "other_rem": "Removidos por outros motivos (erros, PID inválido)",
+        "screened":  "Registros selecionados para triagem",
+        "excl_scr":  "Registros excluídos na triagem (título/resumo)",
+        "sought":    "Relatórios buscados para recuperação",
+        "not_retr":  "Relatórios não recuperados",
+        "assessed":  "Relatórios avaliados para elegibilidade",
+        "excl_elig": "Relatórios excluídos por elegibilidade",
+        "reasons_title": "Razões de exclusão",
+        "pop":       "Pop. inadequada",
+        "interv":    "Intervenção inadequada",
+        "outcome":   "Desfecho inadequado",
+        "other_r":   "Outros motivos",
+        "included":  "Estudos incluídos na revisão",
+        "inc_rep":   "Relatórios dos estudos incluídos",
+    }
+    L_EN = {
+        "title":     "PRISMA 2020 Flow Diagram",
+        "subtitle":  "Reference: Page MJ et al. PRISMA 2020. BMJ 2021;372:n71. prisma-statement.org",
+        "id":        "Identification",
+        "scr":       "Screening",
+        "inc":       "Included",
+        "db":        "Records identified from databases",
+        "other":     "Records identified from other sources",
+        "removed":   "Records removed before screening",
+        "dup":       "Duplicate records removed",
+        "auto":      "Records marked ineligible by automation tools",
+        "other_rem": "Records removed for other reasons (errors, invalid PID)",
+        "screened":  "Records screened",
+        "excl_scr":  "Records excluded (title/abstract screening)",
+        "sought":    "Reports sought for retrieval",
+        "not_retr":  "Reports not retrieved",
+        "assessed":  "Reports assessed for eligibility",
+        "excl_elig": "Reports excluded for eligibility",
+        "reasons_title": "Reasons for exclusion",
+        "pop":       "Wrong population",
+        "interv":    "Wrong intervention",
+        "outcome":   "Wrong outcome",
+        "other_r":   "Other reasons",
+        "included":  "Studies included in review",
+        "inc_rep":   "Reports of included studies",
+    }
+    L = L_PT if lang == "pt" else L_EN
+
+    # ── Dados ────────────────────────────────────────────────────────────────
+    d = dados
+    val = lambda k, dflt=None: d.get(k, dflt)
+
+    # ── Título ───────────────────────────────────────────────────────────────
+    y = H - MV
+    c.setFont(FNB, 11); c.setFillColor(C_BLACK)
+    c.drawCentredString(W / 2, y, L["title"])
+    y -= 12
+    c.setFont(FN, 5.5); c.setFillColor(HexColor("#555555"))
+    c.drawCentredString(W / 2, y, L["subtitle"])
+    y -= 10
+
+    # ── FASE IDENTIFICAÇÃO ───────────────────────────────────────────────────
+    # Calculamos altura da fase para desenhar a banda depois
+    id_y_top = y
+
+    # Box: databases
+    b_db = flow_box(L["db"], val("total_buscado"), "total_buscado", y, auto=True)
+    y_db_bot = b_db; y_db_mid = (id_y_top + y_db_bot) / 2
+
+    # Box composta: removidos antes da triagem (à direita)
+    excl_removed_items = [
+        (L["dup"],       val("duplicates", 0), "duplicates",        False),
+        (L["auto"],      val("automation_removed", 0), "automation_removed", True),
+        (L["other_rem"], val("erros_outros", 0),       "other_removed",     True),
+    ]
+    _, y_removed_bot = compound_excl_box(
+        L["removed"], excl_removed_items, y_db_mid)
+    arrow_h(FLOW_X + FLOW_W, EXCL_X, y_db_mid)
+
+    y = min(y_db_bot, y_removed_bot) - GAP_BOX
+
+    # Box: screened
+    b_scr = flow_box(L["screened"], val("screened"), "screened", y, auto=True)
+    arrow_v(CX_FLOW, y_db_bot, y)
+    y_scr_bot = b_scr
+    y_scr_mid = (y + y_scr_bot) / 2
+
+    id_y_bot = y_scr_bot - GAP_FASE
+    # Desenha banda de fase IDENTIFICAÇÃO
+    fase_band(ML, id_y_bot, FASE_W, id_y_top - id_y_bot, L["id"])
+
+    y = id_y_bot - GAP_FASE
+
+    # ── FASE TRIAGEM ─────────────────────────────────────────────────────────
+    scr_y_top = y
+
+    # Pré-calcula alturas das caixas de exclusão para posicionar sem overlap
+    # excl_scr: alinhada com screened (já calculado y_scr_mid acima)
+    # not_retr: alinhada com sought
+    # excl_elig composta: alinhada com assessed
+
+    # Box: sought for retrieval (primeiro calcula onde vai ficar)
+    y = y_scr_bot - GAP_BOX
+    b_sought = flow_box(L["sought"], val("sought"), "sought", y)
+    arrow_v(CX_FLOW, y_scr_bot, y)
+    y_sought_top = y; y_sought_bot = b_sought
+    y_sought_mid = (y_sought_top + y_sought_bot) / 2
+
+    # Box: assessed for eligibility
+    y = y_sought_bot - GAP_BOX
+    b_assessed = flow_box(L["assessed"], val("assessed"), "assessed", y)
+    arrow_v(CX_FLOW, y_sought_bot, y)
+    y_assessed_top = y; y_assessed_bot = b_assessed
+    y_assessed_mid = (y_assessed_top + y_assessed_bot) / 2
+
+    # Pré-calcula altura da caixa composta de razões para saber y_bottom
+    excl_reasons_items = [
+        (L["pop"],     None, "excl_pop",     False),
+        (L["interv"],  None, "excl_interv",  False),
+        (L["outcome"], None, "excl_outcome", False),
+        (L["other_r"], None, "excl_other",   False),
+    ]
+    _title_lines_reas = _wrap(L["excl_elig"], EXCL_W, FNB)
+    _sub_h_reas = NH + 3
+    _total_h_reas = max(30.0,
+        len(_title_lines_reas) * LINE_H + PAD_V
+        + len(excl_reasons_items) * _sub_h_reas + PAD_V)
+
+    # Garante que a caixa de razões não sobe acima da caixa de not_retr
+    # A caixa not_retr fica centrada em y_sought_mid
+    _not_retr_lines = _wrap(L["not_retr"], EXCL_W)
+    _not_retr_h = _box_h(len(_not_retr_lines))
+    _not_retr_top = y_sought_mid + _not_retr_h / 2
+    _not_retr_bot = y_sought_mid - _not_retr_h / 2
+
+    # Caixa de razões: centro = y_assessed_mid, mas garantindo que não sobe até not_retr
+    _reas_center = y_assessed_mid
+    _reas_top_candidate = _reas_center + _total_h_reas / 2
+    if _reas_top_candidate > _not_retr_bot - GAP_BOX / 2:
+        _reas_center = _not_retr_bot - GAP_BOX / 2 - _total_h_reas / 2
+
+    # Agora desenha as caixas de exclusão (sobre o canvas já desenhado)
+    # excl_scr — alinhada com screened
+    arrow_h(FLOW_X + FLOW_W, EXCL_X, y_scr_mid)
+    excl_box(L["excl_scr"], val("excluded_screening"), "excluded_screening", y_scr_mid)
+
+    # not_retr — alinhada com sought
+    arrow_h(FLOW_X + FLOW_W, EXCL_X, y_sought_mid)
+    excl_box(L["not_retr"], val("not_retrieved"), "not_retrieved", y_sought_mid)
+
+    # excl_elig composta — alinhada com assessed (ajustada para não sobrepor)
+    arrow_h(FLOW_X + FLOW_W, EXCL_X, y_assessed_mid)
+    _, y_excl_elig_bot = compound_excl_box(
+        L["excl_elig"], excl_reasons_items, _reas_center)
+
+    scr_y_bot = min(y_assessed_bot, y_excl_elig_bot) - GAP_FASE
+    # Desenha banda de fase TRIAGEM
+    fase_band(ML, scr_y_bot, FASE_W, scr_y_top - scr_y_bot, L["scr"])
+
+    y = scr_y_bot - GAP_FASE
+
+    # ── FASE INCLUSÃO ────────────────────────────────────────────────────────
+    inc_y_top = y
+
+    # Box: studies included
+    b_inc = flow_box(L["included"], val("included_studies"), "included_studies", y)
+    arrow_v(CX_FLOW, y_assessed_bot, y)
+    y_inc_bot = b_inc
+
+    y = y_inc_bot - GAP_BOX
+
+    # Box: reports of included studies
+    b_rep = flow_box(L["inc_rep"], val("included_reports"), "included_reports", y)
+    arrow_v(CX_FLOW, y_inc_bot, y)
+    y_rep_bot = b_rep
+
+    inc_y_bot = y_rep_bot - GAP_FASE
+    # Desenha banda de fase INCLUSÃO
+    fase_band(ML, inc_y_bot, FASE_W, inc_y_top - inc_y_bot, L["inc"])
+
+    # ── Rodapé ───────────────────────────────────────────────────────────────
+    data_hoje = DT.now().strftime("%Y-%m-%d")
+    c.setFont(FN, 5.0); c.setFillColor(HexColor("#888888"))
+    nota = (f"Gerado por prisma_workflow.py v{__version__} em {data_hoje}. "
+            f"O pipeline SciELO Scraper automatiza apenas a fase de Identificação. "
+            f"As fases de Triagem e Inclusão requerem curadoria humana.")
+    if lang == "en":
+        nota = (f"Generated by prisma_workflow.py v{__version__} on {data_hoje}. "
+                f"The SciELO Scraper pipeline automates only the Identification phase. "
+                f"The Screening and Included phases require human curation.")
+    mid_n = len(nota) // 2
+    sp_n = nota.rfind(" ", 0, mid_n)
+    if sp_n > 0 and stringWidth(nota, FN, 5.0) > W - 2 * ML:
+        c.drawCentredString(W / 2, MV - 4, nota[:sp_n])
+        c.drawCentredString(W / 2, MV - 10, nota[sp_n + 1:])
+    else:
+        c.drawCentredString(W / 2, MV - 7, nota)
+
+    c.showPage()
+    c.save()
+    print(f"  ✓ {output_path}")
+
+
+# ---------------------------------------------------------------------------
 # Descoberta automática de JSON
 # ---------------------------------------------------------------------------
 
@@ -1549,12 +1910,12 @@ def main():
     parser.add_argument("--dry-run", action="store_true",
                         help="Mostra os dados que seriam usados sem gerar o PDF.")
     parser.add_argument(
-        "--style", choices=["default", "artistic"], default="default",
+        "--style", choices=["default", "artistic", "template"], default="default",
         help=(
             "Estilo visual do PDF: "
-            "'default' (diagrama funcional clássico, padrão) | "
-            "'artistic' (layout Systemic Passage — tipografia refinada, paleta institucional, "
-            "campos editáveis apenas nos números n=)."
+            "'default' (diagrama funcional com todos os números AcroForm, padrão) | "
+            "'template' (replica fiel ao layout oficial PRISMA 2020 Word/PDF, todos os números AcroForm) | "
+            "'artistic' (layout Systemic Passage — tipografia refinada, paleta institucional)."
         ),
     )
     parser.add_argument("--version", action="version",
@@ -1631,6 +1992,8 @@ def main():
     print(f"\n  Gerando PDF... (estilo: {args.style})")
     if args.style == "artistic":
         gerar_pdf_artistico(dados, pdf_path, lang=args.lang)
+    elif args.style == "template":
+        gerar_pdf_template(dados, pdf_path, lang=args.lang)
     else:
         gerar_pdf(dados, pdf_path, lang=args.lang)
     print(f"\nPronto. PDF em: {pdf_path.resolve()}")
