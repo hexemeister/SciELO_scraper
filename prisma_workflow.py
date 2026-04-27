@@ -429,22 +429,9 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         "n_sought":             dados.get("sought"),
         "n_not_retrieved":      dados.get("not_retrieved"),
         "n_assessed":           dados.get("assessed"),
-        "n_excluded_reason1":   None,
-        "n_excluded_reason2":   None,
-        "n_excluded_reason3":   None,
-        "n_excluded_etc":       None,
         "n_included_studies":   dados.get("criterio_ok"),
         "n_included_reports":   dados.get("included_reports"),
     }
-
-    reasons = dados.get("excluded_reasons") or []
-    for i, r in enumerate(reasons[:4], 1):
-        key = f"n_excluded_reason{i}" if i < 4 else "n_excluded_etc"
-        parts = r.rsplit(":", 1)
-        try:
-            campo_map[key] = int(parts[-1].strip())
-        except (ValueError, IndexError):
-            campo_map[key] = None
 
     # Labels bilíngues
     LABELS_PT = {
@@ -596,12 +583,41 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         p.moveTo(x_json, rl_yt); p.lineTo(x_json - 3, rl_yt + 5); p.lineTo(x_json + 3, rl_yt + 5)
         p.close(); c.drawPath(p, fill=1, stroke=0)
 
+    # Mapa fase_id → lista de box ids para cálculo dinâmico do centro Y
+    _PHASE_BOXES = {
+        "phase_identification": ["box_identified", "box_removed_before_screening"],
+        "phase_screening":      ["box_screened", "box_excluded_screening",
+                                 "box_sought", "box_not_retrieved",
+                                 "box_assessed", "box_excluded_eligibility"],
+        "phase_included":       ["box_included"],
+    }
+    _box_by_id = {b["id"]: b for b in diag["boxes"]}
+
+    def _phase_y_center(phase_id: str) -> float:
+        """Calcula o centro Y visual (coords JSON) das caixas de uma fase."""
+        box_ids = _PHASE_BOXES.get(phase_id, [])
+        if not box_ids:
+            return 0.0
+        tops    = [_box_by_id[bid]["y_pt"] for bid in box_ids if bid in _box_by_id]
+        bottoms = [_box_by_id[bid]["y_pt"] + _box_by_id[bid]["h_pt"]
+                   for bid in box_ids if bid in _box_by_id]
+        return (min(tops) + max(bottoms)) / 2.0
+
     def phase_band(phase: dict, label: str):
-        """Faixa lateral rotacionada -90°."""
-        x = phase["x_pt"]; y = phase["y_pt"]
-        w = phase["w_pt"]; h = phase["h_pt"]
-        cx_rl = x + w / 2
-        cy_rl = PH - (y + h / 2)
+        """Faixa lateral rotacionada -90°, centralizada sobre as caixas da fase."""
+        h  = phase["h_pt"]   # espessura da faixa (ex: 20.7 pt)
+        w  = phase["w_pt"]   # comprimento visual após rotação
+
+        # Centro X fixo: a faixa fica encostada à margem esquerda da página.
+        # Usamos margem_esquerda/2 como centro, independente do x_pt do JSON
+        # (que pode ser negativo para a fase TRIAGEM no template original).
+        margin_l = meta["margin_left_pt"]
+        cx_rl = margin_l / 2
+
+        # Centro Y calculado dinamicamente para alinhar ao bloco de caixas
+        cy_json = _phase_y_center(phase["id"])
+        cy_rl   = PH - cy_json
+
         c.saveState()
         c.translate(cx_rl, cy_rl)
         c.rotate(90)
@@ -654,22 +670,70 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         pfx_w   = stringWidth(N_PFX, FONT, FS)
         n_block = pfx_w + ACRO_W + PAD_X + 2   # espaço reservado para "n = [campo]"
 
+        # ---- Tratamento especial: box de exclusões por elegibilidade --------
+        # Substituir N campos individuais por 1 textarea multilinha Courier,
+        # com formato col-25: "Motivo X" + espaços até col 25 + "n = ?"
+        if bid == "box_excluded_eligibility":
+            FONT_MONO = "Courier"
+            COL       = 25        # coluna onde "n = " começa
+            FS_MONO   = 8.0       # fonte ligeiramente menor para caber
+
+            # Nomes de motivo por idioma
+            motivo_lbl = "Motivo" if lang == "pt" else "Reason"
+
+            # Pré-preencher com razões fornecidas pelo pesquisador
+            reasons = dados.get("excluded_reasons") or []
+            lines_content = []
+            for i in range(1, 4):
+                if i - 1 < len(reasons):
+                    r = str(reasons[i - 1])
+                    # Separar "Texto: N" ou usar texto bruto como motivo
+                    parts = r.rsplit(":", 1)
+                    motivo_txt = parts[0].strip()
+                    qty        = parts[1].strip() if len(parts) == 2 else "?"
+                else:
+                    motivo_txt = f"{motivo_lbl} {i}"
+                    qty        = "?"
+                # Truncar motivo_txt para caber antes da coluna
+                motivo_txt = motivo_txt[:COL - 5] if len(motivo_txt) > COL - 5 else motivo_txt
+                padding    = " " * (COL - len(motivo_txt))
+                lines_content.append(f"{motivo_txt}{padding}n = {qty}")
+            lines_content.append("etc.")
+
+            field_value = "\n".join(lines_content)
+
+            # Área disponível abaixo do label da caixa
+            field_top_json = text_y - FS         # topo do campo em coords JSON
+            field_h        = by + bh - field_top_json - PAD_Y
+            field_w        = bw - PAD_X * 2
+
+            val_str = _sanitize(field_value)
+            c.acroForm.textfield(
+                name="excluded_eligibility_reasons",
+                tooltip=_sanitize("Motivos de exclusão por elegibilidade"),
+                x=text_x,
+                y=rl_y(field_top_json, field_h),
+                width=field_w,
+                height=field_h,
+                fontSize=FS_MONO,
+                fontName=FONT_MONO,
+                borderColor=_hex_to_rl("#000000"),
+                fillColor=_hex_to_rl("#FFFFFF"),
+                textColor=_hex_to_rl("#000000"),
+                value=val_str,
+                forceBorder=True,
+                borderWidth=0.5,
+                fieldFlags="multiline",
+            )
+            continue   # pula o loop genérico de n_fields para este box
+        # ---------------------------------------------------------------------
+
         for nf in n_fields:
             fid   = nf["id"]
             value = campo_map.get(fid)
 
             # Label do sub-item
             sub_lbl = LBL.get(fid, nf.get("label", "")).strip()
-
-            # "n_excluded_etc" é apenas texto informativo — sem campo n=
-            if fid == "n_excluded_etc":
-                if sub_lbl:
-                    for ln in _wrap(sub_lbl, bw - PAD_X * 2, FONT, FS):
-                        draw_text(ln, text_x, text_y, font=FONT, size=FS)
-                        text_y += LINE_H
-                else:
-                    text_y += LINE_H
-                continue
 
             if sub_lbl:
                 # Linhas do label: todas cabem em largura total da caixa,
@@ -695,12 +759,24 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
             draw_n_field(fid, value, bx, bw, text_y)
             text_y += LINE_H + 1
 
-    # Conectores
+    # Conectores — posições recalculadas a partir das bordas reais das caixas
     for conn in diag["connectors"]:
+        fb = _box_by_id.get(conn["from_box"])
+        tb = _box_by_id.get(conn["to_box"])
         if conn["direction"] == "horizontal":
-            arrow_h(conn["x_start_pt"], conn["x_end_pt"], conn["y_pt"])
+            # seta sai da borda direita de from_box → borda esquerda de to_box
+            x_start = fb["x_pt"] + fb["w_pt"] if fb else conn["x_start_pt"]
+            x_end   = tb["x_pt"]               if tb else conn["x_end_pt"]
+            # y = centro vertical de from_box (e to_box estão alinhadas horizontalmente)
+            y_mid   = fb["y_pt"] + fb["h_pt"] / 2 if fb else conn["y_pt"]
+            arrow_h(x_start, x_end, y_mid)
         else:
-            arrow_v(conn["x_pt"], conn["y_start_pt"], conn["y_end_pt"])
+            # seta sai da borda inferior de from_box → borda superior de to_box
+            y_start = fb["y_pt"] + fb["h_pt"] if fb else conn["y_start_pt"]
+            y_end   = tb["y_pt"]               if tb else conn["y_end_pt"]
+            # x = centro horizontal de from_box
+            x_mid   = fb["x_pt"] + fb["w_pt"] / 2 if fb else conn["x_pt"]
+            arrow_v(x_mid, y_start, y_end)
 
     # Rodapés
     foot_y   = 478.0
