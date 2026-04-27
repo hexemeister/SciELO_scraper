@@ -151,23 +151,20 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Validação de CSV:** se colunas esperadas não existirem, exibe quais colunas o arquivo tem e sugere o CSV correto (`resultado.csv` do scraper).
 - **Saída:** `wordcloud_{campo}_{lang}_{ts}.png` + `wordcloud_stats_{ts}.json`.
 
-## Comportamento do prisma_workflow.py (v1.3)
+## Comportamento do prisma_workflow.py (v2.0)
 
-- **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Todos os campos numéricos são AcroForm editáveis — automáticos pré-preenchidos, humanos em branco (ou com valor se fornecido).
+- **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Layout pixel-perfect baseado em `assets/PRISMAdiagram.json`, extraído do template oficial PRISMA 2020.
 - **Auto-descoberta de JSON:** se `results_report.json` não for passado, busca automaticamente no CWD → `runs/*/results_*/` → `results_*/`, ordenando por data de modificação (mais recente primeiro). Com múltiplos candidatos, lista opções e pede escolha.
 - **Entrada:** `results_report.json` gerado pelo `results_report.py` (path opcional, auto-descoberto se omitido).
-- **Todos os n= são AcroForm:** automáticos (total buscado, screened, automation, erros) ficam pré-preenchidos e editáveis (fundo azul); humanos ficam em branco ou com valor se passado via CLI/arquivo (fundo amarelo/branco).
+- **Todos os n= são AcroForm editáveis:** campos calculados automaticamente vêm pré-preenchidos; campos humanos ficam em branco. Sem distinção de cor — todos os campos têm o mesmo visual.
 - **`--lang pt|en`:** idioma do PDF. Padrão: `pt`.
 - **`-i / --interactive`:** modo interativo no terminal — lista campos humanos e solicita valores um a um.
 - **`--human-data ARQ`:** JSON ou CSV (key,value) com campos humanos pré-preenchidos.
 - **Flags de campos humanos:** `--duplicates`, `--excluded-screening`, `--sought`, `--not-retrieved`, `--assessed`, `--excluded-eligibility`, `--included`, `--included-reports`.
 - **`--output-dir DIR`:** pasta de saída. Padrão: diretório do JSON.
-- **`--style default|template|artistic`:** estilo visual do PDF:
-  - `default` — diagrama funcional, faixas coloridas de fase, todos os n= como AcroForm (padrão)
-  - `template` — replica fiel ao layout oficial PRISMA 2020 (Word/PDF), bandas de fase verticais à esquerda, fundo branco, bordas pretas, todos os n= como AcroForm
-  - `artistic` — estilo *Systemic Passage* (tipografia GeistMono/IBMPlexSerif, paleta azul institucional, watermark "EVIDENCE", grid faint)
 - **`--dry-run`:** mostra dados calculados sem gerar PDF.
 - **Saída:** `prisma_<stem>_<lang>_<ts>.pdf`
+- **Layout:** lê `assets/PRISMAdiagram.json` para posições, cores e geometria. Faixas de fase laterais (#9CC2E5), cabeçalho amarelo (#FFC000), caixas brancas com borda preta 0.5pt, setas block pretas.
 - **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. Triagem e Inclusão requerem curadoria humana após o processamento.
 
 ## Comportamento do scraper (scielo_scraper.py v2.4)

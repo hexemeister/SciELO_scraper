@@ -132,8 +132,6 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Pergunta / Objetivo | Comando | O que cria | Onde salva |
 |---|---|---|---|
 | Auto-descoberta do JSON (sem parâmetro) | `uv run python prisma_workflow.py` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
-| Estilo fiel ao template oficial PRISMA | `uv run python prisma_workflow.py results_report.json --style template` | `prisma_<stem>_pt_<ts>.pdf` (layout template oficial) | Diretório do JSON |
-| Estilo artístico (tipografia refinada) | `uv run python prisma_workflow.py results_report.json --style artistic` | `prisma_<stem>_pt_<ts>.pdf` (layout Systemic Passage) | Diretório do JSON |
 | Gerar PDF PRISMA (campos humanos em branco) | `uv run python prisma_workflow.py results_report.json` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
 | Com campos humanos via CLI | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem |
 | Modo interativo (terminal pergunta cada campo) | `uv run python prisma_workflow.py results_report.json -i` | Idem | Idem |
@@ -895,7 +893,7 @@ Se as colunas esperadas (`Titulo_PT`, `Resumo_PT`, `Palavras_Chave_PT`) não exi
 
 ## 15. Diagrama PRISMA 2020 com prisma_workflow.py
 
-Gera um PDF A4 preenchível com o Diagrama de Fluxo PRISMA 2020. A fase de **Identificação** é auto-preenchida a partir do `results_report.json` gerado pelo `results_report.py`. As fases de **Triagem** e **Inclusão** ficam como campos editáveis para preenchimento após curadoria humana.
+Gera um PDF A4 preenchível com o Diagrama de Fluxo PRISMA 2020. Layout pixel-perfect baseado no template oficial (`assets/PRISMAdiagram.json`). A fase de **Identificação** é auto-preenchida a partir do `results_report.json`. As fases de **Triagem** e **Inclusão** ficam como campos AcroForm editáveis para preenchimento após curadoria humana.
 
 > **Nota:** o pipeline automatiza apenas a fase de Identificação. Triagem e Inclusão dependem de revisão humana dos artigos.
 
@@ -928,6 +926,7 @@ uv run python prisma_workflow.py results_report.json --human-data campos_humanos
 | Registros para triagem (n) | Calculado: buscado − duplicatas − automação − erros |
 | Registros de automação (n) | Artigos marcados inelegíveis automaticamente |
 | Erros/outros (n) | `erro_extracao` + `erro_pid_invalido` |
+| Incluídos (sugestão) | `criterio_ok` (editável no PDF) |
 
 ### Campos humanos (Triagem e Inclusão)
 
@@ -947,8 +946,6 @@ Preencher no PDF após curadoria, ou passar via CLI/arquivo:
 ### Opções completas
 
 ```bash
-uv run python prisma_workflow.py results_report.json --style template   # template oficial PRISMA 2020
-uv run python prisma_workflow.py results_report.json --style artistic   # estilo artístico (Systemic Passage)
 uv run python prisma_workflow.py results_report.json --lang en          # PDF em inglês (default: pt)
 uv run python prisma_workflow.py results_report.json --output-dir pdfs/ # pasta de saída
 uv run python prisma_workflow.py results_report.json --dry-run          # mostrar dados sem gerar PDF
@@ -956,15 +953,9 @@ uv run python prisma_workflow.py --version                              # mostra
 uv run python prisma_workflow.py -?                                     # ajuda
 ```
 
-### Estilos de PDF
+### Campos AcroForm
 
-| Estilo | Flag | Visual | Campos n= |
-|---|---|---|---|
-| `default` | (padrão) | Diagrama funcional, faixas de fase coloridas, caixas azuis (auto) e cinzas tracejadas (humano) | Todos como AcroForm — automáticos pré-preenchidos (fundo azul), humanos em branco (fundo branco) |
-| `template` | `--style template` | Replica fiel ao layout oficial PRISMA 2020 Word/PDF: fundo branco, bordas pretas, bandas de fase verticais à esquerda | Todos como AcroForm — automáticos pré-preenchidos (fundo azul claro), humanos em branco (fundo amarelo claro) |
-| `artistic` | `--style artistic` | *Systemic Passage*: GeistMono + IBMPlexSerif, paleta azul institucional, watermark "EVIDENCE", grid faint | AcroForm transparentes sobrepostos nos números n= (automáticos em bold fixo, humanos editáveis) |
-
-Em todos os estilos: os dados automáticos (total buscado, screened, automation, erros) ficam pré-preenchidos nos campos AcroForm — o usuário pode corrigi-los se necessário. Os campos humanos ficam em branco (ou com valor se passado via CLI/arquivo), prontos para preenchimento no Adobe Acrobat ou qualquer leitor PDF com suporte a formulários.
+Todos os campos `n =` do diagrama são editáveis no PDF (AcroForm). Os que têm valor calculado automaticamente vêm pré-preenchidos; os demais ficam em branco. Não há distinção visual de cor entre campos automáticos e humanos — todos têm o mesmo estilo, facilitando microajustes manuais no Acrobat ou qualquer leitor PDF com suporte a formulários.
 
 ### Formato do arquivo `--human-data`
 
