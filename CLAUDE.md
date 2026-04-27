@@ -238,6 +238,34 @@ claude /resume  # retomar sessão anterior com histórico completo
 
 **Lembrete ao Claude:** ao final de qualquer tarefa concluída, sugerir `/compact` antes de encerrar.
 
+## Lições técnicas (prisma_workflow.py)
+
+### ReportLab — sistemas de coordenadas
+- JSON/DOCX: origem top-left, y cresce ↓
+- ReportLab: origem bottom-left, y cresce ↑
+- Conversão obrigatória: `rl_y = page_height - json_y_top - element_height`
+- Coordenadas extraídas de DOCX são relativas à âncora do shape (parágrafo, margem, página) — nunca usar direto; sempre recalcular a partir de relacionamentos lógicos
+
+### ReportLab — AcroForm
+- Campo multilinha: `fieldFlags="multiline"` (não `multiline=True`)
+- Alinhamento de colunas em campo editável: usar `fontName="Courier"` + padding com espaços até coluna fixa — tabs não são confiáveis em PDF
+- Pré-preenchimento: `value=` aceita string; usar `_sanitize()` para remover chars fora do latin-1
+
+### Posicionamento dinâmico vs. hardcoded
+- Nunca usar coordenadas de layout extraídas de DOCX para posicionamento relativo entre elementos — o referencial pode ser negativo ou fora da página
+- Sempre recalcular a partir de relacionamentos lógicos: centro de faixa = média entre top da primeira caixa e bottom da última da fase; início de seta = borda real da caixa de origem
+
+### Debugging visual de PDF
+Sempre converter para PNG e inspecionar antes de considerar pronto:
+```python
+import fitz  # pip: pymupdf
+doc = fitz.open("output.pdf")
+doc[0].get_pixmap(matrix=fitz.Matrix(2, 2)).save("preview.png")
+```
+
+### Planejamento antes de código
+Para tarefas com múltiplas interdependências visuais (layout, coordenadas, alinhamento): planejar por escrito e confirmar com o usuário antes de escrever código — evita múltiplas iterações de correção.
+
 ## O que NÃO alterar sem contexto
 
 - Lógica de extração HTML: funções `fetch_*`, `extract_*`, `is_article_page` em `scielo_scraper.py`
