@@ -407,123 +407,111 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     # LAYOUT — ajuste aqui para micro-tuning visual
     # =========================================================================
 
-    # -- Margem da folha (offset X onde o conteúdo começa) --------------------
-    MARGIN_LEFT = 36.0          # pt — margem esquerda da página
-
-    # -- Padding interno das caixas -------------------------------------------
-    PAD_X = 4.0                 # pt — padding horizontal (esquerda e direita)
-    PAD_Y = 4.0                 # pt — padding vertical (topo)
-
     # -- Tipografia -----------------------------------------------------------
-    FONT    = "Helvetica"
-    FONT_B  = "Helvetica-Bold"
-    FS      = 9.0               # pt — tamanho base do texto nas caixas
-    FS_FOOT = 7.0               # pt — tamanho do texto dos rodapés
-    LINE_H  = FS * 1.3         # pt — altura de linha (espaçamento entre linhas)
+    FONT      = "Helvetica"       # fonte padrão
+    FONT_B    = "Helvetica-Bold"  # fonte negrito (labels principais)
+    FONT_MONO = "Courier"         # fonte do campo multilinha de exclusões
+    FS        = 9.0               # pt — tamanho base do texto nas caixas
+    FS_MONO   = 8.0               # pt — tamanho da fonte no campo de exclusões
+    FS_FOOT   = 7.0               # pt — tamanho do texto dos rodapés
+    LINE_H    = FS * 1.3          # pt — altura de linha
 
     # -- Campos AcroForm n= ---------------------------------------------------
-    ACRO_W = 32.0               # pt — largura do campo numérico editável
-    ACRO_H = 11.0               # pt — altura do campo numérico editável
-    N_PFX  = "n = "            # texto estático prefixando o campo
+    ACRO_W = 32.0                 # pt — largura do campo numérico editável
+    ACRO_H = 11.0                 # pt — altura do campo numérico editável
+    N_PFX  = "n = "              # texto estático prefixando o campo
+
+    # -- Padding interno das caixas -------------------------------------------
+    PAD_X = 4.0                   # pt — padding horizontal (esquerda e direita)
+    PAD_Y = 4.0                   # pt — padding vertical (topo)
 
     # -- Cores ----------------------------------------------------------------
-    COR_FASE        = "#9CC2E5" # faixas laterais de fase (azul claro)
-    COR_HEADER_FILL = "#FFC000" # fundo do cabeçalho (amarelo)
+    COR_FASE          = "#9CC2E5" # faixas laterais de fase (azul claro)
+    COR_FASE_STROKE   = "#000000" # borda das faixas de fase
+    COR_HEADER_FILL   = "#FFC000" # fundo do cabeçalho (amarelo)
     COR_HEADER_STROKE = "#7F5F00" # borda do cabeçalho (dourado escuro)
-    COR_BOX_FILL    = "#FFFFFF" # fundo das caixas de conteúdo
-    COR_BOX_STROKE  = "#000000" # borda das caixas de conteúdo
-    COR_FASE_STROKE = "#000000" # borda das faixas de fase
-    COR_TEXTO       = "#000000" # cor padrão do texto
-    COR_SETA        = "#000000" # cor das setas conectoras
+    COR_BOX_FILL      = "#FFFFFF" # fundo das caixas de conteúdo
+    COR_BOX_STROKE    = "#000000" # borda das caixas de conteúdo
+    COR_TEXTO         = "#000000" # cor padrão do texto
+    COR_SETA          = "#000000" # cor das setas conectoras
 
-    # -- Gaps verticais entre elementos ---------------------------------------
-    # Todos os Y são calculados em cascata a partir destes gaps.
-    # Aumentar um gap empurra tudo abaixo dele para baixo.
-    MARGIN_TOP          = 36.0  # pt — distância do topo da página ao cabeçalho
-    GAP_HEADER_TO_ID    = 8.0   # pt — cabeçalho → caixas de identificação
-    GAP_ID_TO_SCREENING = 14.0  # pt — fim de identificação → início de triagem
-    GAP_SCREENING_BOXES = 14.0  # pt — entre cada caixa dentro da fase triagem
-    GAP_SCREENING_TO_INCLUDED = 14.0  # pt — fim de triagem → caixa incluídos
-    GAP_INCLUDED_TO_FOOTER    = 14.0  # pt — bottom da caixa incluídos → rodapé
+    # -- Estrutura horizontal -------------------------------------------------
+    # O diagrama é centralizado automaticamente na página a partir destas
+    # constantes. Alterar qualquer valor recalcula tudo em cascata.
+    #
+    #  |<-- MARGIN_LEFT -->|<- W_FASE ->|<- GAP_FASE_TO_COL ->|<- W_BOX ->|<- GAP_COLS ->|<- W_BOX ->|<-- MARGIN_RIGHT (=MARGIN_LEFT) -->|
+    #
+    W_FASE          = 20.7        # pt — espessura visual da faixa de fase
+    GAP_FASE_TO_COL = 55.2        # pt — faixa de fase → coluna esquerda
+    W_BOX           = 148.6       # pt — largura de todas as caixas
+    GAP_COLS        = 46.7        # pt — gap entre colunas (onde ficam as setas)
+
+    # Centralização horizontal: margem esquerda = margem direita
+    _diag_w   = W_FASE + GAP_FASE_TO_COL + W_BOX + GAP_COLS + W_BOX
+    MARGIN_LEFT = (PW - _diag_w) / 2
+
+    # Posições X derivadas em cascata
+    X_FASE    = MARGIN_LEFT                            # borda esquerda da faixa
+    X_COL_L   = MARGIN_LEFT + W_FASE + GAP_FASE_TO_COL  # coluna esquerda
+    X_COL_R   = X_COL_L + W_BOX + GAP_COLS             # coluna direita
+    W_HEADER  = W_BOX + GAP_COLS + W_BOX               # largura do cabeçalho
+
+    # -- Alturas das caixas ---------------------------------------------------
+    H_HEADER  = 20.71             # pt — cabeçalho amarelo
+    H_BOX_ID  = 97.9              # pt — identificação e removidos (par)
+    H_BOX_SM  = 41.45             # pt — caixas pequenas de triagem (5 caixas)
+    H_BOX_EXCL = 89.25            # pt — exclusões por elegibilidade
+    H_BOX_INCL = 57.0             # pt — estudos incluídos
+
+    # -- Gaps verticais -------------------------------------------------------
+    # Todos os Y são calculados em cascata. Aumentar um gap empurra tudo abaixo.
+    MARGIN_TOP               = 36.0  # pt — topo da página ao cabeçalho
+    GAP_HEADER_TO_ID         = 8.0   # pt — cabeçalho → identificação
+    GAP_ID_TO_SCREENING      = 14.0  # pt — identificação → triagem
+    GAP_SCREENING_BOXES      = 14.0  # pt — entre caixas dentro da triagem
+    GAP_SCREENING_TO_INCLUDED = 14.0 # pt — triagem → incluídos
+    GAP_INCLUDED_TO_FOOTER   = 14.0  # pt — incluídos → rodapé
 
     # =========================================================================
-    # POSIÇÕES Y CALCULADAS EM CASCATA
-    # (larguras, alturas e X vêm do JSON; Y é calculado aqui)
+    # POSIÇÕES X E Y CALCULADAS EM CASCATA
     # =========================================================================
 
+    # Y em cascata
+    y_header    = MARGIN_TOP
+    y_id        = y_header   + H_HEADER  + GAP_HEADER_TO_ID
+    y_screened  = y_id       + H_BOX_ID  + GAP_ID_TO_SCREENING
+    y_sought    = y_screened + H_BOX_SM  + GAP_SCREENING_BOXES
+    y_assessed  = y_sought   + H_BOX_SM  + GAP_SCREENING_BOXES
+    y_included  = y_assessed + H_BOX_SM  + GAP_SCREENING_TO_INCLUDED
+
+    # Coluna direita alinhada verticalmente com sua contraparte esquerda
+    y_removed   = y_id
+    y_excl_scr  = y_screened
+    y_not_retr  = y_sought
+    y_excl_elig = y_assessed
+
+    # Dicionário completo de geometria por caixa (sobrescreve o JSON)
     _box_by_id = {b["id"]: b for b in diag["boxes"]}
-
-    def _h(box_id):
-        return _box_by_id[box_id]["h_pt"]
-
-    # Calcular altura total do diagrama para centralização vertical
-    # (usando MARGIN_TOP=0 como base temporária)
-    _h_header    = _box_by_id["header"]["h_pt"]
-    _h_id        = _h("box_identified")
-    _h_screened  = _h("box_screened")
-    _h_sought    = _h("box_sought")
-    _h_assessed  = _h("box_assessed")
-    _h_included  = _h("box_included")
-
-    # Estimar altura total do bloco de rodapés (4 linhas a FS_FOOT*1.35 + gaps)
-    _h_footer_est = FS_FOOT * 1.35 * 6 + 2.0 * 4
-
-    _diag_total_h = (
-        _h_header
-        + GAP_HEADER_TO_ID    + _h_id
-        + GAP_ID_TO_SCREENING + _h_screened
-        + GAP_SCREENING_BOXES + _h_sought
-        + GAP_SCREENING_BOXES + _h_assessed
-        + GAP_SCREENING_TO_INCLUDED + _h_included
-        + GAP_INCLUDED_TO_FOOTER + _h_footer_est
-    )
-
-    # MARGIN_TOP ajustada para centralizar verticalmente na página
-    MARGIN_TOP = max(18.0, (PH - _diag_total_h) / 2)
-
-    # Cabeçalho
-    y_header = MARGIN_TOP
-
-    # Fase IDENTIFICAÇÃO — duas caixas lado a lado (mesma altura)
-    y_id = y_header + _box_by_id["header"]["h_pt"] + GAP_HEADER_TO_ID
-
-    # Fase TRIAGEM — caixas empilhadas na coluna esquerda
-    y_screened  = y_id + _h("box_identified") + GAP_ID_TO_SCREENING
-    y_sought    = y_screened  + _h("box_screened")  + GAP_SCREENING_BOXES
-    y_assessed  = y_sought    + _h("box_sought")    + GAP_SCREENING_BOXES
-
-    # Caixas da coluna direita alinhadas verticalmente com sua contraparte esquerda
-    y_removed   = y_id        # alinhada com box_identified
-    y_excl_scr  = y_screened  # alinhada com box_screened
-    y_not_retr  = y_sought    # alinhada com box_sought
-    y_excl_elig = y_assessed  # alinhada com box_assessed
-
-    # Fase INCLUÍDOS
-    y_included  = y_assessed + _h("box_assessed") + GAP_SCREENING_TO_INCLUDED
-
-    # Dicionário de override de Y (complementa x_pt/w_pt/h_pt do JSON)
-    _y_override = {
-        "header":                       y_header,
-        "box_identified":               y_id,
-        "box_removed_before_screening": y_removed,
-        "box_screened":                 y_screened,
-        "box_excluded_screening":       y_excl_scr,
-        "box_sought":                   y_sought,
-        "box_not_retrieved":            y_not_retr,
-        "box_assessed":                 y_assessed,
-        "box_excluded_eligibility":     y_excl_elig,
-        "box_included":                 y_included,
+    _geom_override = {
+        "header":                       {"x_pt": X_COL_L,  "y_pt": y_header,   "w_pt": W_HEADER,  "h_pt": H_HEADER},
+        "box_identified":               {"x_pt": X_COL_L,  "y_pt": y_id,        "w_pt": W_BOX,     "h_pt": H_BOX_ID},
+        "box_removed_before_screening": {"x_pt": X_COL_R,  "y_pt": y_removed,   "w_pt": W_BOX,     "h_pt": H_BOX_ID},
+        "box_screened":                 {"x_pt": X_COL_L,  "y_pt": y_screened,  "w_pt": W_BOX,     "h_pt": H_BOX_SM},
+        "box_excluded_screening":       {"x_pt": X_COL_R,  "y_pt": y_excl_scr,  "w_pt": W_BOX,     "h_pt": H_BOX_SM},
+        "box_sought":                   {"x_pt": X_COL_L,  "y_pt": y_sought,    "w_pt": W_BOX,     "h_pt": H_BOX_SM},
+        "box_not_retrieved":            {"x_pt": X_COL_R,  "y_pt": y_not_retr,  "w_pt": W_BOX,     "h_pt": H_BOX_SM},
+        "box_assessed":                 {"x_pt": X_COL_L,  "y_pt": y_assessed,  "w_pt": W_BOX,     "h_pt": H_BOX_SM},
+        "box_excluded_eligibility":     {"x_pt": X_COL_R,  "y_pt": y_excl_elig, "w_pt": W_BOX,     "h_pt": H_BOX_EXCL},
+        "box_included":                 {"x_pt": X_COL_L,  "y_pt": y_included,  "w_pt": W_BOX,     "h_pt": H_BOX_INCL},
     }
 
-    def _by(box_id: str) -> float:
-        """Retorna y_pt efetivo (override > JSON)."""
-        return _y_override.get(box_id, _box_by_id[box_id]["y_pt"])
-
-    # Aplicar overrides às caixas para que phase_band e conectores os usem
-    for bid, y_val in _y_override.items():
+    # Aplicar overrides: mescla geometria calculada sobre atributos do JSON
+    for bid, geom in _geom_override.items():
         if bid in _box_by_id:
-            _box_by_id[bid] = dict(_box_by_id[bid])  # cópia para não mutar o JSON
-            _box_by_id[bid]["y_pt"] = y_val
+            _box_by_id[bid] = {**_box_by_id[bid], **geom}
+
+    def _h(box_id: str) -> float:
+        return _box_by_id[box_id]["h_pt"]
 
     # =========================================================================
 
@@ -693,7 +681,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         p.moveTo(x_json, rl_yt); p.lineTo(x_json - 3, rl_yt + 5); p.lineTo(x_json + 3, rl_yt + 5)
         p.close(); c.drawPath(p, fill=1, stroke=0)
 
-    # Mapa fase_id → lista de box ids para cálculo dinâmico do centro Y
+    # Mapa fase_id → lista de box ids para cálculo dinâmico de comprimento e centro Y
     _PHASE_BOXES = {
         "phase_identification": ["box_identified", "box_removed_before_screening"],
         "phase_screening":      ["box_screened", "box_excluded_screening",
@@ -701,10 +689,10 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
                                  "box_assessed", "box_excluded_eligibility"],
         "phase_included":       ["box_included"],
     }
-    _box_by_id = {b["id"]: b for b in diag["boxes"]}
+    # _box_by_id já foi construído e populado com geometria calculada no bloco LAYOUT
 
     def _phase_y_center(phase_id: str) -> float:
-        """Calcula o centro Y visual (coords JSON) das caixas de uma fase."""
+        """Calcula o centro Y visual (coords calculados) das caixas de uma fase."""
         box_ids = _PHASE_BOXES.get(phase_id, [])
         if not box_ids:
             return 0.0
@@ -713,13 +701,23 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
                    for bid in box_ids if bid in _box_by_id]
         return (min(tops) + max(bottoms)) / 2.0
 
-    def phase_band(phase: dict, label: str):
-        """Faixa lateral rotacionada -90°, centralizada sobre as caixas da fase."""
-        h  = phase["h_pt"]   # espessura da faixa (ex: 20.7 pt)
-        w  = phase["w_pt"]   # comprimento visual após rotação
+    def _phase_w(phase_id: str) -> float:
+        """Calcula o comprimento visual da faixa (= span Y das caixas da fase)."""
+        box_ids = _PHASE_BOXES.get(phase_id, [])
+        if not box_ids:
+            return 0.0
+        tops    = [_box_by_id[bid]["y_pt"] for bid in box_ids if bid in _box_by_id]
+        bottoms = [_box_by_id[bid]["y_pt"] + _box_by_id[bid]["h_pt"]
+                   for bid in box_ids if bid in _box_by_id]
+        return max(bottoms) - min(tops)
 
-        # Centro X fixo: a faixa fica encostada à margem esquerda da página.
-        cx_rl = MARGIN_LEFT / 2
+    def phase_band(phase: dict, label: str):
+        """Faixa lateral rotacionada -90°, centralizada e dimensionada sobre as caixas da fase."""
+        h  = W_FASE                      # espessura visual da faixa (constante)
+        w  = _phase_w(phase["id"])       # comprimento calculado a partir das caixas
+
+        # Centro X da faixa: borda esquerda + metade da espessura
+        cx_rl = X_FASE + W_FASE / 2
 
         # Centro Y calculado dinamicamente para alinhar ao bloco de caixas
         cy_json = _phase_y_center(phase["id"])
@@ -743,8 +741,8 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     for ph in diag["phases"]:
         phase_band(ph, LBL.get(ph["id"], ph["label"]))
 
-    # Caixas
-    for box in diag["boxes"]:
+    # Caixas (usa _box_by_id que já tem geometria calculada)
+    for box in [_box_by_id[b["id"]] for b in diag["boxes"]]:
         bx  = box["x_pt"]; by = box["y_pt"]
         bw  = box["w_pt"]; bh = box["h_pt"]
         bid = box["id"]
@@ -783,9 +781,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         # Substituir N campos individuais por 1 textarea multilinha Courier,
         # com formato col-25: "Motivo X" + espaços até col 25 + "n = ?"
         if bid == "box_excluded_eligibility":
-            FONT_MONO = "Courier"
-            COL       = 25        # coluna onde "n = " começa
-            FS_MONO   = 8.0       # fonte ligeiramente menor para caber
+            COL = 25              # coluna onde "n = " começa (em chars Courier)
 
             # Nomes de motivo por idioma
             motivo_lbl = "Motivo" if lang == "pt" else "Reason"
@@ -888,10 +884,11 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
             arrow_v(x_mid, y_start, y_end)
 
     # Rodapés — posicionados logo abaixo da última caixa
-    last_box_bottom = y_included + _h("box_included")
+    last_box_bottom = (_box_by_id["box_included"]["y_pt"]
+                       + _box_by_id["box_included"]["h_pt"])
     foot_y   = last_box_bottom + GAP_INCLUDED_TO_FOOTER
-    foot_x   = MARGIN_LEFT
-    foot_w   = PW - MARGIN_LEFT * 2
+    foot_x   = X_COL_L
+    foot_w   = W_BOX + GAP_COLS + W_BOX
 
     footnote_data = [
         (LBL["footnote_1_sym"], LBL["footnote_1_txt"]),
