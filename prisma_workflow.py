@@ -469,8 +469,8 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     GAP_HEADER_TO_ID         = 8.0   # pt — cabeçalho → identificação
     GAP_ID_TO_SCREENING      = 14.0  # pt — identificação → triagem
     GAP_SCREENING_BOXES      = 14.0  # pt — entre caixas dentro da triagem
-    GAP_SCREENING_TO_INCLUDED = 14.0 # pt — triagem → incluídos
-    GAP_INCLUDED_TO_FOOTER   = 14.0  # pt — incluídos → rodapé
+    GAP_SCREENING_TO_INCLUDED = 28.0 # pt — triagem → incluídos
+    GAP_INCLUDED_TO_FOOTER   = 28.0  # pt — incluídos → rodapé
 
     # =========================================================================
     # POSIÇÕES X E Y CALCULADAS EM CASCATA
@@ -887,8 +887,8 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     last_box_bottom = (_box_by_id["box_included"]["y_pt"]
                        + _box_by_id["box_included"]["h_pt"])
     foot_y   = last_box_bottom + GAP_INCLUDED_TO_FOOTER
-    foot_x   = X_COL_L
-    foot_w   = W_BOX + GAP_COLS + W_BOX
+    foot_x   = X_FASE
+    foot_w   = _diag_w
 
     footnote_data = [
         (LBL["footnote_1_sym"], LBL["footnote_1_txt"]),
