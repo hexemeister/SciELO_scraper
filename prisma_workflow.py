@@ -403,19 +403,129 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     def rl_y(json_y_top: float, h: float) -> float:
         return PH - json_y_top - h
 
+    # =========================================================================
+    # LAYOUT — ajuste aqui para micro-tuning visual
+    # =========================================================================
+
+    # -- Margem da folha (offset X onde o conteúdo começa) --------------------
+    MARGIN_LEFT = 36.0          # pt — margem esquerda da página
+
+    # -- Padding interno das caixas -------------------------------------------
+    PAD_X = 4.0                 # pt — padding horizontal (esquerda e direita)
+    PAD_Y = 4.0                 # pt — padding vertical (topo)
+
+    # -- Tipografia -----------------------------------------------------------
     FONT    = "Helvetica"
     FONT_B  = "Helvetica-Bold"
-    FS      = meta.get("base_font_size_pt", 9.0)
-    FS_FOOT = 7.0
-    LINE_H  = FS * 1.3
+    FS      = 9.0               # pt — tamanho base do texto nas caixas
+    FS_FOOT = 7.0               # pt — tamanho do texto dos rodapés
+    LINE_H  = FS * 1.3         # pt — altura de linha (espaçamento entre linhas)
 
-    # Dimensões do campo AcroForm
-    ACRO_W = 32.0
-    ACRO_H = 11.0
-    N_PFX  = "n = "   # prefixo estático antes do campo
+    # -- Campos AcroForm n= ---------------------------------------------------
+    ACRO_W = 32.0               # pt — largura do campo numérico editável
+    ACRO_H = 11.0               # pt — altura do campo numérico editável
+    N_PFX  = "n = "            # texto estático prefixando o campo
 
-    PAD_X = 4.0
-    PAD_Y = 4.0
+    # -- Cores ----------------------------------------------------------------
+    COR_FASE        = "#9CC2E5" # faixas laterais de fase (azul claro)
+    COR_HEADER_FILL = "#FFC000" # fundo do cabeçalho (amarelo)
+    COR_HEADER_STROKE = "#7F5F00" # borda do cabeçalho (dourado escuro)
+    COR_BOX_FILL    = "#FFFFFF" # fundo das caixas de conteúdo
+    COR_BOX_STROKE  = "#000000" # borda das caixas de conteúdo
+    COR_FASE_STROKE = "#000000" # borda das faixas de fase
+    COR_TEXTO       = "#000000" # cor padrão do texto
+    COR_SETA        = "#000000" # cor das setas conectoras
+
+    # -- Gaps verticais entre elementos ---------------------------------------
+    # Todos os Y são calculados em cascata a partir destes gaps.
+    # Aumentar um gap empurra tudo abaixo dele para baixo.
+    MARGIN_TOP          = 36.0  # pt — distância do topo da página ao cabeçalho
+    GAP_HEADER_TO_ID    = 8.0   # pt — cabeçalho → caixas de identificação
+    GAP_ID_TO_SCREENING = 14.0  # pt — fim de identificação → início de triagem
+    GAP_SCREENING_BOXES = 14.0  # pt — entre cada caixa dentro da fase triagem
+    GAP_SCREENING_TO_INCLUDED = 14.0  # pt — fim de triagem → caixa incluídos
+    GAP_INCLUDED_TO_FOOTER    = 14.0  # pt — bottom da caixa incluídos → rodapé
+
+    # =========================================================================
+    # POSIÇÕES Y CALCULADAS EM CASCATA
+    # (larguras, alturas e X vêm do JSON; Y é calculado aqui)
+    # =========================================================================
+
+    _box_by_id = {b["id"]: b for b in diag["boxes"]}
+
+    def _h(box_id):
+        return _box_by_id[box_id]["h_pt"]
+
+    # Calcular altura total do diagrama para centralização vertical
+    # (usando MARGIN_TOP=0 como base temporária)
+    _h_header    = _box_by_id["header"]["h_pt"]
+    _h_id        = _h("box_identified")
+    _h_screened  = _h("box_screened")
+    _h_sought    = _h("box_sought")
+    _h_assessed  = _h("box_assessed")
+    _h_included  = _h("box_included")
+
+    # Estimar altura total do bloco de rodapés (4 linhas a FS_FOOT*1.35 + gaps)
+    _h_footer_est = FS_FOOT * 1.35 * 6 + 2.0 * 4
+
+    _diag_total_h = (
+        _h_header
+        + GAP_HEADER_TO_ID    + _h_id
+        + GAP_ID_TO_SCREENING + _h_screened
+        + GAP_SCREENING_BOXES + _h_sought
+        + GAP_SCREENING_BOXES + _h_assessed
+        + GAP_SCREENING_TO_INCLUDED + _h_included
+        + GAP_INCLUDED_TO_FOOTER + _h_footer_est
+    )
+
+    # MARGIN_TOP ajustada para centralizar verticalmente na página
+    MARGIN_TOP = max(18.0, (PH - _diag_total_h) / 2)
+
+    # Cabeçalho
+    y_header = MARGIN_TOP
+
+    # Fase IDENTIFICAÇÃO — duas caixas lado a lado (mesma altura)
+    y_id = y_header + _box_by_id["header"]["h_pt"] + GAP_HEADER_TO_ID
+
+    # Fase TRIAGEM — caixas empilhadas na coluna esquerda
+    y_screened  = y_id + _h("box_identified") + GAP_ID_TO_SCREENING
+    y_sought    = y_screened  + _h("box_screened")  + GAP_SCREENING_BOXES
+    y_assessed  = y_sought    + _h("box_sought")    + GAP_SCREENING_BOXES
+
+    # Caixas da coluna direita alinhadas verticalmente com sua contraparte esquerda
+    y_removed   = y_id        # alinhada com box_identified
+    y_excl_scr  = y_screened  # alinhada com box_screened
+    y_not_retr  = y_sought    # alinhada com box_sought
+    y_excl_elig = y_assessed  # alinhada com box_assessed
+
+    # Fase INCLUÍDOS
+    y_included  = y_assessed + _h("box_assessed") + GAP_SCREENING_TO_INCLUDED
+
+    # Dicionário de override de Y (complementa x_pt/w_pt/h_pt do JSON)
+    _y_override = {
+        "header":                       y_header,
+        "box_identified":               y_id,
+        "box_removed_before_screening": y_removed,
+        "box_screened":                 y_screened,
+        "box_excluded_screening":       y_excl_scr,
+        "box_sought":                   y_sought,
+        "box_not_retrieved":            y_not_retr,
+        "box_assessed":                 y_assessed,
+        "box_excluded_eligibility":     y_excl_elig,
+        "box_included":                 y_included,
+    }
+
+    def _by(box_id: str) -> float:
+        """Retorna y_pt efetivo (override > JSON)."""
+        return _y_override.get(box_id, _box_by_id[box_id]["y_pt"])
+
+    # Aplicar overrides às caixas para que phase_band e conectores os usem
+    for bid, y_val in _y_override.items():
+        if bid in _box_by_id:
+            _box_by_id[bid] = dict(_box_by_id[bid])  # cópia para não mutar o JSON
+            _box_by_id[bid]["y_pt"] = y_val
+
+    # =========================================================================
 
     # Mapeamento campo_id → valor numérico
     campo_map = {
@@ -569,7 +679,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
 
     def arrow_h(x_from, x_to, y_json):
         rl_yy = PH - y_json
-        set_stroke("#000000"); set_fill("#000000"); c.setLineWidth(0.5)
+        set_stroke(COR_SETA); set_fill(COR_SETA); c.setLineWidth(0.5)
         c.line(x_from, rl_yy, x_to - 5, rl_yy)
         p = c.beginPath()
         p.moveTo(x_to, rl_yy); p.lineTo(x_to - 5, rl_yy + 3); p.lineTo(x_to - 5, rl_yy - 3)
@@ -577,7 +687,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
 
     def arrow_v(x_json, y_from_json, y_to_json):
         rl_yf = PH - y_from_json; rl_yt = PH - y_to_json
-        set_stroke("#000000"); set_fill("#000000"); c.setLineWidth(0.5)
+        set_stroke(COR_SETA); set_fill(COR_SETA); c.setLineWidth(0.5)
         c.line(x_json, rl_yf, x_json, rl_yt + 5)
         p = c.beginPath()
         p.moveTo(x_json, rl_yt); p.lineTo(x_json - 3, rl_yt + 5); p.lineTo(x_json + 3, rl_yt + 5)
@@ -609,10 +719,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         w  = phase["w_pt"]   # comprimento visual após rotação
 
         # Centro X fixo: a faixa fica encostada à margem esquerda da página.
-        # Usamos margem_esquerda/2 como centro, independente do x_pt do JSON
-        # (que pode ser negativo para a fase TRIAGEM no template original).
-        margin_l = meta["margin_left_pt"]
-        cx_rl = margin_l / 2
+        cx_rl = MARGIN_LEFT / 2
 
         # Centro Y calculado dinamicamente para alinhar ao bloco de caixas
         cy_json = _phase_y_center(phase["id"])
@@ -621,10 +728,10 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         c.saveState()
         c.translate(cx_rl, cy_rl)
         c.rotate(90)
-        set_fill(phase["fill"]); set_stroke(phase["stroke"])
+        set_fill(COR_FASE); set_stroke(COR_FASE_STROKE)
         c.setLineWidth(phase["stroke_w_pt"])
         c.roundRect(-w/2, -h/2, w, h, radius=3.0, fill=1, stroke=1)
-        c.setFont(FONT_B, FS); c.setFillColor(_hex_to_rl("#000000"))
+        c.setFont(FONT_B, FS); c.setFillColor(_hex_to_rl(COR_TEXTO))
         c.drawCentredString(0, -FS * 0.35, label)
         c.restoreState()
 
@@ -643,9 +750,11 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
         bid = box["id"]
 
         if box["geometry"] == "flowChartAlternateProcess":
-            draw_rounded_rect(bx, by, bw, bh, box["fill"], box["stroke"], box["stroke_w_pt"], r=4.0)
+            fill   = COR_HEADER_FILL   if bid == "header" else COR_BOX_FILL
+            stroke = COR_HEADER_STROKE if bid == "header" else COR_BOX_STROKE
+            draw_rounded_rect(bx, by, bw, bh, fill, stroke, box["stroke_w_pt"], r=4.0)
         else:
-            draw_rect(bx, by, bw, bh, box["fill"], box["stroke"], box["stroke_w_pt"])
+            draw_rect(bx, by, bw, bh, COR_BOX_FILL, COR_BOX_STROKE, box["stroke_w_pt"])
 
         # Cursor de texto interno
         text_x  = bx + PAD_X
@@ -778,10 +887,11 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
             x_mid   = fb["x_pt"] + fb["w_pt"] / 2 if fb else conn["x_pt"]
             arrow_v(x_mid, y_start, y_end)
 
-    # Rodapés
-    foot_y   = 478.0
-    foot_x   = meta["margin_left_pt"]
-    foot_w   = meta["content_width_pt"]
+    # Rodapés — posicionados logo abaixo da última caixa
+    last_box_bottom = y_included + _h("box_included")
+    foot_y   = last_box_bottom + GAP_INCLUDED_TO_FOOTER
+    foot_x   = MARGIN_LEFT
+    foot_w   = PW - MARGIN_LEFT * 2
 
     footnote_data = [
         (LBL["footnote_1_sym"], LBL["footnote_1_txt"]),
