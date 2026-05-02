@@ -46,25 +46,25 @@ python scielo_scraper.py lista.csv
 
 ## Opções
 
-| Opção | Default | Descrição |
-|---|---|---|
-| `--output-dir DIR` | `<csv>_s_<timestamp>_<modo>/` | Pasta de saída |
-| `--delay SEG` | `1.5` | Delay mínimo entre requests |
-| `--jitter SEG` | `0.5` | Variação aleatória máxima do delay |
-| `--retries N` | `3` | Tentativas em erro transitório |
-| `--timeout SEG` | `20` | Timeout HTTP em segundos |
-| `--workers N` | `1` | Threads paralelas (máx: 4) |
-| `--resume` | — | Retomar execução anterior |
-| `--no-resume` | — | Ignorar resultados anteriores |
-| `--only-api` | — | Usar apenas ArticleMeta API |
-| `--only-html` | — | Usar apenas scraping HTML |
-| `--stats-report` | — | Imprimir relatório de uma execução anterior |
-| `--list-collections` | — | Listar coleções SciELO disponíveis |
-| `--log-level LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
-| `--collection COD` | `scl` | Coleção SciELO (ex: `scl`=Brasil, `arg`=Argentina) |
-| `--checkpoint N` | `25` | Salvar CSV a cada N artigos (0=só no final, 1=cada artigo) |
-| `--version` | — | Mostrar versão |
-| `-h`, `--help`, `-?` | — | Mostrar ajuda |
+| Opção                | Default                       | Descrição                                                  |
+| -------------------- | ----------------------------- | ---------------------------------------------------------- |
+| `--output-dir DIR`   | `<csv>_s_<timestamp>_<modo>/` | Pasta de saída                                             |
+| `--delay SEG`        | `1.5`                         | Delay mínimo entre requests                                |
+| `--jitter SEG`       | `0.5`                         | Variação aleatória máxima do delay                         |
+| `--retries N`        | `3`                           | Tentativas em erro transitório                             |
+| `--timeout SEG`      | `20`                          | Timeout HTTP em segundos                                   |
+| `--workers N`        | `1`                           | Threads paralelas (máx: 4)                                 |
+| `--resume`           | —                             | Retomar execução anterior                                  |
+| `--no-resume`        | —                             | Ignorar resultados anteriores                              |
+| `--only-api`         | —                             | Usar apenas ArticleMeta API                                |
+| `--only-html`        | —                             | Usar apenas scraping HTML                                  |
+| `--stats-report`     | —                             | Imprimir relatório de uma execução anterior                |
+| `--list-collections` | —                             | Listar coleções SciELO disponíveis                         |
+| `--log-level LEVEL`  | `INFO`                        | `DEBUG` / `INFO` / `WARNING` / `ERROR`                     |
+| `--collection COD`   | `scl`                         | Coleção SciELO (ex: `scl`=Brasil, `arg`=Argentina)         |
+| `--checkpoint N`     | `25`                          | Salvar CSV a cada N artigos (0=só no final, 1=cada artigo) |
+| `--version`          | —                             | Mostrar versão                                             |
+| `-h`, `--help`, `-?` | —                             | Mostrar ajuda                                              |
 
 ## scielo_search.py — Busca de artigos
 
@@ -83,16 +83,16 @@ Gera dois arquivos no diretório atual:
 
 ### Opções
 
-| Opção | Descrição |
-|---|---|
-| `--terms TERMO...` | Termos de busca (um ou mais) |
-| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos de publicação |
-| `--collection COD` | Coleção SciELO (default: `scl` = Brasil) |
-| `--fields CAMPO...` | Campos onde pesquisar os termos |
-| `--no-truncate` | Desativar truncamento automático de termos |
-| `--show-params [ARQ]` | Exibir parâmetros da última busca (ou de `ARQ` explícito) e sair |
-| `--output ARQUIVO` | Nome do arquivo de saída (default: `sc_<timestamp>.csv`) |
-| `-h`, `--help`, `-?` | Mostrar ajuda |
+| Opção                      | Descrição                                                        |
+| -------------------------- | ---------------------------------------------------------------- |
+| `--terms TERMO...`         | Termos de busca (um ou mais)                                     |
+| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos de publicação                           |
+| `--collection COD`         | Coleção SciELO (default: `scl` = Brasil)                         |
+| `--fields CAMPO...`        | Campos onde pesquisar os termos                                  |
+| `--no-truncate`            | Desativar truncamento automático de termos                       |
+| `--show-params [ARQ]`      | Exibir parâmetros da última busca (ou de `ARQ` explícito) e sair |
+| `--output ARQUIVO`         | Nome do arquivo de saída (default: `sc_<timestamp>.csv`)         |
+| `-h`, `--help`, `-?`       | Mostrar ajuda                                                    |
 
 > O CSV gerado contém uma coluna `ID` com os PIDs SciELO e é diretamente compatível com o `scielo_scraper.py`.
 
@@ -112,45 +112,45 @@ O PID deve seguir o padrão `[A-Z]\d{4}-\d{3}[\dA-Z]\d{13}` (ex: `S1982-88372022
 
 Cada execução cria uma pasta `<nome_csv>_s_<timestamp>_<modo>/` com:
 
-| Arquivo | Descrição |
-|---|---|
+| Arquivo         | Descrição                  |
+| --------------- | -------------------------- |
 | `resultado.csv` | CSV com os dados extraídos |
-| `scraper.log` | Log completo da execução |
-| `stats.json` | Estatísticas em JSON |
+| `scraper.log`   | Log completo da execução   |
+| `stats.json`    | Estatísticas em JSON       |
 
 ### Colunas do resultado.csv
 
 Mantém todas as colunas do CSV de entrada e adiciona:
 
-| Coluna | Descrição |
-|---|---|
-| `PID_limpo` | PID normalizado |
-| `URL_PT` | URL da versão em português |
-| `Titulo_PT` | Título em português |
-| `Resumo_PT` | Resumo em português |
-| `Palavras_Chave_PT` | Palavras-chave em português (separadas por `;`) |
-| `status` | `ok_completo` / `ok_parcial` / `nada_encontrado` / `erro_extracao` / `erro_pid_invalido` |
-| `fonte_extracao` | Fonte(s) usada(s) para cada campo |
-| `url_acedida` | URL(s) acessada(s) durante o scraping |
+| Coluna              | Descrição                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `PID_limpo`         | PID normalizado                                                                          |
+| `URL_PT`            | URL da versão em português                                                               |
+| `Titulo_PT`         | Título em português                                                                      |
+| `Resumo_PT`         | Resumo em português                                                                      |
+| `Palavras_Chave_PT` | Palavras-chave em português (separadas por `;`)                                          |
+| `status`            | `ok_completo` / `ok_parcial` / `nada_encontrado` / `erro_extracao` / `erro_pid_invalido` |
+| `fonte_extracao`    | Fonte(s) usada(s) para cada campo                                                        |
+| `url_acedida`       | URL(s) acessada(s) durante o scraping                                                    |
 
 ## Comparativo de estratégias
 
 Resultados em quatro anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
-| Ano | n | Estratégia | ok_completo | ok_parcial | erro | Tempo |
-|---|---|---|---|---|---|---|
-| 2022 | 564 | `--only-api` | 98.6% | 1.1% | 0.4% | ~26 min |
-| 2022 | 564 | `--only-html` | 99.5% | 0.2% | 0.4% | ~37 min |
-| 2022 | 564 | padrão (api+html) | **99.8%** | 0.2% | **0.0%** | **~27 min** |
-| 2023 | 468 | `--only-api` | 98.9% | 1.1% | 0.0% | ~21 min |
-| 2023 | 468 | `--only-html` | 99.1% | 0.6% | 0.2% | ~39 min |
-| 2023 | 468 | padrão (api+html) | **99.4%** | 0.6% | **0.0%** | **~22 min** |
-| 2024 | 553 | `--only-api` | 98.9% | 0.9% | 0.2% | ~25 min |
-| 2024 | 553 | `--only-html` | 99.3% | 0.2% | 0.5% | ~35 min |
-| 2024 | 553 | padrão (api+html) | **99.6%** | 0.2% | **0.2%** | **~26 min** |
-| 2025 | 603 | `--only-api` | 99.2% | 0.8% | 0.0% | ~28 min |
-| 2025 | 603 | `--only-html` | 99.0% | 0.5% | 0.5% | ~43 min |
-| 2025 | 603 | padrão (api+html) | **99.8%** | 0.2% | **0.0%** | **~28 min** |
+| Ano  | n   | Estratégia        | ok_completo | ok_parcial | erro     | Tempo       |
+| ---- | --- | ----------------- | ----------- | ---------- | -------- | ----------- |
+| 2022 | 564 | `--only-api`      | 98.6%       | 1.1%       | 0.4%     | ~26 min     |
+| 2022 | 564 | `--only-html`     | 99.5%       | 0.2%       | 0.4%     | ~37 min     |
+| 2022 | 564 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~27 min** |
+| 2023 | 468 | `--only-api`      | 98.9%       | 1.1%       | 0.0%     | ~21 min     |
+| 2023 | 468 | `--only-html`     | 99.1%       | 0.6%       | 0.2%     | ~39 min     |
+| 2023 | 468 | padrão (api+html) | **99.4%**   | 0.6%       | **0.0%** | **~22 min** |
+| 2024 | 553 | `--only-api`      | 98.9%       | 0.9%       | 0.2%     | ~25 min     |
+| 2024 | 553 | `--only-html`     | 99.3%       | 0.2%       | 0.5%     | ~35 min     |
+| 2024 | 553 | padrão (api+html) | **99.6%**   | 0.2%       | **0.2%** | **~26 min** |
+| 2025 | 603 | `--only-api`      | 99.2%       | 0.8%       | 0.0%     | ~28 min     |
+| 2025 | 603 | `--only-html`     | 99.0%       | 0.5%       | 0.5%     | ~43 min     |
+| 2025 | 603 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~28 min** |
 
 A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~99% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo equivalente ao modo apenas-api.
 
@@ -164,21 +164,21 @@ Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use
 
 ## Dependências
 
-| Pacote | Uso |
-|---|---|
-| `requests` | HTTP |
-| `beautifulsoup4` + `lxml` | Parsing HTML |
-| `pandas` | Leitura/escrita CSV |
-| `tqdm` | Barra de progresso |
-| `wakepy` | Impede sleep do sistema durante execução longa |
-| `brotli` | Descompressão Brotli (obrigatório para o CDN do SciELO) |
-| `matplotlib` | Gráficos (`process_charts.py`, `results_report.py`) |
-| `matplotlib-venn` | Diagramas de Venn (`results_report.py`) |
-| `upsetplot` | UpSet plots para ≥4 termos (`results_report.py`) |
-| `wordcloud` | Nuvem de palavras (`scielo_wordcloud.py`) |
-| `nltk` | Stopwords multilíngues (`scielo_wordcloud.py`) |
-| `pillow` | Máscara/shape da wordcloud (`scielo_wordcloud.py`) |
-| `reportlab` | Geração de PDF preenchível (`prisma_workflow.py`) |
+| Pacote                    | Uso                                                     |
+| ------------------------- | ------------------------------------------------------- |
+| `requests`                | HTTP                                                    |
+| `beautifulsoup4` + `lxml` | Parsing HTML                                            |
+| `pandas`                  | Leitura/escrita CSV                                     |
+| `tqdm`                    | Barra de progresso                                      |
+| `wakepy`                  | Impede sleep do sistema durante execução longa          |
+| `brotli`                  | Descompressão Brotli (obrigatório para o CDN do SciELO) |
+| `matplotlib`              | Gráficos (`process_charts.py`, `results_report.py`)     |
+| `matplotlib-venn`         | Diagramas de Venn (`results_report.py`)                 |
+| `upsetplot`               | UpSet plots para ≥4 termos (`results_report.py`)        |
+| `wordcloud`               | Nuvem de palavras (`scielo_wordcloud.py`)               |
+| `nltk`                    | Stopwords multilíngues (`scielo_wordcloud.py`)          |
+| `pillow`                  | Máscara/shape da wordcloud (`scielo_wordcloud.py`)      |
+| `reportlab`               | Geração de PDF preenchível (`prisma_workflow.py`)       |
 
 ## Workflow típico
 
@@ -294,13 +294,13 @@ Gera `prisma_<stem>_<lang>_<ts>.pdf` — PDF abrível em qualquer leitor de PDF;
 
 Consolida os `resultado.csv` de um ou mais anos e detecta termos de busca em cada campo PT, gerando colunas booleanas auditáveis em planilha eletrônica:
 
-| Coluna | Descrição |
-|---|---|
-| `n_palavras_titulo` | Nº de palavras no Titulo_PT |
-| `n_palavras_resumo` | Nº de palavras no Resumo_PT |
-| `n_keywords_pt` | Nº de keywords separadas por ";" |
-| `<termo>_titulo` / `<termo>_resumo` / `<termo>_keywords` | Bool: termo encontrado no campo |
-| `criterio_ok` | Bool: todos os termos em pelo menos um dos `--required-fields` |
+| Coluna                                                   | Descrição                                                      |
+| -------------------------------------------------------- | -------------------------------------------------------------- |
+| `n_palavras_titulo`                                      | Nº de palavras no Titulo_PT                                    |
+| `n_palavras_resumo`                                      | Nº de palavras no Resumo_PT                                    |
+| `n_keywords_pt`                                          | Nº de keywords separadas por ";"                               |
+| `<termo>_titulo` / `<termo>_resumo` / `<termo>_keywords` | Bool: termo encontrado no campo                                |
+| `criterio_ok`                                            | Bool: todos os termos em pelo menos um dos `--required-fields` |
 
 > ⚠ **Atenção:** T termos × 3 campos = 3T colunas booleanas. Padrão (2 termos): 6 colunas.
 > As colunas booleanas cobrem os 3 campos (titulo, resumo, keywords); o `criterio_ok` avalia apenas os `--required-fields` (padrão: titulo e keywords).
@@ -320,67 +320,67 @@ Gera também `terms_<ts>.log` e `terms_<ts>_stats.json` com estatísticas por an
 
 ### Termos e conceitos
 
-| Termo | Definição |
-|---|---|
-| **PID** | Identificador único SciELO. Formato: `S` + ISSN (com hífen) + ano (4 dígitos) + volume/fascículo (3 dígitos) + sequência (5 dígitos). Ex: `S1982-88372022000300013`. Total: 23 caracteres. |
-| **ISSN** | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`). |
-| **AoP** | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML. |
-| **Coleção** | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina). |
-| **ISIS-JSON** | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente. |
-| **Truncamento** | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py` e removido automaticamente no `terms_matcher.py` para detecção por substring. |
-| **criterio_ok** | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos campos `--required-fields` (padrão: titulo ou keywords). |
-| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Por padrão: `titulo` e `keywords` (basta que cada termo apareça em pelo menos um deles). |
+| Termo              | Definição                                                                                                                                                                                                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PID**            | Identificador único SciELO. Formato: `S` + ISSN (com hífen) + ano (4 dígitos) + volume/fascículo (3 dígitos) + sequência (5 dígitos). Ex: `S1982-88372022000300013`. Total: 23 caracteres.                                                                                         |
+| **ISSN**           | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`).                                                                                                                                                             |
+| **AoP**            | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML.                                                                                |
+| **Coleção**        | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina).                                                                                                                                     |
+| **ISIS-JSON**      | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente.                                                                                                                                                             |
+| **Truncamento**    | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py` e removido automaticamente no `terms_matcher.py` para detecção por substring. |
+| **criterio_ok**    | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos campos `--required-fields` (padrão: titulo ou keywords).                                                                                                          |
+| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Por padrão: `titulo` e `keywords` (basta que cada termo apareça em pelo menos um deles).                                                                                                                                        |
 
 ### Colunas do resultado.csv (scraper)
 
-| Coluna | Tipo | Origem | Descrição |
-|---|---|---|---|
-| `ID` | str | CSV entrada | PID bruto conforme fornecido |
-| `Title` | str | CSV entrada | Título conforme indexado no SciELO Search |
-| `Author(s)` | str | CSV entrada | Autores |
-| `Source` | str | CSV entrada | Fonte/periódico |
-| `Journal` | str | CSV entrada | Periódico |
-| `Language(s)` | str | CSV entrada | Idioma(s) do artigo |
-| `Publication year` | int | CSV entrada | Ano de publicação |
-| `PID_limpo` | str | scraper | PID normalizado (sufixos removidos, validado) |
-| `URL_PT` | str | scraper | URL da versão em português consultada |
-| `Titulo_PT` | str | scraper | Título em português extraído |
-| `Resumo_PT` | str | scraper | Resumo em português extraído |
-| `Palavras_Chave_PT` | str | scraper | Palavras-chave em português, separadas por `;` |
-| `status` | str | scraper | Status da extração (ver tabela abaixo) |
-| `fonte_extracao` | str | scraper | Fonte(s) usadas por campo (ex: `articlemeta_isis[T]`) |
-| `url_acedida` | str | scraper | URL(s) acessadas durante o scraping |
+| Coluna              | Tipo | Origem      | Descrição                                             |
+| ------------------- | ---- | ----------- | ----------------------------------------------------- |
+| `ID`                | str  | CSV entrada | PID bruto conforme fornecido                          |
+| `Title`             | str  | CSV entrada | Título conforme indexado no SciELO Search             |
+| `Author(s)`         | str  | CSV entrada | Autores                                               |
+| `Source`            | str  | CSV entrada | Fonte/periódico                                       |
+| `Journal`           | str  | CSV entrada | Periódico                                             |
+| `Language(s)`       | str  | CSV entrada | Idioma(s) do artigo                                   |
+| `Publication year`  | int  | CSV entrada | Ano de publicação                                     |
+| `PID_limpo`         | str  | scraper     | PID normalizado (sufixos removidos, validado)         |
+| `URL_PT`            | str  | scraper     | URL da versão em português consultada                 |
+| `Titulo_PT`         | str  | scraper     | Título em português extraído                          |
+| `Resumo_PT`         | str  | scraper     | Resumo em português extraído                          |
+| `Palavras_Chave_PT` | str  | scraper     | Palavras-chave em português, separadas por `;`        |
+| `status`            | str  | scraper     | Status da extração (ver tabela abaixo)                |
+| `fonte_extracao`    | str  | scraper     | Fonte(s) usadas por campo (ex: `articlemeta_isis[T]`) |
+| `url_acedida`       | str  | scraper     | URL(s) acessadas durante o scraping                   |
 
 ### Colunas adicionadas pelo terms_matcher.py
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `n_palavras_titulo` | int | Nº de palavras em Titulo_PT |
-| `n_palavras_resumo` | int | Nº de palavras em Resumo_PT |
-| `n_keywords_pt` | int | Nº de keywords em Palavras_Chave_PT (separador `;`) |
-| `<termo>_titulo` | bool | Termo detectado em Titulo_PT (case-insensitive, substring) |
-| `<termo>_resumo` | bool | Termo detectado em Resumo_PT (case-insensitive, substring) |
-| `<termo>_keywords` | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
-| `criterio_ok` | bool | Todos os termos presentes em ≥1 campo required |
+| Coluna              | Tipo | Descrição                                                          |
+| ------------------- | ---- | ------------------------------------------------------------------ |
+| `n_palavras_titulo` | int  | Nº de palavras em Titulo_PT                                        |
+| `n_palavras_resumo` | int  | Nº de palavras em Resumo_PT                                        |
+| `n_keywords_pt`     | int  | Nº de keywords em Palavras_Chave_PT (separador `;`)                |
+| `<termo>_titulo`    | bool | Termo detectado em Titulo_PT (case-insensitive, substring)         |
+| `<termo>_resumo`    | bool | Termo detectado em Resumo_PT (case-insensitive, substring)         |
+| `<termo>_keywords`  | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
+| `criterio_ok`       | bool | Todos os termos presentes em ≥1 campo required                     |
 
 ### Status de extração
 
-| Status | Significado |
-|---|---|
-| `ok_completo` | Título + resumo + palavras-chave extraídos |
-| `ok_parcial` | Pelo menos um campo extraído, mas não todos |
-| `nada_encontrado` | Página acessada, nenhum dado encontrado |
-| `erro_extracao` | Falha de acesso (ex: HTTP 404, timeout) |
-| `erro_pid_invalido` | PID fora do padrão esperado |
+| Status              | Significado                                 |
+| ------------------- | ------------------------------------------- |
+| `ok_completo`       | Título + resumo + palavras-chave extraídos  |
+| `ok_parcial`        | Pelo menos um campo extraído, mas não todos |
+| `nada_encontrado`   | Página acessada, nenhum dado encontrado     |
+| `erro_extracao`     | Falha de acesso (ex: HTTP 404, timeout)     |
+| `erro_pid_invalido` | PID fora do padrão esperado                 |
 
 ### Fontes de extração (`fonte_extracao`)
 
-| Valor | Significado |
-|---|---|
-| `articlemeta_isis[T]` | Título via ArticleMeta API (ISIS-JSON) |
-| `articlemeta_isis[R]` | Resumo via ArticleMeta API |
-| `articlemeta_isis[K]` | Palavras-chave via ArticleMeta API |
-| `Titulo_PT←pag1_meta_tags` | Título via meta tags da URL legacy |
-| `Titulo_PT←pag1_html_body` | Título via corpo HTML da URL legacy |
-| `Resumo_PT←pag_pt_meta_tags` | Resumo via meta tags da versão PT |
-| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP) |
+| Valor                                       | Significado                            |
+| ------------------------------------------- | -------------------------------------- |
+| `articlemeta_isis[T]`                       | Título via ArticleMeta API (ISIS-JSON) |
+| `articlemeta_isis[R]`                       | Resumo via ArticleMeta API             |
+| `articlemeta_isis[K]`                       | Palavras-chave via ArticleMeta API     |
+| `Titulo_PT←pag1_meta_tags`                  | Título via meta tags da URL legacy     |
+| `Titulo_PT←pag1_html_body`                  | Título via corpo HTML da URL legacy    |
+| `Resumo_PT←pag_pt_meta_tags`                | Resumo via meta tags da versão PT      |
+| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP)              |

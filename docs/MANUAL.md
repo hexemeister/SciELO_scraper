@@ -4,7 +4,7 @@
 > Grupo de pesquisa do Mestrado Profissional em Avaliação da Fundação Cesgranrio.
 > Este conjunto de ferramentas apoia o processo anual de coleta, extração, filtragem e análise
 > da produção científica em avaliação educacional indexada no SciELO Brasil.
->
+> 
 > - 🌐 Banco de dados público: https://eavaleducacao1.websiteseguro.com/
 > - 💻 Repositório do banco de dados: https://github.com/hexemeister/eaval
 
@@ -38,107 +38,107 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 ### Pipeline completo (recomendado)
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Rodar tudo para um ano (default: termos `avalia educa`, coleção SciELO Brasil, campos `titulo keywords`) | `uv run python run_pipeline.py --year 2024` | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, `pipeline_stats.json`, `results_<stem>_api+html/` | `runs/2024/` |
-| Rodar tudo para vários anos em sequência | `uv run python run_pipeline.py --per-year --year 2022 2023 2024 2025` | Idem por ano + gráfico agregado de comparação entre anos | `runs/<ano>/` cada um + `runs/chart_*.png` |
-| Ver o que seria executado sem rodar | `uv run python run_pipeline.py --year 2024 --dry-run` | Nada (apenas imprime os comandos) | — |
-| Reutilizar busca já feita (pular `scielo_search.py`) | `uv run python run_pipeline.py --year 2024 --skip-search` | Idem sem nova busca | `runs/2024/` |
-| Reutilizar scraping já feito (pular scraper) | `uv run python run_pipeline.py --year 2024 --skip-scrape` | Análise + termos + gráficos | `runs/2024/` |
-| Pular análise de discrepância | `uv run python run_pipeline.py --year 2024 --skip-analysis` | Busca + scraping + termos + gráficos | `runs/2024/` |
-| Pular detecção de termos | `uv run python run_pipeline.py --year 2024 --skip-match` | Busca + scraping + análise + gráficos | `runs/2024/` |
-| Pular gráficos de processo | `uv run python run_pipeline.py --year 2024 --skip-charts` | Busca + scraping + análise + termos + relatório | `runs/2024/` |
-| Pular relatório científico | `uv run python run_pipeline.py --year 2024 --skip-report` | Busca + scraping + análise + termos + gráficos | `runs/2024/` |
-| Ver relatório consolidado de todos os anos | `uv run python run_pipeline.py --stats-report` | Imprime Markdown no terminal | — |
-| Salvar relatório em arquivo | `uv run python run_pipeline.py --stats-report > stats.md` | `stats.md` | Diretório atual |
+| Pergunta / Objetivo                                                                                      | Comando                                                               | O que cria                                                                                                                       | Onde salva                                 |
+| -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Rodar tudo para um ano (default: termos `avalia educa`, coleção SciELO Brasil, campos `titulo keywords`) | `uv run python run_pipeline.py --year 2024`                           | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, `pipeline_stats.json`, `results_<stem>_api+html/` | `runs/2024/`                               |
+| Rodar tudo para vários anos em sequência                                                                 | `uv run python run_pipeline.py --per-year --year 2022 2023 2024 2025` | Idem por ano + gráfico agregado de comparação entre anos                                                                         | `runs/<ano>/` cada um + `runs/chart_*.png` |
+| Ver o que seria executado sem rodar                                                                      | `uv run python run_pipeline.py --year 2024 --dry-run`                 | Nada (apenas imprime os comandos)                                                                                                | —                                          |
+| Reutilizar busca já feita (pular `scielo_search.py`)                                                     | `uv run python run_pipeline.py --year 2024 --skip-search`             | Idem sem nova busca                                                                                                              | `runs/2024/`                               |
+| Reutilizar scraping já feito (pular scraper)                                                             | `uv run python run_pipeline.py --year 2024 --skip-scrape`             | Análise + termos + gráficos                                                                                                      | `runs/2024/`                               |
+| Pular análise de discrepância                                                                            | `uv run python run_pipeline.py --year 2024 --skip-analysis`           | Busca + scraping + termos + gráficos                                                                                             | `runs/2024/`                               |
+| Pular detecção de termos                                                                                 | `uv run python run_pipeline.py --year 2024 --skip-match`              | Busca + scraping + análise + gráficos                                                                                            | `runs/2024/`                               |
+| Pular gráficos de processo                                                                               | `uv run python run_pipeline.py --year 2024 --skip-charts`             | Busca + scraping + análise + termos + relatório                                                                                  | `runs/2024/`                               |
+| Pular relatório científico                                                                               | `uv run python run_pipeline.py --year 2024 --skip-report`             | Busca + scraping + análise + termos + gráficos                                                                                   | `runs/2024/`                               |
+| Ver relatório consolidado de todos os anos                                                               | `uv run python run_pipeline.py --stats-report`                        | Imprime Markdown no terminal                                                                                                     | —                                          |
+| Salvar relatório em arquivo                                                                              | `uv run python run_pipeline.py --stats-report > stats.md`             | `stats.md`                                                                                                                       | Diretório atual                            |
 
 ### Busca de artigos
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Buscar artigos com termos e anos | `uv run python scielo_search.py --terms avalia educa --years 2022-2025` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
-| Buscar em outra coleção (default: `scl` = Brasil) | `uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
-| Buscar sem truncamento (default: truncamento ativo com `$`) | `uv run python scielo_search.py --terms avaliação educação --no-truncate` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
-| Ver parâmetros da última busca | `uv run python scielo_search.py --show-params` | Nada (imprime no terminal) | — |
-| Listar todas as coleções disponíveis | `uv run python scielo_search.py --list-collections` | Nada (imprime no terminal) | — |
+| Pergunta / Objetivo                                         | Comando                                                                                  | O que cria                            | Onde salva      |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------- | --------------- |
+| Buscar artigos com termos e anos                            | `uv run python scielo_search.py --terms avalia educa --years 2022-2025`                  | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Buscar em outra coleção (default: `scl` = Brasil)           | `uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg` | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Buscar sem truncamento (default: truncamento ativo com `$`) | `uv run python scielo_search.py --terms avaliação educação --no-truncate`                | `sc_<ts>.csv` + `sc_<ts>_params.json` | Diretório atual |
+| Ver parâmetros da última busca                              | `uv run python scielo_search.py --show-params`                                           | Nada (imprime no terminal)            | —               |
+| Listar todas as coleções disponíveis                        | `uv run python scielo_search.py --list-collections`                                      | Nada (imprime no terminal)            | —               |
 
 ### Scraping de artigos
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Extrair título, resumo e keywords (default: api+html, checkpoint a cada 25) | `uv run python scielo_scraper.py sc_<ts>.csv` | `resultado.csv`, `scraper.log`, `stats.json` | `sc_<ts>_s_<ts>_api+html/` |
-| Extrair apenas via API (mais rápido, sem AoPs) | `uv run python scielo_scraper.py sc_<ts>.csv --only-api` | Idem | `sc_<ts>_s_<ts>_api/` |
-| Extrair apenas via HTML (API fora do ar) | `uv run python scielo_scraper.py sc_<ts>.csv --only-html` | Idem | `sc_<ts>_s_<ts>_html/` |
-| Retomar execução interrompida | `uv run python scielo_scraper.py sc_<ts>.csv --resume` | Nada novo — continua na pasta existente | Pasta mais recente existente |
-| Ver estatísticas de uma execução anterior | `uv run python scielo_scraper.py sc_<ts>.csv --stats-report` | Nada (imprime no terminal) | — |
+| Pergunta / Objetivo                                                         | Comando                                                      | O que cria                                   | Onde salva                   |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------- | ---------------------------- |
+| Extrair título, resumo e keywords (default: api+html, checkpoint a cada 25) | `uv run python scielo_scraper.py sc_<ts>.csv`                | `resultado.csv`, `scraper.log`, `stats.json` | `sc_<ts>_s_<ts>_api+html/`   |
+| Extrair apenas via API (mais rápido, sem AoPs)                              | `uv run python scielo_scraper.py sc_<ts>.csv --only-api`     | Idem                                         | `sc_<ts>_s_<ts>_api/`        |
+| Extrair apenas via HTML (API fora do ar)                                    | `uv run python scielo_scraper.py sc_<ts>.csv --only-html`    | Idem                                         | `sc_<ts>_s_<ts>_html/`       |
+| Retomar execução interrompida                                               | `uv run python scielo_scraper.py sc_<ts>.csv --resume`       | Nada novo — continua na pasta existente      | Pasta mais recente existente |
+| Ver estatísticas de uma execução anterior                                   | `uv run python scielo_scraper.py sc_<ts>.csv --stats-report` | Nada (imprime no terminal)                   | —                            |
 
 ### Detecção de termos
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Detectar termos nos resultados (default: termos `avalia educa`, campos `titulo keywords`, todos os anos em `runs/`) | `uv run python terms_matcher.py` | `terms_<ts>.csv`, `terms_<ts>.log`, `terms_<ts>_stats.json` | Diretório atual |
-| Detectar termos em anos específicos | `uv run python terms_matcher.py --years 2022 2024` | Idem | Diretório atual |
-| Alterar campos verificados em `criterio_ok` (default: `titulo keywords`) | `uv run python terms_matcher.py --required-fields titulo resumo keywords` | Idem | Diretório atual |
-| Exigir qualquer termo (default: todos os termos) | `uv run python terms_matcher.py --match-mode any` | Idem | Diretório atual |
-| Ver relatório do último run de termos | `uv run python terms_matcher.py --stats-report` | Nada (imprime no terminal) | — |
+| Pergunta / Objetivo                                                                                                 | Comando                                                                   | O que cria                                                  | Onde salva      |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------- |
+| Detectar termos nos resultados (default: termos `avalia educa`, campos `titulo keywords`, todos os anos em `runs/`) | `uv run python terms_matcher.py`                                          | `terms_<ts>.csv`, `terms_<ts>.log`, `terms_<ts>_stats.json` | Diretório atual |
+| Detectar termos em anos específicos                                                                                 | `uv run python terms_matcher.py --years 2022 2024`                        | Idem                                                        | Diretório atual |
+| Alterar campos verificados em `criterio_ok` (default: `titulo keywords`)                                            | `uv run python terms_matcher.py --required-fields titulo resumo keywords` | Idem                                                        | Diretório atual |
+| Exigir qualquer termo (default: todos os termos)                                                                    | `uv run python terms_matcher.py --match-mode any`                         | Idem                                                        | Diretório atual |
+| Ver relatório do último run de termos                                                                               | `uv run python terms_matcher.py --stats-report`                           | Nada (imprime no terminal)                                  | —               |
 
 ### Gráficos de diagnóstico do processo
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Gerar gráficos a partir de `runs/` | `uv run python process_charts.py` | `chart_status.png`, `chart_sources.png`, `chart_time.png`, `chart_stats.json` | Diretório atual |
-| Gráficos de anos específicos | `uv run python process_charts.py --years 2022 2024` | Idem | Diretório atual |
-| Salvar gráficos em outra pasta | `uv run python process_charts.py --output graficos/` | Idem | `graficos/` |
-| Gráfico agregado comparando todos os anos | `uv run python process_charts.py --base runs/ --output runs/` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | `runs/` |
-| Gráficos em inglês | `uv run python process_charts.py --lang en` | `chart_status.png`, `chart_sources.png`, `chart_time.png` | Diretório atual |
-| Gráficos em todos os idiomas | `uv run python process_charts.py --lang all` | `chart_status_pt.png`, `chart_status_en.png`, ... | Diretório atual |
-| Pular gráfico de fontes | `uv run python process_charts.py --no-sources` | `chart_status.png`, `chart_time.png` | Diretório atual |
+| Pergunta / Objetivo                       | Comando                                                       | O que cria                                                                    | Onde salva      |
+| ----------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------- |
+| Gerar gráficos a partir de `runs/`        | `uv run python process_charts.py`                             | `chart_status.png`, `chart_sources.png`, `chart_time.png`, `chart_stats.json` | Diretório atual |
+| Gráficos de anos específicos              | `uv run python process_charts.py --years 2022 2024`           | Idem                                                                          | Diretório atual |
+| Salvar gráficos em outra pasta            | `uv run python process_charts.py --output graficos/`          | Idem                                                                          | `graficos/`     |
+| Gráfico agregado comparando todos os anos | `uv run python process_charts.py --base runs/ --output runs/` | `chart_status.png`, `chart_sources.png`, `chart_time.png`                     | `runs/`         |
+| Gráficos em inglês                        | `uv run python process_charts.py --lang en`                   | `chart_status.png`, `chart_sources.png`, `chart_time.png`                     | Diretório atual |
+| Gráficos em todos os idiomas              | `uv run python process_charts.py --lang all`                  | `chart_status_pt.png`, `chart_status_en.png`, ...                             | Diretório atual |
+| Pular gráfico de fontes                   | `uv run python process_charts.py --no-sources`                | `chart_status.png`, `chart_time.png`                                          | Diretório atual |
 
 ### Artefatos científicos (resultados)
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Gerar todos os artefatos (default: api+html, PT, todos os anos em `runs/`) | `uv run python results_report.py` | 5 gráficos, 3 CSVs, `results_text_pt.md`, `results_report.json` | `results_<stem>/` ao lado da pasta de scraping |
-| Anos específicos | `uv run python results_report.py --years 2022 2024` | Idem | Idem |
-| Estratégia alternativa | `uv run python results_report.py --mode api` | Idem | Idem |
-| Artefatos em inglês | `uv run python results_report.py --lang en` | Idem com `results_text_en.md` | Idem |
-| Ambos os idiomas | `uv run python results_report.py --lang all` | PT + EN (`results_text_pt.md` + `results_text_en.md`) | Idem |
-| Pasta de saída explícita | `uv run python results_report.py --output-dir relatorios/` | Idem | `relatorios/` |
-| Estilo de gráficos alternativo | `uv run python results_report.py --style grayscale` | Idem (gráficos em escala de cinza) | Idem |
-| Colormap do heatmap alternativo | `uv run python results_report.py --colormap plasma` | Idem (heatmap em plasma; default: viridis) | Idem |
-| Ver artefatos no terminal (sem regerar) | `uv run python results_report.py --show-report runs/.../results_report.json` | Nada (imprime no terminal) | — |
-| Gerar apenas artefatos selecionados | `uv run python results_report.py --artifacts funnel,trend,heatmap` | Apenas os artefatos listados | `results_<stem>/` |
-| Pular artefatos específicos | `uv run python results_report.py --skip-artifacts text,report` | Todos exceto os listados | `results_<stem>/` |
-| Listar todos os artefatos com descrição | `uv run python results_report.py --help-artifacts` | Nada (imprime no terminal) | — |
-| Descrição detalhada de um artefato | `uv run python results_report.py --help-artifact results_funnel` | Nada (imprime no terminal) | — |
+| Pergunta / Objetivo                                                        | Comando                                                                      | O que cria                                                      | Onde salva                                     |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
+| Gerar todos os artefatos (default: api+html, PT, todos os anos em `runs/`) | `uv run python results_report.py`                                            | 5 gráficos, 3 CSVs, `results_text_pt.md`, `results_report.json` | `results_<stem>/` ao lado da pasta de scraping |
+| Anos específicos                                                           | `uv run python results_report.py --years 2022 2024`                          | Idem                                                            | Idem                                           |
+| Estratégia alternativa                                                     | `uv run python results_report.py --mode api`                                 | Idem                                                            | Idem                                           |
+| Artefatos em inglês                                                        | `uv run python results_report.py --lang en`                                  | Idem com `results_text_en.md`                                   | Idem                                           |
+| Ambos os idiomas                                                           | `uv run python results_report.py --lang all`                                 | PT + EN (`results_text_pt.md` + `results_text_en.md`)           | Idem                                           |
+| Pasta de saída explícita                                                   | `uv run python results_report.py --output-dir relatorios/`                   | Idem                                                            | `relatorios/`                                  |
+| Estilo de gráficos alternativo                                             | `uv run python results_report.py --style grayscale`                          | Idem (gráficos em escala de cinza)                              | Idem                                           |
+| Colormap do heatmap alternativo                                            | `uv run python results_report.py --colormap plasma`                          | Idem (heatmap em plasma; default: viridis)                      | Idem                                           |
+| Ver artefatos no terminal (sem regerar)                                    | `uv run python results_report.py --show-report runs/.../results_report.json` | Nada (imprime no terminal)                                      | —                                              |
+| Gerar apenas artefatos selecionados                                        | `uv run python results_report.py --artifacts funnel,trend,heatmap`           | Apenas os artefatos listados                                    | `results_<stem>/`                              |
+| Pular artefatos específicos                                                | `uv run python results_report.py --skip-artifacts text,report`               | Todos exceto os listados                                        | `results_<stem>/`                              |
+| Listar todos os artefatos com descrição                                    | `uv run python results_report.py --help-artifacts`                           | Nada (imprime no terminal)                                      | —                                              |
+| Descrição detalhada de um artefato                                         | `uv run python results_report.py --help-artifact results_funnel`             | Nada (imprime no terminal)                                      | —                                              |
 
 ### Nuvem de palavras
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Auto-descoberta do CSV (sem parâmetro) | `uv run python scielo_wordcloud.py` | `wordcloud_title_ptbr_<ts>.png`, `wordcloud_keywords_ptbr_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório atual |
-| Gerar wordcloud de title + keywords (padrão, criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv` | Idem | Diretório atual |
-| Apenas um campo | `uv run python scielo_wordcloud.py resultado.csv --field abstract` | `wordcloud_abstract_ptbr_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório atual |
-| Todos os artigos extraídos (não só criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv --corpus all` | Idem | Idem |
-| Shape personalizada | `uv run python scielo_wordcloud.py resultado.csv --mask forma.png` | Idem (recortado na forma) | Idem |
-| Pasta de saída específica | `uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/` | Idem | `graficos/` |
-| Stopwords extras | `uv run python scielo_wordcloud.py resultado.csv --stopwords extra.txt` | Idem | Idem |
-| Colormap alternativo | `uv run python scielo_wordcloud.py resultado.csv --colormap plasma` | Idem (cores plasma) | Idem |
-| Estilo matplotlib alternativo | `uv run python scielo_wordcloud.py resultado.csv --style ggplot` | Idem (estilo diferente) | Idem |
-| Simular sem gerar arquivos | `uv run python scielo_wordcloud.py resultado.csv --dry-run` | Nada (imprime config) | — |
+| Pergunta / Objetivo                                       | Comando                                                                  | O que cria                                                                                       | Onde salva      |
+| --------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ | --------------- |
+| Auto-descoberta do CSV (sem parâmetro)                    | `uv run python scielo_wordcloud.py`                                      | `wordcloud_title_ptbr_<ts>.png`, `wordcloud_keywords_ptbr_<ts>.png`, `wordcloud_stats_<ts>.json` | Diretório atual |
+| Gerar wordcloud de title + keywords (padrão, criterio_ok) | `uv run python scielo_wordcloud.py resultado.csv`                        | Idem                                                                                             | Diretório atual |
+| Apenas um campo                                           | `uv run python scielo_wordcloud.py resultado.csv --field abstract`       | `wordcloud_abstract_ptbr_<ts>.png`, `wordcloud_stats_<ts>.json`                                  | Diretório atual |
+| Todos os artigos extraídos (não só criterio_ok)           | `uv run python scielo_wordcloud.py resultado.csv --corpus all`           | Idem                                                                                             | Idem            |
+| Shape personalizada                                       | `uv run python scielo_wordcloud.py resultado.csv --mask forma.png`       | Idem (recortado na forma)                                                                        | Idem            |
+| Pasta de saída específica                                 | `uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/` | Idem                                                                                             | `graficos/`     |
+| Stopwords extras                                          | `uv run python scielo_wordcloud.py resultado.csv --stopwords extra.txt`  | Idem                                                                                             | Idem            |
+| Colormap alternativo                                      | `uv run python scielo_wordcloud.py resultado.csv --colormap plasma`      | Idem (cores plasma)                                                                              | Idem            |
+| Estilo matplotlib alternativo                             | `uv run python scielo_wordcloud.py resultado.csv --style ggplot`         | Idem (estilo diferente)                                                                          | Idem            |
+| Simular sem gerar arquivos                                | `uv run python scielo_wordcloud.py resultado.csv --dry-run`              | Nada (imprime config)                                                                            | —               |
 
 ### Diagrama PRISMA 2020
 
-| Pergunta / Objetivo | Comando | O que cria | Onde salva |
-|---|---|---|---|
-| Auto-descoberta do JSON (sem parâmetro) | `uv run python prisma_workflow.py` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
-| Gerar PDF PRISMA (campos humanos em branco) | `uv run python prisma_workflow.py results_report.json` | `prisma_<stem>_pt_<ts>.pdf` | Diretório do JSON |
-| Com campos humanos via CLI | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem |
-| Modo interativo (terminal pergunta cada campo) | `uv run python prisma_workflow.py results_report.json -i` | Idem | Idem |
-| Campos humanos de arquivo | `uv run python prisma_workflow.py results_report.json --human-data campos.json` | Idem | Idem |
-| PDF em inglês | `uv run python prisma_workflow.py results_report.json --lang en` | `prisma_<stem>_en_<ts>.pdf` | Idem |
-| Pasta de saída específica | `uv run python prisma_workflow.py results_report.json --output-dir pdfs/` | Idem | `pdfs/` |
-| Simular sem gerar PDF | `uv run python prisma_workflow.py results_report.json --dry-run` | Nada (imprime dados calculados) | — |
+| Pergunta / Objetivo                            | Comando                                                                                       | O que cria                       | Onde salva        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------- | ----------------- |
+| Auto-descoberta do JSON (sem parâmetro)        | `uv run python prisma_workflow.py`                                                            | `prisma_<stem>_pt_<ts>.pdf`      | Diretório do JSON |
+| Gerar PDF PRISMA (campos humanos em branco)    | `uv run python prisma_workflow.py results_report.json`                                        | `prisma_<stem>_pt_<ts>.pdf`      | Diretório do JSON |
+| Com campos humanos via CLI                     | `uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523` | Idem (campos preenchidos no PDF) | Idem              |
+| Modo interativo (terminal pergunta cada campo) | `uv run python prisma_workflow.py results_report.json -i`                                     | Idem                             | Idem              |
+| Campos humanos de arquivo                      | `uv run python prisma_workflow.py results_report.json --human-data campos.json`               | Idem                             | Idem              |
+| PDF em inglês                                  | `uv run python prisma_workflow.py results_report.json --lang en`                              | `prisma_<stem>_en_<ts>.pdf`      | Idem              |
+| Pasta de saída específica                      | `uv run python prisma_workflow.py results_report.json --output-dir pdfs/`                     | Idem                             | `pdfs/`           |
+| Simular sem gerar PDF                          | `uv run python prisma_workflow.py results_report.json --dry-run`                              | Nada (imprime dados calculados)  | —                 |
 
 ---
 
@@ -333,13 +333,13 @@ uv run python scielo_scraper.py -?
 
 ### Status de cada artigo
 
-| Status | Significado |
-|---|---|
-| `ok_completo` | Título, resumo e palavras-chave extraídos com sucesso |
-| `ok_parcial` | Pelo menos um campo extraído, mas não todos |
-| `nada_encontrado` | Página acessada mas sem dados encontrados |
-| `erro_extracao` | Falha na extração (ex: página não encontrada) |
-| `erro_pid_invalido` | PID não reconhecido como válido |
+| Status              | Significado                                           |
+| ------------------- | ----------------------------------------------------- |
+| `ok_completo`       | Título, resumo e palavras-chave extraídos com sucesso |
+| `ok_parcial`        | Pelo menos um campo extraído, mas não todos           |
+| `nada_encontrado`   | Página acessada mas sem dados encontrados             |
+| `erro_extracao`     | Falha na extração (ex: página não encontrada)         |
+| `erro_pid_invalido` | PID não reconhecido como válido                       |
 
 ### Relatório final
 
@@ -362,14 +362,14 @@ Ao terminar, o script imprime um resumo:
 
 Indica de onde cada campo veio:
 
-| Valor | Significado |
-|---|---|
-| `articlemeta_isis[T]` | Título via ArticleMeta API |
-| `articlemeta_isis[R]` | Resumo via ArticleMeta API |
-| `articlemeta_isis[K]` | Palavras-chave via ArticleMeta API |
-| `Titulo_PT←pag1_meta_tags` | Título via meta tags HTML |
-| `Resumo_PT←pag1_html_body` | Resumo via corpo da página HTML |
-| `Palavras_Chave_PT←pag_pt_meta_tags` | Keywords via versão PT da página |
+| Valor                                | Significado                        |
+| ------------------------------------ | ---------------------------------- |
+| `articlemeta_isis[T]`                | Título via ArticleMeta API         |
+| `articlemeta_isis[R]`                | Resumo via ArticleMeta API         |
+| `articlemeta_isis[K]`                | Palavras-chave via ArticleMeta API |
+| `Titulo_PT←pag1_meta_tags`           | Título via meta tags HTML          |
+| `Resumo_PT←pag1_html_body`           | Resumo via corpo da página HTML    |
+| `Palavras_Chave_PT←pag_pt_meta_tags` | Keywords via versão PT da página   |
 
 ---
 
@@ -388,6 +388,7 @@ O script encontra automaticamente a execução anterior mais recente, carrega os
 - O script procura a pasta `minha_lista_s_*/` mais recente no mesmo diretório do CSV
 - **Reutiliza a pasta existente** — nenhuma pasta nova é criada
 - O log é **anexado** à execução anterior, com um separador indicando a retomada:
+  
   ```
   ══ RETOMADA ══
   ```
@@ -434,11 +435,11 @@ Mais lento (~10 min a mais para 564 artigos), mas útil quando a API estiver for
 
 Resultados observados em três anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
-| Estratégia | ok_completo | Tempo médio | Pasta gerada | Quando usar |
-|---|---|---|---|---|
-| Padrão (api+html) | 99.6–99.8% | ~26–27 min | `_s_..._api+html/` | Sempre — melhor custo-benefício |
-| Apenas HTML | 99.0–99.5% | ~30–36 min | `_s_..._html/` | API fora do ar |
-| Apenas API | 93.8–99.2% | ~26–27 min | `_s_..._api/` | Testes rápidos sem AoPs |
+| Estratégia        | ok_completo | Tempo médio | Pasta gerada       | Quando usar                     |
+| ----------------- | ----------- | ----------- | ------------------ | ------------------------------- |
+| Padrão (api+html) | 99.6–99.8%  | ~26–27 min  | `_s_..._api+html/` | Sempre — melhor custo-benefício |
+| Apenas HTML       | 99.0–99.5%  | ~30–36 min  | `_s_..._html/`     | API fora do ar                  |
+| Apenas API        | 93.8–99.2%  | ~26–27 min  | `_s_..._api/`      | Testes rápidos sem AoPs         |
 
 > O modo apenas-api é significativamente mais limitado em anos com muitos artigos AoP: em 2022 apresentou 5.1% de erros (vs. 0.2% do padrão), pois artigos Ahead of Print não estão indexados na API.
 
@@ -554,12 +555,12 @@ Lê automaticamente todos os anos presentes em `runs/` e salva os gráficos no d
 
 ### Gráficos e artefatos gerados
 
-| Arquivo | O que mostra |
-|---|---|
-| `chart_status.png` | Distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano. Barras cinzas para a categoria dominante; cores fortes para casos raros. Tabela inset com n exatos. |
+| Arquivo             | O que mostra                                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chart_status.png`  | Distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano. Barras cinzas para a categoria dominante; cores fortes para casos raros. Tabela inset com n exatos.                                                                     |
 | `chart_sources.png` | Fontes de extração no modo `api+html` por ano. Distingue: *ArticleMeta API* (todos os campos via API), *Fallback API+HTML* (API parcial + complemento HTML), *Fallback HTML* (API sem dados + extração inteiramente via HTML), *Falha de acesso* (erro HTTP). |
-| `chart_time.png` | Tempo total de scraping (em minutos) por modo e ano, para comparar custo entre estratégias. |
-| `chart_stats.json` | Metadados da execução: `versao_script`, `gerado_em`, `modo`, `labels` (anos/stems processados), `idiomas` e `arquivos_gerados`. Gravado automaticamente na pasta `--output`. |
+| `chart_time.png`    | Tempo total de scraping (em minutos) por modo e ano, para comparar custo entre estratégias.                                                                                                                                                                   |
+| `chart_stats.json`  | Metadados da execução: `versao_script`, `gerado_em`, `modo`, `labels` (anos/stems processados), `idiomas` e `arquivos_gerados`. Gravado automaticamente na pasta `--output`.                                                                                  |
 
 ### Opções
 
@@ -594,6 +595,7 @@ uv run python run_pipeline.py --stats-report outra/pasta
 ```
 
 O relatório inclui, por ano e por modo (`api+html`, `api`, `html`):
+
 - Total de artigos e distribuição de status com percentuais
 - Fontes de extração (`por_fonte_extracao`)
 - Tempo de execução e média por artigo
@@ -632,40 +634,41 @@ uv run python terms_matcher.py --stats-report terms_20260414_211522_stats.json
 
 ### Colunas adicionadas ao CSV original
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `n_palavras_titulo` | int | Nº de palavras no Titulo_PT |
-| `n_palavras_resumo` | int | Nº de palavras no Resumo_PT |
-| `n_keywords_pt` | int | Nº de keywords separadas por ";" |
-| `<termo>_titulo` | bool | Termo encontrado em Titulo_PT |
-| `<termo>_resumo` | bool | Termo encontrado em Resumo_PT |
-| `<termo>_keywords` | bool | Termo encontrado em Palavras_Chave_PT |
-| `criterio_ok` | bool | Todos os termos em pelo menos um dos `--required-fields` |
+| Coluna              | Tipo | Descrição                                                |
+| ------------------- | ---- | -------------------------------------------------------- |
+| `n_palavras_titulo` | int  | Nº de palavras no Titulo_PT                              |
+| `n_palavras_resumo` | int  | Nº de palavras no Resumo_PT                              |
+| `n_keywords_pt`     | int  | Nº de keywords separadas por ";"                         |
+| `<termo>_titulo`    | bool | Termo encontrado em Titulo_PT                            |
+| `<termo>_resumo`    | bool | Termo encontrado em Resumo_PT                            |
+| `<termo>_keywords`  | bool | Termo encontrado em Palavras_Chave_PT                    |
+| `criterio_ok`       | bool | Todos os termos em pelo menos um dos `--required-fields` |
 
 > ⚠ **Atenção:** o nº de colunas booleanas cresce com T termos × 3 campos = 3T colunas. Padrão (2 termos): 6 colunas. Com 5 termos: 15 colunas. Considere isso ao abrir em planilhas.
 > As colunas booleanas cobrem sempre os 3 campos (titulo, resumo, keywords); o `criterio_ok` avalia apenas os `--required-fields` (padrão: titulo e keywords).
 
 ### Saídas geradas
 
-| Arquivo | Conteúdo |
-|---|---|
-| `terms_<ts>.csv` | CSV consolidado com colunas originais + novas |
-| `terms_<ts>.log` | Log detalhado da execução |
+| Arquivo                 | Conteúdo                                              |
+| ----------------------- | ----------------------------------------------------- |
+| `terms_<ts>.csv`        | CSV consolidado com colunas originais + novas         |
+| `terms_<ts>.log`        | Log detalhado da execução                             |
 | `terms_<ts>_stats.json` | Estatísticas por ano e globais, parâmetros, auditoria |
 
 ### Estatísticas no log e no stats.json
 
 Por ano e, quando há mais de um ano, consolidadas globalmente:
+
 - `criterio_ok`: artigos que atendem ao critério (n e %)
 - Por termo: presença em cada campo (titulo, resumo, keywords)
 - Médias de n_palavras_titulo, n_palavras_resumo, n_keywords
 
 ### Campos disponíveis para --required-fields
 
-| Campo | Coluna do CSV |
-|---|---|
-| `titulo` | Titulo_PT |
-| `resumo` | Resumo_PT |
+| Campo      | Coluna do CSV     |
+| ---------- | ----------------- |
+| `titulo`   | Titulo_PT         |
+| `resumo`   | Resumo_PT         |
 | `keywords` | Palavras_Chave_PT |
 
 ### Opções completas
@@ -715,36 +718,36 @@ uv run python results_report.py --lang all
 
 **Gráficos:**
 
-| Arquivo | O que mostra |
-|---|---|
-| `results_funnel.png` | Funil de seleção: total buscado → scrapeado → criterio_ok, por ano |
-| `results_trend.png` | Evolução temporal de criterio_ok: n artigos e % por ano |
-| `results_terms_heatmap.png` | Heatmap termos × campos: % de artigos (base: criterio_ok=True) onde cada termo aparece em cada campo |
-| `results_journals.png` | Top N periódicos com mais artigos criterio_ok |
-| `results_coverage.png` | % de artigos com título / resumo / palavras-chave em PT presentes, por ano |
-| `results_venn[_en].png` | Diagrama de Venn (≤3 termos) ou UpSet (≥4 termos) — sobreposição de termos por campo no corpus completo. Inclui legenda colorida identificando qual cor = qual termo. |
+| Arquivo                     | O que mostra                                                                                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `results_funnel.png`        | Funil de seleção: total buscado → scrapeado → criterio_ok, por ano                                                                                                    |
+| `results_trend.png`         | Evolução temporal de criterio_ok: n artigos e % por ano                                                                                                               |
+| `results_terms_heatmap.png` | Heatmap termos × campos: % de artigos (base: criterio_ok=True) onde cada termo aparece em cada campo                                                                  |
+| `results_journals.png`      | Top N periódicos com mais artigos criterio_ok                                                                                                                         |
+| `results_coverage.png`      | % de artigos com título / resumo / palavras-chave em PT presentes, por ano                                                                                            |
+| `results_venn[_en].png`     | Diagrama de Venn (≤3 termos) ou UpSet (≥4 termos) — sobreposição de termos por campo no corpus completo. Inclui legenda colorida identificando qual cor = qual termo. |
 
 **Tabelas:**
 
-| Arquivo | Conteúdo |
-|---|---|
-| `results_table_summary.csv` | Funil por ano: total buscado, scrapeado, criterio_ok n e % |
-| `results_table_terms.csv` | Por termo × campo: n e % de ocorrência (base: criterio_ok) |
-| `results_table_journals.csv` | Todos os periódicos com contagem, % e anos presentes |
+| Arquivo                      | Conteúdo                                                   |
+| ---------------------------- | ---------------------------------------------------------- |
+| `results_table_summary.csv`  | Funil por ano: total buscado, scrapeado, criterio_ok n e % |
+| `results_table_terms.csv`    | Por termo × campo: n e % de ocorrência (base: criterio_ok) |
+| `results_table_journals.csv` | Todos os periódicos com contagem, % e anos presentes       |
 
 **Texto:**
 
-| Arquivo | Conteúdo |
-|---|---|
+| Arquivo              | Conteúdo                                                                                                                                                                                                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `results_text_pt.md` | Texto publication-ready em PT-BR com: Metodologia (data da busca, versões dos scripts, tempo de extração, taxa de sucesso, explicação leiga da estratégia api+html) + Nota técnica (URL da busca) + Resultados + Limitações + Descrição dos resultados por figura (versão curta e longa para cada gráfico) |
-| `results_text_en.md` | Idem em inglês (gerado com `--lang en` ou `--lang all`) |
+| `results_text_en.md` | Idem em inglês (gerado com `--lang en` ou `--lang all`)                                                                                                                                                                                                                                                    |
 
 > O arquivo sempre é gerado com sufixo de idioma (`_pt` ou `_en`). Não existe `results_text.md` sem sufixo.
 
 **Metadados:**
 
-| Arquivo | Conteúdo |
-|---|---|
+| Arquivo               | Conteúdo                                                       |
+| --------------------- | -------------------------------------------------------------- |
 | `results_report.json` | Todos os dados calculados — para consulta, reúso ou integração |
 
 ### Opções completas
@@ -776,19 +779,19 @@ uv run python results_report.py --help-artifact results_funnel  # descrição de
 
 **Aliases de artefatos disponíveis** (para `--artifacts` e `--skip-artifacts`):
 
-| Alias | Artefato completo |
-|---|---|
-| `funnel` | `results_funnel` |
-| `trend` | `results_trend` |
-| `heatmap` | `results_terms_heatmap` |
-| `journals` | `results_journals` |
-| `coverage` | `results_coverage` |
-| `venn` | `results_venn` |
-| `text` | `results_text` |
-| `table_summary` | `results_table_summary` |
-| `table_terms` | `results_table_terms` |
+| Alias            | Artefato completo        |
+| ---------------- | ------------------------ |
+| `funnel`         | `results_funnel`         |
+| `trend`          | `results_trend`          |
+| `heatmap`        | `results_terms_heatmap`  |
+| `journals`       | `results_journals`       |
+| `coverage`       | `results_coverage`       |
+| `venn`           | `results_venn`           |
+| `text`           | `results_text`           |
+| `table_summary`  | `results_table_summary`  |
+| `table_terms`    | `results_table_terms`    |
 | `table_journals` | `results_table_journals` |
-| `report` | `results_report` |
+| `report`         | `results_report`         |
 
 ### Consultando artefatos gerados
 
@@ -878,6 +881,7 @@ uv run python scielo_wordcloud.py -?                                 # ajuda
 ### Stopwords
 
 O script combina três fontes de stopwords (por padrão):
+
 1. **NLTK** — lista geral do idioma (português: 207 palavras; inglês: 198; espanhol: 313). Baixada automaticamente na primeira execução.
 2. **Domínio acadêmico** — termos do contexto SciELO/avaliação educacional (ex: "artigo", "estudo", "resultado"). Desative com `--no-domain-stopwords`.
 3. **Arquivo personalizado** — via `--stopwords ARQ` (uma palavra por linha, ou CSV com coluna `word`).
@@ -885,6 +889,7 @@ O script combina três fontes de stopwords (por padrão):
 ### Validação de CSV
 
 Se as colunas esperadas (`Titulo_PT`, `Resumo_PT`, `Palavras_Chave_PT`) não existirem no arquivo, o script:
+
 - Exibe a lista de colunas encontradas
 - Avisa se o arquivo não parece ser um `resultado.csv` do scraper
 - Indica o comando para gerar o arquivo correto
@@ -920,28 +925,28 @@ uv run python prisma_workflow.py results_report.json --human-data campos_humanos
 
 ### Campos auto-preenchidos (da fase de Identificação)
 
-| Campo | Fonte |
-|---|---|
-| Total buscado (n) | `total_buscado` do JSON |
+| Campo                      | Fonte                                               |
+| -------------------------- | --------------------------------------------------- |
+| Total buscado (n)          | `total_buscado` do JSON                             |
 | Registros para triagem (n) | Calculado: buscado − duplicatas − automação − erros |
-| Registros de automação (n) | Artigos marcados inelegíveis automaticamente |
-| Erros/outros (n) | `erro_extracao` + `erro_pid_invalido` |
-| Incluídos (sugestão) | `criterio_ok` (editável no PDF) |
+| Registros de automação (n) | Artigos marcados inelegíveis automaticamente        |
+| Erros/outros (n)           | `erro_extracao` + `erro_pid_invalido`               |
+| Incluídos (sugestão)       | `criterio_ok` (editável no PDF)                     |
 
 ### Campos humanos (Triagem e Inclusão)
 
 Preencher no PDF após curadoria, ou passar via CLI/arquivo:
 
-| Flag | Campo PRISMA |
-|---|---|
-| `--duplicates N` | Registros duplicados removidos |
-| `--sought N` | Relatórios buscados para recuperação |
-| `--not-retrieved N` | Relatórios não recuperados |
-| `--assessed N` | Relatórios avaliados para elegibilidade |
-| `--excluded-screening N` | Registros excluídos na triagem (título/resumo) |
-| `--excluded-eligibility N` | Relatórios excluídos por elegibilidade |
-| `--included N` | Estudos incluídos na revisão |
-| `--included-reports N` | Relatórios dos estudos incluídos |
+| Flag                       | Campo PRISMA                                   |
+| -------------------------- | ---------------------------------------------- |
+| `--duplicates N`           | Registros duplicados removidos                 |
+| `--sought N`               | Relatórios buscados para recuperação           |
+| `--not-retrieved N`        | Relatórios não recuperados                     |
+| `--assessed N`             | Relatórios avaliados para elegibilidade        |
+| `--excluded-screening N`   | Registros excluídos na triagem (título/resumo) |
+| `--excluded-eligibility N` | Relatórios excluídos por elegibilidade         |
+| `--included N`             | Estudos incluídos na revisão                   |
+| `--included-reports N`     | Relatórios dos estudos incluídos               |
 
 ### Opções completas
 
@@ -960,6 +965,7 @@ Todos os campos `n =` do diagrama são editáveis no PDF (AcroForm). Os que têm
 ### Formato do arquivo `--human-data`
 
 **JSON:**
+
 ```json
 {
   "duplicates": 12,
@@ -974,6 +980,7 @@ Todos os campos `n =` do diagrama são editáveis no PDF (AcroForm). Os que têm
 ```
 
 **CSV:**
+
 ```
 key,value
 duplicates,12
@@ -1028,85 +1035,85 @@ uv run python scielo_scraper.py lista.csv
 
 ### Conceitos e terminologia
 
-| Termo | Definição |
-|---|---|
-| **PID** | Identificador único SciELO. Formato: `S` + ISSN (com hífen, 9 chars) + ano (4) + volume/fascículo (3) + sequência (5) + dígito verificador (1) + letra de coleção (1). Total: 23 caracteres. Ex: `S1982-88372022000300013`. |
-| **ISSN** | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`, já com hífen). |
-| **AoP** | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML. |
-| **Coleção** | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina, `prt` = Portugal). |
-| **ISIS-JSON** | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente. Contém os campos do artigo em múltiplos idiomas. |
-| **Truncamento** | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py`. No `terms_matcher.py`, o `$` é removido automaticamente para detecção por substring. |
-| **criterio_ok** | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos `--required-fields` (padrão: titulo ou keywords). |
-| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Cada termo deve aparecer em pelo menos um deles (não necessariamente o mesmo campo para todos os termos). Padrão: `titulo` e `keywords`. |
-| **fallback HTML** | Estratégia secundária de extração: quando a ArticleMeta API não retorna um campo, o scraper acessa a página HTML do artigo para tentar extraí-lo via meta tags ou corpo da página. |
+| Termo              | Definição                                                                                                                                                                                                                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **PID**            | Identificador único SciELO. Formato: `S` + ISSN (com hífen, 9 chars) + ano (4) + volume/fascículo (3) + sequência (5) + dígito verificador (1) + letra de coleção (1). Total: 23 caracteres. Ex: `S1982-88372022000300013`.                                                                |
+| **ISSN**           | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`, já com hífen).                                                                                                                                                       |
+| **AoP**            | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML.                                                                                        |
+| **Coleção**        | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina, `prt` = Portugal).                                                                                                                           |
+| **ISIS-JSON**      | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente. Contém os campos do artigo em múltiplos idiomas.                                                                                                                    |
+| **Truncamento**    | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py`. No `terms_matcher.py`, o `$` é removido automaticamente para detecção por substring. |
+| **criterio_ok**    | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos `--required-fields` (padrão: titulo ou keywords).                                                                                                                         |
+| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Cada termo deve aparecer em pelo menos um deles (não necessariamente o mesmo campo para todos os termos). Padrão: `titulo` e `keywords`.                                                                                                |
+| **fallback HTML**  | Estratégia secundária de extração: quando a ArticleMeta API não retorna um campo, o scraper acessa a página HTML do artigo para tentar extraí-lo via meta tags ou corpo da página.                                                                                                         |
 
 ### Colunas do resultado.csv (scielo_scraper.py)
 
-| Coluna | Tipo | Origem | Descrição |
-|---|---|---|---|
-| `ID` | str | CSV entrada | PID bruto conforme fornecido |
-| `Title` | str | CSV entrada | Título conforme indexado no SciELO Search |
-| `Author(s)` | str | CSV entrada | Autores |
-| `Source` | str | CSV entrada | Abreviatura do periódico |
-| `Journal` | str | CSV entrada | Nome completo do periódico |
-| `Language(s)` | str | CSV entrada | Idioma(s) do artigo |
-| `Publication year` | int | CSV entrada | Ano de publicação |
-| `PID_limpo` | str | scraper | PID normalizado (sufixos removidos, validado pelo regex) |
-| `URL_PT` | str | scraper | URL da versão em português consultada |
-| `Titulo_PT` | str | scraper | Título em português extraído |
-| `Resumo_PT` | str | scraper | Resumo em português extraído |
-| `Palavras_Chave_PT` | str | scraper | Palavras-chave em português, separadas por `;` |
-| `status` | str | scraper | Status da extração (ver abaixo) |
-| `fonte_extracao` | str | scraper | Fonte(s) usadas por campo |
-| `url_acedida` | str | scraper | URL(s) efetivamente acessadas |
+| Coluna              | Tipo | Origem      | Descrição                                                |
+| ------------------- | ---- | ----------- | -------------------------------------------------------- |
+| `ID`                | str  | CSV entrada | PID bruto conforme fornecido                             |
+| `Title`             | str  | CSV entrada | Título conforme indexado no SciELO Search                |
+| `Author(s)`         | str  | CSV entrada | Autores                                                  |
+| `Source`            | str  | CSV entrada | Abreviatura do periódico                                 |
+| `Journal`           | str  | CSV entrada | Nome completo do periódico                               |
+| `Language(s)`       | str  | CSV entrada | Idioma(s) do artigo                                      |
+| `Publication year`  | int  | CSV entrada | Ano de publicação                                        |
+| `PID_limpo`         | str  | scraper     | PID normalizado (sufixos removidos, validado pelo regex) |
+| `URL_PT`            | str  | scraper     | URL da versão em português consultada                    |
+| `Titulo_PT`         | str  | scraper     | Título em português extraído                             |
+| `Resumo_PT`         | str  | scraper     | Resumo em português extraído                             |
+| `Palavras_Chave_PT` | str  | scraper     | Palavras-chave em português, separadas por `;`           |
+| `status`            | str  | scraper     | Status da extração (ver abaixo)                          |
+| `fonte_extracao`    | str  | scraper     | Fonte(s) usadas por campo                                |
+| `url_acedida`       | str  | scraper     | URL(s) efetivamente acessadas                            |
 
 ### Colunas adicionadas pelo terms_matcher.py
 
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `n_palavras_titulo` | int | Nº de palavras em Titulo_PT |
-| `n_palavras_resumo` | int | Nº de palavras em Resumo_PT |
-| `n_keywords_pt` | int | Nº de keywords em Palavras_Chave_PT (separador `;`) |
-| `<termo>_titulo` | bool | Termo detectado em Titulo_PT (case-insensitive, substring) |
-| `<termo>_resumo` | bool | Termo detectado em Resumo_PT (case-insensitive, substring) |
-| `<termo>_keywords` | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
-| `criterio_ok` | bool | Todos os termos presentes em ≥1 campo required |
+| Coluna              | Tipo | Descrição                                                          |
+| ------------------- | ---- | ------------------------------------------------------------------ |
+| `n_palavras_titulo` | int  | Nº de palavras em Titulo_PT                                        |
+| `n_palavras_resumo` | int  | Nº de palavras em Resumo_PT                                        |
+| `n_keywords_pt`     | int  | Nº de keywords em Palavras_Chave_PT (separador `;`)                |
+| `<termo>_titulo`    | bool | Termo detectado em Titulo_PT (case-insensitive, substring)         |
+| `<termo>_resumo`    | bool | Termo detectado em Resumo_PT (case-insensitive, substring)         |
+| `<termo>_keywords`  | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
+| `criterio_ok`       | bool | Todos os termos presentes em ≥1 campo required                     |
 
 ### Status de extração
 
-| Status | Significado |
-|---|---|
-| `ok_completo` | Título + resumo + palavras-chave extraídos com sucesso |
-| `ok_parcial` | Pelo menos um campo extraído, mas não todos |
-| `nada_encontrado` | Página acessada, nenhum dado encontrado |
-| `erro_extracao` | Falha de acesso (ex: HTTP 404, timeout) |
-| `erro_pid_invalido` | PID fora do padrão esperado |
+| Status              | Significado                                            |
+| ------------------- | ------------------------------------------------------ |
+| `ok_completo`       | Título + resumo + palavras-chave extraídos com sucesso |
+| `ok_parcial`        | Pelo menos um campo extraído, mas não todos            |
+| `nada_encontrado`   | Página acessada, nenhum dado encontrado                |
+| `erro_extracao`     | Falha de acesso (ex: HTTP 404, timeout)                |
+| `erro_pid_invalido` | PID fora do padrão esperado                            |
 
 ### Fontes de extração (`fonte_extracao`)
 
-| Valor | Significado |
-|---|---|
-| `articlemeta_isis[T]` | Título via ArticleMeta API (ISIS-JSON) |
-| `articlemeta_isis[R]` | Resumo via ArticleMeta API |
-| `articlemeta_isis[K]` | Palavras-chave via ArticleMeta API |
-| `Titulo_PT←pag1_meta_tags` | Título via meta tags da URL legacy |
-| `Titulo_PT←pag1_html_body` | Título via corpo HTML da URL legacy |
-| `Resumo_PT←pag_pt_meta_tags` | Resumo via meta tags da versão PT |
-| `Resumo_PT←pag_pt_html_body` | Resumo via corpo HTML da versão PT |
-| `Palavras_Chave_PT←pag_pt_meta_tags` | Keywords via meta tags da versão PT |
-| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP) |
+| Valor                                       | Significado                            |
+| ------------------------------------------- | -------------------------------------- |
+| `articlemeta_isis[T]`                       | Título via ArticleMeta API (ISIS-JSON) |
+| `articlemeta_isis[R]`                       | Resumo via ArticleMeta API             |
+| `articlemeta_isis[K]`                       | Palavras-chave via ArticleMeta API     |
+| `Titulo_PT←pag1_meta_tags`                  | Título via meta tags da URL legacy     |
+| `Titulo_PT←pag1_html_body`                  | Título via corpo HTML da URL legacy    |
+| `Resumo_PT←pag_pt_meta_tags`                | Resumo via meta tags da versão PT      |
+| `Resumo_PT←pag_pt_html_body`                | Resumo via corpo HTML da versão PT     |
+| `Palavras_Chave_PT←pag_pt_meta_tags`        | Keywords via meta tags da versão PT    |
+| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP)              |
 
 ### Nomenclatura de arquivos e pastas
 
-| Padrão | Exemplo | Gerado por |
-|---|---|---|
-| `sc_<ts>.csv` | `sc_20260411_143022.csv` | scielo_search.py |
-| `sc_<ts>_params.json` | `sc_20260411_143022_params.json` | scielo_search.py |
-| `<stem>_s_<ts>_<modo>/` | `sc_20260411_s_20260411_150312_api+html/` | scielo_scraper.py |
-| `runs/<ano>/` | `runs/2024/` | run_pipeline.py |
-| `terms_<ts>.csv` | `terms_20260415_161055.csv` | terms_matcher.py |
-| `terms_<ts>.log` | `terms_20260415_161055.log` | terms_matcher.py |
-| `terms_<ts>_stats.json` | `terms_20260415_161055_stats.json` | terms_matcher.py |
-| `results_<stem>/` | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
-| `results_text_<lang>.md` | `results_text_pt.md`, `results_text_en.md` | results_report.py |
-| `results_report.json` | `results_report.json` | results_report.py |
+| Padrão                   | Exemplo                                                  | Gerado por        |
+| ------------------------ | -------------------------------------------------------- | ----------------- |
+| `sc_<ts>.csv`            | `sc_20260411_143022.csv`                                 | scielo_search.py  |
+| `sc_<ts>_params.json`    | `sc_20260411_143022_params.json`                         | scielo_search.py  |
+| `<stem>_s_<ts>_<modo>/`  | `sc_20260411_s_20260411_150312_api+html/`                | scielo_scraper.py |
+| `runs/<ano>/`            | `runs/2024/`                                             | run_pipeline.py   |
+| `terms_<ts>.csv`         | `terms_20260415_161055.csv`                              | terms_matcher.py  |
+| `terms_<ts>.log`         | `terms_20260415_161055.log`                              | terms_matcher.py  |
+| `terms_<ts>_stats.json`  | `terms_20260415_161055_stats.json`                       | terms_matcher.py  |
+| `results_<stem>/`        | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
+| `results_text_<lang>.md` | `results_text_pt.md`, `results_text_en.md`               | results_report.py |
+| `results_report.json`    | `results_report.json`                                    | results_report.py |

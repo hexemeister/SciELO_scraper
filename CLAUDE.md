@@ -9,8 +9,8 @@
 | `run_pipeline.py` | Pipeline completo (v2.2): busca → 3×scraping → análise → 3×match → gráficos → relatório → cópia | `--year` | `runs/<ano>/` |
 | `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png`, `chart_stats.json` |
 | `results_report.py` | Artefatos científicos publication-ready dos resultados | `[--base]`, `[--scrape-dir]`, `--years`, `--mode`, `--output-dir`, `--lang`, `--top-journals` | `results_*/` (gráficos + CSVs + Markdown + JSON) |
-| `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
-| `scielo_wordcloud.py` | Gera nuvem de palavras a partir de CSV de scraping | `CSV`, `[--field]`, `[--lang]`, `[--corpus]`, `[--mask]`, `[--colormap]` | `wordcloud_<campo>_<lang>_<ts>.png` + `wordcloud_stats_<ts>.json` |
+| `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode`, `--required-fields` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
+| `scielo_wordcloud.py` | Gera nuvem de palavras a partir de CSV de scraping | `CSV`, `[--field]`, `[--lang]`, `[--corpus]`, `[--mask]`, `[--colormap]`, `[--style]` | `wordcloud_<campo>_<lang>_<ts>.png` + `wordcloud_stats_<ts>.json` |
 | `prisma_workflow.py` | Gera PDF preenchível A4 com diagrama PRISMA 2020 | `results_report.json`, `[--human-data]`, `[--lang]`, `[-i]` | `prisma_<stem>_<lang>_<ts>.pdf` |
 | `_gerar_fluxograma.py` | Gera SVG do fluxograma de extração | — | `flowchart_extracao_pt_br.svg` |
 
@@ -89,7 +89,9 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Propósito:** diagnóstico técnico do processo — como o scraping correu (taxas, fontes, tempo). Não é sobre resultados científicos.
 - **`--lang pt|en|all`:** gera gráficos em português, inglês ou ambos. Com `all`, sufixo `_pt`/`_en` nos nomes dos arquivos.
 - **`--stem`:** busca determinística sem `--base` — filtra pastas `<stem>_s_*_<modo>/`. O pipeline sempre passa `--stem`.
-- **Bug fix:** no modo single-run (sem `--base`), o label do eixo X agora mostra o ano real (lido do `params.json` ou `Publication year`), não o stem do CSV.
+- **Modo single-run (sem `--base`):** o label do eixo X mostra o ano real (lido do `params.json` ou `Publication year`), não o stem do CSV.
+- **`--timestamp`:** adiciona sufixo `_<YYYYMMDD_HHMMSS>` nos nomes dos PNGs gerados (evita sobrescrever runs anteriores).
+- **`--no-status / --no-sources / --no-time`:** pula individualmente cada um dos três gráficos.
 - **`chart_stats.json`:** gravado na pasta de saída ao final de cada execução com `versao_script`, `gerado_em`, `modo`, `labels`, `idiomas` e `arquivos_gerados`.
 - **Fontes de extração distinguidas:**
   - *ArticleMeta API* — todos os campos via API
@@ -167,7 +169,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Layout:** lê `assets/PRISMAdiagram.json` para posições, cores e geometria. Faixas de fase laterais (#9CC2E5), cabeçalho amarelo (#FFC000), caixas brancas com borda preta 0.5pt, setas block pretas.
 - **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. Triagem e Inclusão requerem curadoria humana após o processamento.
 
-## Comportamento do scraper (scielo_scraper.py v2.4)
+## Comportamento do scraper (scielo_scraper.py v2.5)
 
 - **Fonte primária:** ArticleMeta REST API (ISIS-JSON)
 - **Fallback:** HTML scraping multi-estratégia (meta tags → body → link PT → og:url)

@@ -469,7 +469,7 @@ def gerar_pdf(dados: dict, output_path: Path, lang: str = "pt"):
     GAP_HEADER_TO_ID         = 8.0   # pt — cabeçalho → identificação
     GAP_ID_TO_SCREENING      = 14.0  # pt — identificação → triagem
     GAP_SCREENING_BOXES      = 14.0  # pt — entre caixas dentro da triagem
-    GAP_SCREENING_TO_INCLUDED = 28.0 # pt — triagem → incluídos
+    GAP_SCREENING_TO_INCLUDED = 58.0 # pt — triagem → incluídos
     GAP_INCLUDED_TO_FOOTER   = 28.0  # pt — incluídos → rodapé
 
     # =========================================================================
