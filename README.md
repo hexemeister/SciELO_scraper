@@ -215,6 +215,8 @@ uv run python run_pipeline.py --year 2024 --skip-wordcloud --skip-prisma  # pula
 uv run python run_pipeline.py --year 2024 --prisma-lang pt       # PRISMA só em PT (default: pt+en)
 uv run python run_pipeline.py --stats-report                     # relatório consolidado de runs/
 uv run python run_pipeline.py --versions                         # versão de todos os scripts
+uv run python run_pipeline.py --reset-working-tree --dry-run     # preview do que seria removido
+uv run python run_pipeline.py --reset-working-tree               # reset completo (pede confirmação)
 ```
 
 Gera em `runs/<ano>/`: CSV de busca, 3 pastas de scraping, análise de discrepância, gráficos de processo, relatório científico, wordclouds, PDFs PRISMA (pt + en), `pipeline_<ts>.log` e `pipeline_stats.json`.

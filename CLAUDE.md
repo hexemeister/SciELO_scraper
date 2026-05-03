@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `run_pipeline.py` | Pipeline completo (v2.4): busca → 3×scraping → análise → 3×match → gráficos → relatório → wordcloud → prisma → cópia | `--year` | `runs/<ano>/` |
+| `run_pipeline.py` | Pipeline completo (v2.5): busca → 3×scraping → análise → 3×match → gráficos → relatório → wordcloud → prisma → cópia | `--year` | `runs/<ano>/` |
 | `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png`, `chart_stats.json` |
 | `results_report.py` | Artefatos científicos publication-ready dos resultados | `[--base]`, `[--scrape-dir]`, `--years`, `--mode`, `--output-dir`, `--lang`, `--top-journals` | `results_*/` (gráficos + CSVs + Markdown + JSON) |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode`, `--required-fields` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
@@ -34,7 +34,7 @@
 - **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
 - **`--list-collections`:** lista as 36 coleções SciELO e sai
 
-## Comportamento do run_pipeline.py (v2.4)
+## Comportamento do run_pipeline.py (v2.5)
 
 **Etapas do pipeline** (12 no total por ano):
 1. Busca (`scielo_search.py`)
@@ -73,6 +73,7 @@
 - **`--stats-report [DIR]`:** gera relatório Markdown consolidado de todos os `stats.json` em `runs/` (ou `DIR`); funciona sem `--year` — modo standalone
 - **`--per-year`:** executa o pipeline para cada ano, com barra de progresso global e ETA estimado por histórico
 - **`--versions`:** exibe a versão do pipeline e de cada script do conjunto; funciona sem `--year` — modo standalone
+- **`--reset-working-tree`:** remove todos os arquivos e pastas gerados no diretório raiz (runs/, exemplos/, CSVs, pastas de scraping, etc.), preservando scripts `.py`, docs e `.git`. Pede confirmação `y/N`. Combina com `--dry-run` para preview sem apagar.
 
 **Saída em `runs/<ano>/`:**
 - `sc_<ts>.csv` + `sc_<ts>_params.json`

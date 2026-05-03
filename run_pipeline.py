@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_pipeline.py  v2.4
+run_pipeline.py  v2.5
 =====================
 Executa o pipeline completo: busca → extração (3 estratégias) →
 análise de discrepância → detecção de termos (terms_matcher) →
@@ -35,6 +35,8 @@ OPÇÕES
   --dry-run                 Mostra o que faria sem executar nada
   --stats-report [DIR]      Gera relatório consolidado dos stats.json em DIR (default: runs/)
   --versions                Exibe a versão deste pipeline e de todos os scripts; não executa pipeline
+  --reset-working-tree      Remove todos os arquivos/pastas gerados no raiz (preserva scripts, docs, .git)
+                            Combina com --dry-run para preview sem apagar
   -h, --help, -?            Mostrar esta mensagem de ajuda e sair
 
 CAMPOS DISPONÍVEIS PARA --terms-fields
@@ -66,7 +68,7 @@ EXEMPLOS
   python run_pipeline.py --stats-report runs/         # idem com pasta explícita
 """
 
-__version__ = "2.4"
+__version__ = "2.5"
 
 import argparse
 import json
@@ -1331,6 +1333,93 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
 
 # ── Versões ───────────────────────────────────────────────────────────────────
 
+# ── Reset working tree ────────────────────────────────────────────────────────
+
+# Itens do diretório raiz que devem ser PRESERVADOS (nunca apagados)
+_PRESERVAR = {
+    # scripts
+    ".py",
+    # docs e config
+    "README.md", "CLAUDE.md", "pyproject.toml", "uv.lock", ".gitignore",
+    "LICENSE",
+    # pastas protegidas (checadas pelo nome, sem extensão)
+}
+_PRESERVAR_DIRS = {".git", ".venv", ".claude", "docs", "temp"}
+
+
+def _reset_working_tree(dry: bool = False) -> None:
+    """Remove todos os arquivos e pastas gerados no diretório raiz do projeto,
+    preservando apenas scripts, docs e pastas de infraestrutura."""
+    raiz = HERE
+    remover: list[Path] = []
+
+    for item in sorted(raiz.iterdir()):
+        nome = item.name
+
+        # Sempre preservar itens ocultos de infraestrutura
+        if nome.startswith("."):
+            if nome in _PRESERVAR_DIRS or any(nome.startswith(d) for d in _PRESERVAR_DIRS):
+                continue
+            # outros dotfiles/dotdirs também são preservados por precaução
+            continue
+
+        if item.is_dir():
+            if nome in _PRESERVAR_DIRS:
+                continue
+            remover.append(item)
+        else:
+            # Preservar por extensão
+            if item.suffix == ".py":
+                continue
+            # Preservar por nome exato
+            if nome in _PRESERVAR:
+                continue
+            remover.append(item)
+
+    if not remover:
+        print("Working tree já está limpa — nada a remover.")
+        return
+
+    print("Os seguintes itens serão removidos permanentemente:\n")
+    for p in remover:
+        tipo = "DIR " if p.is_dir() else "FILE"
+        print(f"  [{tipo}] {p.name}")
+
+    print()
+    if dry:
+        print("(--dry-run: nenhuma remoção efetuada)")
+        return
+
+    try:
+        resposta = input("Confirmar remoção? [y/N] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\nCancelado.")
+        return
+
+    if resposta != "y":
+        print("Cancelado.")
+        return
+
+    erros = []
+    for p in remover:
+        try:
+            if p.is_dir():
+                shutil.rmtree(p)
+            else:
+                p.unlink()
+        except Exception as e:
+            erros.append(f"  {p.name}: {e}")
+
+    removidos = len(remover) - len(erros)
+    print(f"\n{removidos} item(ns) removido(s).")
+    if erros:
+        print("Erros:")
+        for e in erros:
+            print(e)
+
+
+# ── Versões ───────────────────────────────────────────────────────────────────
+
 _SCRIPTS_VERSIONADOS = [
     "scielo_search.py",
     "scielo_scraper.py",
@@ -1422,11 +1511,18 @@ def main():
     ap.add_argument("--version", action="version", version=f"v{__version__}")
     ap.add_argument("--versions", action="store_true",
         help="Exibe a versão deste pipeline e de todos os scripts do conjunto")
+    ap.add_argument("--reset-working-tree", action="store_true",
+        help="Remove todos os arquivos e pastas gerados no raiz do projeto (preserva scripts, docs e .git). Pede confirmação.")
     args = ap.parse_args()
 
     # ── Modo --versions (não executa pipeline) ────────────────────────────────
     if args.versions:
         _mostrar_versions(sys.executable)
+        sys.exit(0)
+
+    # ── Modo --reset-working-tree (não executa pipeline) ─────────────────────
+    if args.reset_working_tree:
+        _reset_working_tree(dry=args.dry_run)
         sys.exit(0)
 
     # ── Modo --stats-report (não executa pipeline) ────────────────────────────
