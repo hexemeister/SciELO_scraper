@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-run_pipeline.py  v2.1
+run_pipeline.py  v2.3
 =====================
 Executa o pipeline completo: busca → extração (3 estratégias) →
 análise de discrepância → detecção de termos (terms_matcher) →
 gráficos comparativos (process_charts) → relatório científico (results_report) →
+nuvem de palavras (scielo_wordcloud) → diagrama PRISMA (prisma_workflow) →
 cópia para runs/<ano>/.
 
 Verifica e instala dependências automaticamente antes de começar.
@@ -27,6 +28,9 @@ OPÇÕES
   --skip-match              Pular etapa do terms_matcher
   --skip-charts             Pular geração de gráficos
   --skip-report             Pular geração do relatório científico (results_report.py)
+  --skip-wordcloud          Pular geração de nuvem de palavras (scielo_wordcloud.py)
+  --skip-prisma             Pular geração do diagrama PRISMA (prisma_workflow.py)
+  --prisma-lang LANG        Idioma(s) do PDF PRISMA: pt|en|both (default: both)
   --per-year                Rodar pipeline separado por ano (um CSV e destino por ano)
   --dry-run                 Mostra o que faria sem executar nada
   --stats-report [DIR]      Gera relatório consolidado dos stats.json em DIR (default: runs/)
@@ -61,7 +65,7 @@ EXEMPLOS
   python run_pipeline.py --stats-report runs/         # idem com pasta explícita
 """
 
-__version__ = "2.2"
+__version__ = "2.3"
 
 import argparse
 import json
@@ -117,25 +121,68 @@ MODO_SUFIXO = {
 CAMPOS_DISPONIVEIS = ["titulo", "resumo", "keywords"]
 
 # Etapas do pipeline (para GlobalProgress e pipeline_stats)
-# busca(1) + 3×scraping(3) + análise(1) + 3×match(3) + charts(1) + report(1) = 10
-ETAPAS_POR_ANO = 10
+# busca(1) + 3×scraping(3) + análise(1) + 3×match(3) + charts(1) + report(1) + wordcloud(1) + prisma(1) = 12
+ETAPAS_POR_ANO = 12
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
+
+# Handle do arquivo de log — definido em setup_log_file(), usado por log() e run()
+_log_fh = None
+
+
+def setup_log_file(path: Path) -> None:
+    """Abre o arquivo de log para escrita. Chamado no início de cada run de ano."""
+    global _log_fh
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _log_fh = open(path, "w", encoding="utf-8", buffering=1)  # line-buffered
+
+
+def close_log_file() -> None:
+    """Fecha o arquivo de log. Chamado ao fim de cada run de ano."""
+    global _log_fh
+    if _log_fh:
+        _log_fh.close()
+        _log_fh = None
+
+
+def _write_log(line: str) -> None:
+    """Escreve linha no arquivo de log se estiver aberto."""
+    if _log_fh:
+        try:
+            _log_fh.write(line + "\n")
+        except Exception:
+            pass
+
 
 def log(msg: str, level: str = "INFO"):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     prefix = {"INFO": "[OK]", "WARN": "[AV]", "ERROR": "[ER]", "STEP": ">>>"}.get(level, "   ")
+    line = f"{ts}  {prefix}  {msg}"
     try:
-        print(f"{ts}  {prefix}  {msg}", flush=True)
+        print(line, flush=True)
     except UnicodeEncodeError:
         print(f"{ts}  {prefix}  {msg.encode('ascii', errors='replace').decode()}", flush=True)
+    _write_log(line)
 
 
 def run(cmd: list, dry_run: bool) -> int:
     log(f"$ {' '.join(str(c) for c in cmd)}", "STEP")
     if dry_run:
         return 0
-    return subprocess.run(cmd, cwd=HERE).returncode
+    result = subprocess.run(
+        cmd, cwd=HERE,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", errors="replace",
+    )
+    # Tee: exibe no terminal e grava no log
+    if result.stdout:
+        for line in result.stdout.splitlines():
+            try:
+                print(line, flush=True)
+            except UnicodeEncodeError:
+                print(line.encode("ascii", errors="replace").decode(), flush=True)
+            _write_log(line)
+    return result.returncode
 
 
 def humanize(seconds: float) -> str:
@@ -175,7 +222,7 @@ class GlobalProgress:
     Rastreia progresso global do pipeline multi-ano.
 
     Etapas por ano (--per-year):
-      busca(1) + 3×scraping(3) + análise(1) + 3×match(3) + charts(1) = 9
+      busca(1) + 3×scraping(3) + análise(1) + 3×match(3) + charts(1) + report(1) + wordcloud(1) + prisma(1) = 12
     """
 
     ETAPAS_POR_ANO = ETAPAS_POR_ANO
@@ -620,15 +667,26 @@ def _pasta_preferida(run_dirs: dict) -> Path | None:
 def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
                  collection: str, dest: Path, python: str,
                  skip_search: bool, skip_scrape: bool, skip_analysis: bool,
-                 skip_match: bool, skip_charts: bool, skip_report: bool, dry: bool,
+                 skip_match: bool, skip_charts: bool, skip_report: bool,
+                 skip_wordcloud: bool, skip_prisma: bool,
+                 prisma_lang: str,
+                 dry: bool,
                  terms_fields: list[str], terms_match_mode: str,
-                 gp: "GlobalProgress | None" = None):
-    """Executa search → 3×scrape → análise → 3×match → charts → report → cópia para dest."""
+                 gp: "GlobalProgress | None" = None,
+                 origem: dict | None = None):
+    """Executa search → 3×scrape → análise → 3×match → charts → report → wordcloud → prisma → cópia para dest."""
 
     ano_ref   = years[0]
     anos_label = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
     etapa_local = 0
     etapa_total = ETAPAS_POR_ANO
+
+    # ── Log em arquivo — aberto desde o início, arquivado ao fim ─────────────
+    if not dry:
+        ts_log = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = dest / f"pipeline_{ts_log}.log"
+        setup_log_file(log_path)
+        log(f"Log em arquivo  : {log_path}")
 
     def _header(n: int, label: str, extra: str = ""):
         nonlocal etapa_local
@@ -919,6 +977,91 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             gp.avancar()
     print()
 
+    # ── 11. Nuvem de palavras ─────────────────────────────────────────────────
+    est_principal = ESTRATEGIAS[0]
+    pasta_principal = run_dirs.get(est_principal["label"])
+
+    if not skip_wordcloud:
+        _header(11, "Nuvem de palavras (scielo_wordcloud)")
+        log(f"  Pasta      : {pasta_principal}")
+        log(f"  Campos     : {'+'.join(terms_fields)}")
+        log(f"  Saida      : {dest}/")
+
+        resultado_csv = pasta_principal / "resultado.csv" if pasta_principal else None
+        if resultado_csv and resultado_csv.exists():
+            # Mapeia campos do matcher para campos do wordcloud
+            _campo_map = {"titulo": "title", "resumo": "abstract", "keywords": "keywords"}
+            wc_fields = "+".join(_campo_map.get(f, f) for f in terms_fields)
+            rc = run(
+                [python, "scielo_wordcloud.py",
+                 str(resultado_csv),
+                 "--field", wc_fields,
+                 "--output-dir", str(dest)],
+                dry,
+            )
+            if gp:
+                gp.avancar()
+            if rc != 0:
+                log("  Wordcloud falhou — continuando", "WARN")
+            elif not dry:
+                pngs = list(dest.glob("wordcloud_*.png"))
+                log(f"  {len(pngs)} arquivo(s) gerado(s) em {dest.name}/")
+        else:
+            log("  resultado.csv nao encontrado — etapa pulada", "WARN")
+            if gp:
+                gp.avancar()
+    else:
+        log(f"  Etapa 11/{ETAPAS_POR_ANO}: Nuvem de palavras — PULADA (--skip-wordcloud)", "WARN")
+        if gp:
+            gp.avancar()
+    print()
+
+    # ── 12. Diagrama PRISMA ───────────────────────────────────────────────────
+    if not skip_prisma:
+        _header(12, "Diagrama PRISMA (prisma_workflow)")
+
+        # Localiza results_report.json gerado na etapa 10
+        slug_principal = est_principal["slug"]
+        report_output = dest / f"results_{stem}_{slug_principal}"
+        report_json = report_output / "results_report.json"
+
+        log(f"  JSON       : {report_json}")
+        log(f"  Idioma(s)  : {prisma_lang}")
+        log(f"  Saida      : {dest}/")
+
+        if report_json.exists() or dry:
+            # Determina flags de idioma
+            if prisma_lang == "both":
+                lang_flags = ["pt", "en"]
+            else:
+                lang_flags = [prisma_lang]
+
+            for lang in lang_flags:
+                rc = run(
+                    [python, "prisma_workflow.py",
+                     str(report_json),
+                     "--lang", lang,
+                     "--output-dir", str(dest)],
+                    dry,
+                )
+                if rc != 0:
+                    log(f"  PRISMA ({lang}) falhou — continuando", "WARN")
+
+            if gp:
+                gp.avancar()
+            if not dry:
+                pdfs = list(dest.glob("prisma_*.pdf"))
+                log(f"  {len(pdfs)} PDF(s) gerado(s) em {dest.name}/")
+        else:
+            log("  results_report.json nao encontrado — etapa pulada", "WARN")
+            if gp:
+                gp.avancar()
+    else:
+        log(f"  Etapa 12/{ETAPAS_POR_ANO}: Diagrama PRISMA — PULADA (--skip-prisma)", "WARN")
+        if gp:
+            gp.avancar()
+    print()
+
     # ── Cópia para destino + limpeza ──────────────────────────────────────────
     log(f"── Copiando para {dest} ──────────────────────────────────────", "STEP")
 
@@ -962,8 +1105,10 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             skip_match=skip_match,
             skip_charts=skip_charts,
             skip_report=skip_report,
+            skip_wordcloud=skip_wordcloud,
+            skip_prisma=skip_prisma,
             run_dirs=run_dirs,
-            origem=_origem(args),
+            origem=origem or {},
         )
 
         # Arquivar originais do diretório raiz (move → nunca apaga)
@@ -976,6 +1121,13 @@ def run_pipeline(years: list[int], raw_years: list[str], terms: list[str],
             run_dirs=run_dirs,
             analise_path=analise_path if not skip_analysis else None,
         )
+
+        # Fechar e arquivar log em dest (última ação — captura tudo)
+        log(f"Log arquivado em: {dest}/")
+        close_log_file()
+        if log_path.exists() and not (dest / log_path.name).exists():
+            shutil.copy2(log_path, dest / log_path.name)
+            log_path.unlink()
     else:
         log(f"  (dry-run) copiaria CSV, params.json, 3 pastas e analise para {dest}")
         log(f"  (dry-run) gravaria pipeline_stats.json em {dest}")
@@ -997,18 +1149,22 @@ def _arquivar_originais(dest: Path, stem: str, csv_path: Path, params: Path,
             return
         target = dest / src.name
         if target.exists():
-            # Já copiado anteriormente — só remove o original
-            if src.is_dir():
-                shutil.rmtree(src)
+            # Já copiado anteriormente — verifica tamanho antes de remover original
+            src_ok = (src.stat().st_size > 0) if src.is_file() else any(src.iterdir())
+            tgt_ok = (target.stat().st_size > 0) if target.is_file() else any(target.iterdir())
+            if tgt_ok:
+                # Cópia em dest está íntegra — remove original
+                if src.is_dir():
+                    shutil.rmtree(src)
+                else:
+                    src.unlink()
+                log(f"  Removido (ja estava em dest): {label}")
             else:
-                src.unlink()
-            log(f"  Removido (ja estava em dest): {label}")
+                # Cópia em dest suspeita — mantém original e avisa
+                log(f"  AVISO: dest/{label} existe mas parece vazio — original mantido em raiz", "WARN")
         else:
             # Não estava em dest — move e avisa
-            if src.is_dir():
-                shutil.move(str(src), str(target))
-            else:
-                shutil.move(str(src), str(target))
+            shutil.move(str(src), str(target))
             log(f"  Arquivado (movido para dest): {label}", "WARN")
         movidos += 1
 
@@ -1058,9 +1214,12 @@ def _origem(args) -> dict:
     if getattr(args, "per_year", False):
         cmd.append("--per-year")
     for flag in ("skip_search", "skip_scrape", "skip_analysis",
-                 "skip_match", "skip_charts", "skip_report"):
+                 "skip_match", "skip_charts", "skip_report",
+                 "skip_wordcloud", "skip_prisma"):
         if getattr(args, flag, False):
             cmd.append(f"--{flag.replace('_', '-')}")
+    if getattr(args, "prisma_lang", "both") != "both":
+        cmd += ["--prisma-lang", args.prisma_lang]
     return {
         "comando": " ".join(cmd),
         "argv":    sys.argv[1:],
@@ -1074,6 +1233,7 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
                             skip_search: bool, skip_scrape: bool,
                             skip_analysis: bool, skip_match: bool,
                             skip_charts: bool, skip_report: bool,
+                            skip_wordcloud: bool, skip_prisma: bool,
                             run_dirs: dict, origem: dict | None = None):
     """Grava pipeline_stats.json em dest com resumo completo da execução."""
     ts_now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1114,6 +1274,16 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
         etapas_executadas.append("results_report")
     else:
         etapas_puladas.append("results_report")
+
+    if not skip_wordcloud:
+        etapas_executadas.append("wordcloud")
+    else:
+        etapas_puladas.append("wordcloud")
+
+    if not skip_prisma:
+        etapas_executadas.append("prisma")
+    else:
+        etapas_puladas.append("prisma")
 
     # Resumo de stats por estratégia
     estrategias_stats = {}
@@ -1198,6 +1368,13 @@ def main():
         help="Pular geração de gráficos comparativos")
     ap.add_argument("--skip-report", action="store_true",
         help="Pular geração do relatório científico (results_report.py)")
+    ap.add_argument("--skip-wordcloud", action="store_true",
+        help="Pular geração de nuvem de palavras (scielo_wordcloud.py)")
+    ap.add_argument("--skip-prisma", action="store_true",
+        help="Pular geração do diagrama PRISMA (prisma_workflow.py)")
+    ap.add_argument("--prisma-lang", default="both", choices=["pt", "en", "both"],
+        metavar="LANG",
+        help="Idioma(s) do PDF PRISMA: pt|en|both (default: both)")
     ap.add_argument("--dry-run", action="store_true",
         help="Mostra o que faria sem executar nada")
     ap.add_argument(
@@ -1247,6 +1424,8 @@ def main():
         ("match",    args.skip_match),
         ("charts",   args.skip_charts),
         ("report",   args.skip_report),
+        ("wordcloud", args.skip_wordcloud),
+        ("prisma",   args.skip_prisma),
     ] if v]
     if etapas_skip:
         log(f"Etapas puladas  : {', '.join(etapas_skip)}", "WARN")
@@ -1299,10 +1478,14 @@ def main():
                 skip_match=args.skip_match,
                 skip_charts=args.skip_charts,
                 skip_report=args.skip_report,
+                skip_wordcloud=args.skip_wordcloud,
+                skip_prisma=args.skip_prisma,
+                prisma_lang=args.prisma_lang,
                 dry=dry,
                 terms_fields=args.terms_fields,
                 terms_match_mode=args.terms_match_mode,
                 gp=gp,
+                origem=_origem(args),
             )
 
         # ── Chart agregado multi-ano ───────────────────────────────────────────
@@ -1350,10 +1533,14 @@ def main():
             skip_match=args.skip_match,
             skip_charts=args.skip_charts,
             skip_report=args.skip_report,
+            skip_wordcloud=args.skip_wordcloud,
+            skip_prisma=args.skip_prisma,
+            prisma_lang=args.prisma_lang,
             dry=dry,
             terms_fields=args.terms_fields,
             terms_match_mode=args.terms_match_mode,
             gp=None,
+            origem=_origem(args),
         )
 
     elapsed = time.time() - t_total
