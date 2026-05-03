@@ -6,7 +6,7 @@
 |---|---|---|---|
 | `scielo_search.py` | Busca artigos no SciELO Search | `--terms`, `--years`, `--collection` | `sc_<ts>.csv` + `sc_<ts>_params.json` |
 | `scielo_scraper.py` | Extrai título/resumo/keywords PT | `sc_<ts>.csv` | `<stem>_s_<ts>_<modo>/` |
-| `run_pipeline.py` | Pipeline completo (v2.2): busca → 3×scraping → análise → 3×match → gráficos → relatório → cópia | `--year` | `runs/<ano>/` |
+| `run_pipeline.py` | Pipeline completo (v2.3): busca → 3×scraping → análise → 3×match → gráficos → relatório → wordcloud → prisma → cópia | `--year` | `runs/<ano>/` |
 | `process_charts.py` | Diagnóstico técnico do processo de extração (gráficos) | `[--base]`, `[--stem]`, `--years`, `--output`, `--lang`, `--timestamp` | `chart_status[_<lang>][_<ts>].png`, `chart_sources[_<lang>][_<ts>].png`, `chart_time[_<lang>][_<ts>].png`, `chart_stats.json` |
 | `results_report.py` | Artefatos científicos publication-ready dos resultados | `[--base]`, `[--scrape-dir]`, `--years`, `--mode`, `--output-dir`, `--lang`, `--top-journals` | `results_*/` (gráficos + CSVs + Markdown + JSON) |
 | `terms_matcher.py` | Detecta termos por campo e gera CSV auditável | `--base`, `--years`, `--terms`, `--mode`, `--match-mode`, `--required-fields` | `terms_<ts>.csv` + `terms_<ts>.log` + `terms_<ts>_stats.json` |
@@ -34,9 +34,9 @@
 - **Truncamento:** `$` adicionado automaticamente ao final de cada termo (ex: `avalia` → `avalia$`); desativar com `--no-truncate`
 - **`--list-collections`:** lista as 36 coleções SciELO e sai
 
-## Comportamento do run_pipeline.py (v2.2)
+## Comportamento do run_pipeline.py (v2.3)
 
-**Etapas do pipeline** (10 no total por ano):
+**Etapas do pipeline** (12 no total por ano):
 1. Busca (`scielo_search.py`)
 2. Scraping api+html (`scielo_scraper.py`)
 3. Scraping api (`scielo_scraper.py --only-api`)
@@ -48,6 +48,8 @@
 9. Gráficos comparativos (`process_charts.py --stem <sc_ts> --output runs/<ano>/`)
    - No `--per-year` com múltiplos anos: etapa extra ao final — `process_charts.py --base runs/ --output runs/` (chart agregado comparando todos os anos)
 10. Relatório científico (`results_report.py --scrape-dir <pasta_api+html> --output-dir runs/<ano>/results_<stem>/`)
+11. Nuvem de palavras (`scielo_wordcloud.py` com campos propagados de `--terms-fields`)
+12. Diagrama PRISMA (`prisma_workflow.py --lang pt` + `--lang en` por padrão)
 
 **Comportamento padrão** (zero flags adicionais):
 - `--terms avalia educa` — termos de busca e detecção
@@ -64,6 +66,9 @@
 - **`--skip-match`:** pula as 3 invocações do terms_matcher
 - **`--skip-charts`:** pula geração de gráficos de processo
 - **`--skip-report`:** pula geração do relatório científico (results_report.py)
+- **`--skip-wordcloud`:** pula geração de nuvem de palavras (scielo_wordcloud.py)
+- **`--skip-prisma`:** pula geração do diagrama PRISMA (prisma_workflow.py)
+- **`--prisma-lang pt|en|both`:** idioma(s) do PDF PRISMA. Padrão: `both` (gera pt + en)
 - **`--dry-run`:** mostra os comandos sem executar, inclusive a limpeza que seria feita
 - **`--stats-report [DIR]`:** gera relatório Markdown consolidado de todos os `stats.json` em `runs/` (ou `DIR`); funciona sem `--year` — modo standalone
 - **`--per-year`:** executa o pipeline para cada ano, com barra de progresso global e ETA estimado por histórico
@@ -74,6 +79,9 @@
 - `ANALISE_DISCREPANCIA_<ano>.md`
 - `chart_status.png`, `chart_sources.png`, `chart_time.png`
 - `results_<stem>_api+html/` — artefatos científicos (gráficos + CSVs + Markdown + JSON)
+- `wordcloud_<campo>_<lang>_<ts>.png` — nuvem de palavras (campos de `--terms-fields`)
+- `prisma_<stem>_pt_<ts>.pdf` + `prisma_<stem>_en_<ts>.pdf` — diagramas PRISMA
+- `pipeline_<ts>.log` — log completo da execução (pipeline + todos os subprocessos)
 - `pipeline_stats.json` — resumo completo da execução (versão, termos, campos, etapas, stats por estratégia)
 
 **Arquivamento automático (nunca apaga):** após copiar tudo para `runs/<ano>/`, o pipeline faz uma varredura de segurança no diretório raiz procurando qualquer arquivo/pasta do run atual (identificados pelo stem do CSV). Se encontrar algo:
