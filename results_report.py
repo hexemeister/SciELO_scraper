@@ -2743,6 +2743,9 @@ def main():
         "--help-artifact", metavar="NOME",
         help="Descrição detalhada de um artefato específico.",
     )
+    parser.add_argument(
+        "--version", action="version", version=f"results_report.py v{__version__}",
+    )
     args = parser.parse_args()
 
     # --show-report (modo standalone)

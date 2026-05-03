@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_pipeline.py  v2.3
+run_pipeline.py  v2.4
 =====================
 Executa o pipeline completo: busca → extração (3 estratégias) →
 análise de discrepância → detecção de termos (terms_matcher) →
@@ -34,6 +34,7 @@ OPÇÕES
   --per-year                Rodar pipeline separado por ano (um CSV e destino por ano)
   --dry-run                 Mostra o que faria sem executar nada
   --stats-report [DIR]      Gera relatório consolidado dos stats.json em DIR (default: runs/)
+  --versions                Exibe a versão deste pipeline e de todos os scripts; não executa pipeline
   -h, --help, -?            Mostrar esta mensagem de ajuda e sair
 
 CAMPOS DISPONÍVEIS PARA --terms-fields
@@ -65,7 +66,7 @@ EXEMPLOS
   python run_pipeline.py --stats-report runs/         # idem com pasta explícita
 """
 
-__version__ = "2.3"
+__version__ = "2.4"
 
 import argparse
 import json
@@ -1328,6 +1329,43 @@ def _gravar_pipeline_stats(dest: Path, anos_label: str, years: list[int],
         log(f"  Falha ao gravar pipeline_stats.json: {e}", "WARN")
 
 
+# ── Versões ───────────────────────────────────────────────────────────────────
+
+_SCRIPTS_VERSIONADOS = [
+    "scielo_search.py",
+    "scielo_scraper.py",
+    "terms_matcher.py",
+    "process_charts.py",
+    "results_report.py",
+    "scielo_wordcloud.py",
+    "prisma_workflow.py",
+]
+
+def _mostrar_versions(python: str) -> None:
+    """Exibe a versão do pipeline e de cada script do conjunto de ferramentas."""
+    print(f"run_pipeline.py       v{__version__}")
+    for script in _SCRIPTS_VERSIONADOS:
+        path = HERE / script
+        if not path.exists():
+            print(f"{script:<22} (não encontrado)")
+            continue
+        try:
+            result = subprocess.run(
+                [python, script, "--version"],
+                cwd=HERE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+            )
+            versao = (result.stdout or "").strip()
+        except Exception as e:
+            versao = f"(erro: {e})"
+        print(f"{script:<22} {versao}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1382,7 +1420,14 @@ def main():
         help="Gera relatório consolidado dos stats.json em DIR (default: runs/)",
     )
     ap.add_argument("--version", action="version", version=f"v{__version__}")
+    ap.add_argument("--versions", action="store_true",
+        help="Exibe a versão deste pipeline e de todos os scripts do conjunto")
     args = ap.parse_args()
+
+    # ── Modo --versions (não executa pipeline) ────────────────────────────────
+    if args.versions:
+        _mostrar_versions(sys.executable)
+        sys.exit(0)
 
     # ── Modo --stats-report (não executa pipeline) ────────────────────────────
     if args.stats_report is not None:

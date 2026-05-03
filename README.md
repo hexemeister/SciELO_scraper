@@ -200,6 +200,25 @@ uv run python terms_matcher.py --years 2022 2023 2024 2025
 # → gera terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
 ```
 
+## run_pipeline.py — Pipeline completo
+
+Executa o fluxo completo em um único comando: busca → 3×scraping → análise de discrepância → detecção de termos → gráficos → relatório científico → nuvem de palavras → diagrama PRISMA → arquivamento em `runs/<ano>/`.
+
+```bash
+uv run python run_pipeline.py --year 2024                        # pipeline completo para 2024
+uv run python run_pipeline.py --year 2021 2022 2023 2024 2025    # múltiplos anos (um destino)
+uv run python run_pipeline.py --per-year --year 2021-2025        # um destino por ano
+uv run python run_pipeline.py --year 2024 --dry-run              # simula sem executar
+uv run python run_pipeline.py --year 2024 --skip-search          # reutiliza CSV existente
+uv run python run_pipeline.py --year 2024 --skip-scrape          # reutiliza scraping existente
+uv run python run_pipeline.py --year 2024 --skip-wordcloud --skip-prisma  # pula etapas finais
+uv run python run_pipeline.py --year 2024 --prisma-lang pt       # PRISMA só em PT (default: pt+en)
+uv run python run_pipeline.py --stats-report                     # relatório consolidado de runs/
+uv run python run_pipeline.py --versions                         # versão de todos os scripts
+```
+
+Gera em `runs/<ano>/`: CSV de busca, 3 pastas de scraping, análise de discrepância, gráficos de processo, relatório científico, wordclouds, PDFs PRISMA (pt + en), `pipeline_<ts>.log` e `pipeline_stats.json`.
+
 ## process_charts.py — Diagnóstico técnico do processo
 
 Gera três gráficos PNG de diagnóstico técnico (como o scraping correu) a partir das pastas `runs/<ano>/`:
