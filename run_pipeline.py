@@ -1430,13 +1430,20 @@ _SCRIPTS_VERSIONADOS = [
     "prisma_workflow.py",
 ]
 
+def _extrair_versao(texto: str) -> str:
+    """Extrai apenas o número de versão (ex: '1.3') de qualquer saída de --version."""
+    m = re.search(r"v?(\d+\.\d+(?:\.\d+)*)", texto)
+    return f"v{m.group(1)}" if m else texto.strip() or "(desconhecida)"
+
+
 def _mostrar_versions(python: str) -> None:
     """Exibe a versão do pipeline e de cada script do conjunto de ferramentas."""
-    print(f"run_pipeline.py       v{__version__}")
+    col = 22
+    print(f"{'run_pipeline.py':<{col}} v{__version__}")
     for script in _SCRIPTS_VERSIONADOS:
         path = HERE / script
         if not path.exists():
-            print(f"{script:<22} (não encontrado)")
+            print(f"{script:<{col}} (não encontrado)")
             continue
         try:
             result = subprocess.run(
@@ -1449,10 +1456,10 @@ def _mostrar_versions(python: str) -> None:
                 errors="replace",
                 timeout=30,
             )
-            versao = (result.stdout or "").strip()
+            versao = _extrair_versao(result.stdout or "")
         except Exception as e:
             versao = f"(erro: {e})"
-        print(f"{script:<22} {versao}")
+        print(f"{script:<{col}} {versao}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
