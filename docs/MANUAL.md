@@ -40,17 +40,20 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 | Pergunta / Objetivo                                                                                      | Comando                                                               | O que cria                                                                                                                       | Onde salva                                 |
 | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Rodar tudo para um ano (default: termos `avalia educa`, coleção SciELO Brasil, campos `titulo keywords`) | `uv run python run_pipeline.py --year 2024`                           | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, `pipeline_stats.json`, `results_<stem>_api+html/` | `runs/2024/`                               |
-| Rodar tudo para vários anos em sequência                                                                 | `uv run python run_pipeline.py --per-year --year 2022 2023 2024 2025` | Idem por ano + gráfico agregado de comparação entre anos                                                                         | `runs/<ano>/` cada um + `runs/chart_*.png` |
-| Ver o que seria executado sem rodar                                                                      | `uv run python run_pipeline.py --year 2024 --dry-run`                 | Nada (apenas imprime os comandos)                                                                                                | —                                          |
-| Reutilizar busca já feita (pular `scielo_search.py`)                                                     | `uv run python run_pipeline.py --year 2024 --skip-search`             | Idem sem nova busca                                                                                                              | `runs/2024/`                               |
-| Reutilizar scraping já feito (pular scraper)                                                             | `uv run python run_pipeline.py --year 2024 --skip-scrape`             | Análise + termos + gráficos                                                                                                      | `runs/2024/`                               |
-| Pular análise de discrepância                                                                            | `uv run python run_pipeline.py --year 2024 --skip-analysis`           | Busca + scraping + termos + gráficos                                                                                             | `runs/2024/`                               |
-| Pular detecção de termos                                                                                 | `uv run python run_pipeline.py --year 2024 --skip-match`              | Busca + scraping + análise + gráficos                                                                                            | `runs/2024/`                               |
-| Pular gráficos de processo                                                                               | `uv run python run_pipeline.py --year 2024 --skip-charts`             | Busca + scraping + análise + termos + relatório                                                                                  | `runs/2024/`                               |
-| Pular relatório científico                                                                               | `uv run python run_pipeline.py --year 2024 --skip-report`             | Busca + scraping + análise + termos + gráficos                                                                                   | `runs/2024/`                               |
-| Ver relatório consolidado de todos os anos                                                               | `uv run python run_pipeline.py --stats-report`                        | Imprime Markdown no terminal                                                                                                     | —                                          |
-| Salvar relatório em arquivo                                                                              | `uv run python run_pipeline.py --stats-report > stats.md`             | `stats.md`                                                                                                                       | Diretório atual                            |
+| Rodar tudo para um ano (default: termos `avalia educa`, coleção SciELO Brasil, campos `titulo keywords`) | `uv run python run_pipeline.py --year 2024`                           | CSV de busca, 3 pastas de scraping, análise, 3 arquivos de termos, 3 gráficos, relatório, wordcloud, PDFs PRISMA, `pipeline_stats.json`, `pipeline_<ts>.log` | `runs/2024/`                               |
+| Rodar tudo para vários anos em sequência                                                                 | `uv run python run_pipeline.py --per-year --year 2022 2023 2024 2025` | Idem por ano + gráfico agregado de comparação entre anos                                                                                                    | `runs/<ano>/` cada um + `runs/chart_*.png` |
+| Ver o que seria executado sem rodar                                                                      | `uv run python run_pipeline.py --year 2024 --dry-run`                 | Nada (apenas imprime os comandos)                                                                                                                            | —                                          |
+| Reutilizar busca já feita (pular `scielo_search.py`)                                                     | `uv run python run_pipeline.py --year 2024 --skip-search`             | Idem sem nova busca                                                                                                                                          | `runs/2024/`                               |
+| Reutilizar scraping já feito (pular scraper)                                                             | `uv run python run_pipeline.py --year 2024 --skip-scrape`             | Análise + termos + gráficos + relatório + wordcloud + prisma                                                                                                 | `runs/2024/`                               |
+| Pular análise de discrepância                                                                            | `uv run python run_pipeline.py --year 2024 --skip-analysis`           | Busca + scraping + termos + gráficos + relatório + wordcloud + prisma                                                                                        | `runs/2024/`                               |
+| Pular detecção de termos                                                                                 | `uv run python run_pipeline.py --year 2024 --skip-match`              | Busca + scraping + análise + gráficos                                                                                                                        | `runs/2024/`                               |
+| Pular gráficos de processo                                                                               | `uv run python run_pipeline.py --year 2024 --skip-charts`             | Busca + scraping + análise + termos + relatório + wordcloud + prisma                                                                                         | `runs/2024/`                               |
+| Pular relatório científico                                                                               | `uv run python run_pipeline.py --year 2024 --skip-report`             | Busca + scraping + análise + termos + gráficos                                                                                                               | `runs/2024/`                               |
+| Pular wordcloud                                                                                          | `uv run python run_pipeline.py --year 2024 --skip-wordcloud`          | Idem sem wordcloud                                                                                                                                           | `runs/2024/`                               |
+| Pular diagrama PRISMA                                                                                    | `uv run python run_pipeline.py --year 2024 --skip-prisma`             | Idem sem PDFs PRISMA                                                                                                                                         | `runs/2024/`                               |
+| PRISMA apenas em português                                                                               | `uv run python run_pipeline.py --year 2024 --prisma-lang pt`          | Gera apenas `prisma_*_pt_*.pdf` (default: `both` = pt + en)                                                                                                 | `runs/2024/`                               |
+| Ver relatório consolidado de todos os anos                                                               | `uv run python run_pipeline.py --stats-report`                        | Imprime Markdown no terminal                                                                                                                                 | —                                          |
+| Salvar relatório em arquivo                                                                              | `uv run python run_pipeline.py --stats-report > stats.md`             | `stats.md`                                                                                                                                                   | Diretório atual                            |
 
 ### Busca de artigos
 
@@ -139,6 +142,7 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | PDF em inglês                                  | `uv run python prisma_workflow.py results_report.json --lang en`                              | `prisma_<stem>_en_<ts>.pdf`      | Idem              |
 | Pasta de saída específica                      | `uv run python prisma_workflow.py results_report.json --output-dir pdfs/`                     | Idem                             | `pdfs/`           |
 | Simular sem gerar PDF                          | `uv run python prisma_workflow.py results_report.json --dry-run`                              | Nada (imprime dados calculados)  | —                 |
+| Exportar template de layout para customização  | `uv run python prisma_workflow.py --export-template`                                          | `assets/PRISMAdiagram.json`      | Diretório atual   |
 
 ---
 
@@ -898,7 +902,9 @@ Se as colunas esperadas (`Titulo_PT`, `Resumo_PT`, `Palavras_Chave_PT`) não exi
 
 ## 15. Diagrama PRISMA 2020 com prisma_workflow.py
 
-Gera um PDF A4 preenchível com o Diagrama de Fluxo PRISMA 2020. Layout pixel-perfect baseado no template oficial (`assets/PRISMAdiagram.json`). A fase de **Identificação** é auto-preenchida a partir do `results_report.json`. As fases de **Triagem** e **Inclusão** ficam como campos AcroForm editáveis para preenchimento após curadoria humana.
+Gera um PDF A4 preenchível com o Diagrama de Fluxo PRISMA 2020. O layout está embutido diretamente no script — nenhum arquivo externo é necessário. A fase de **Identificação** é auto-preenchida a partir do `results_report.json`. As fases de **Triagem** e **Inclusão** ficam como campos AcroForm editáveis para preenchimento após curadoria humana.
+
+> **Layout customizável:** use `--export-template` para exportar o template de layout como JSON e modificá-lo. Se o arquivo `assets/PRISMAdiagram.json` existir, ele sobrepõe o layout padrão embutido.
 
 > **Nota:** o pipeline automatiza apenas a fase de Identificação. Triagem e Inclusão dependem de revisão humana dos artigos.
 
@@ -954,6 +960,8 @@ Preencher no PDF após curadoria, ou passar via CLI/arquivo:
 uv run python prisma_workflow.py results_report.json --lang en          # PDF em inglês (default: pt)
 uv run python prisma_workflow.py results_report.json --output-dir pdfs/ # pasta de saída
 uv run python prisma_workflow.py results_report.json --dry-run          # mostrar dados sem gerar PDF
+uv run python prisma_workflow.py --export-template                      # exportar template de layout para assets/PRISMAdiagram.json
+uv run python prisma_workflow.py --export-template meu_layout.json      # exportar para caminho específico
 uv run python prisma_workflow.py --version                              # mostrar versão
 uv run python prisma_workflow.py -?                                     # ajuda
 ```
@@ -1107,13 +1115,18 @@ uv run python scielo_scraper.py lista.csv
 
 | Padrão                   | Exemplo                                                  | Gerado por        |
 | ------------------------ | -------------------------------------------------------- | ----------------- |
-| `sc_<ts>.csv`            | `sc_20260411_143022.csv`                                 | scielo_search.py  |
-| `sc_<ts>_params.json`    | `sc_20260411_143022_params.json`                         | scielo_search.py  |
-| `<stem>_s_<ts>_<modo>/`  | `sc_20260411_s_20260411_150312_api+html/`                | scielo_scraper.py |
-| `runs/<ano>/`            | `runs/2024/`                                             | run_pipeline.py   |
-| `terms_<ts>.csv`         | `terms_20260415_161055.csv`                              | terms_matcher.py  |
-| `terms_<ts>.log`         | `terms_20260415_161055.log`                              | terms_matcher.py  |
-| `terms_<ts>_stats.json`  | `terms_20260415_161055_stats.json`                       | terms_matcher.py  |
-| `results_<stem>/`        | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
-| `results_text_<lang>.md` | `results_text_pt.md`, `results_text_en.md`               | results_report.py |
-| `results_report.json`    | `results_report.json`                                    | results_report.py |
+| `sc_<ts>.csv`                    | `sc_20260411_143022.csv`                                 | scielo_search.py  |
+| `sc_<ts>_params.json`            | `sc_20260411_143022_params.json`                         | scielo_search.py  |
+| `<stem>_s_<ts>_<modo>/`          | `sc_20260411_s_20260411_150312_api+html/`                | scielo_scraper.py |
+| `runs/<ano>/`                    | `runs/2024/`                                             | run_pipeline.py   |
+| `pipeline_<ts>.log`              | `pipeline_20260501_143022.log`                           | run_pipeline.py   |
+| `pipeline_stats.json`            | `pipeline_stats.json`                                    | run_pipeline.py   |
+| `terms_<ts>.csv`                 | `terms_20260415_161055.csv`                              | terms_matcher.py  |
+| `terms_<ts>.log`                 | `terms_20260415_161055.log`                              | terms_matcher.py  |
+| `terms_<ts>_stats.json`          | `terms_20260415_161055_stats.json`                       | terms_matcher.py  |
+| `results_<stem>/`                | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
+| `results_text_<lang>.md`         | `results_text_pt.md`, `results_text_en.md`               | results_report.py |
+| `results_report.json`            | `results_report.json`                                    | results_report.py |
+| `wordcloud_<campo>_<lang>_<ts>.png` | `wordcloud_title_ptbr_20260501_120000.png`            | scielo_wordcloud.py |
+| `wordcloud_stats_<ts>.json`      | `wordcloud_stats_20260501_120000.json`                   | scielo_wordcloud.py |
+| `prisma_<stem>_<lang>_<ts>.pdf`  | `prisma_sc_..._pt_20260501_120000.pdf`                   | prisma_workflow.py  |

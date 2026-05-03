@@ -284,9 +284,15 @@ uv run python prisma_workflow.py results_report.json --output-dir pdfs/
 
 # Simular sem gerar PDF
 uv run python prisma_workflow.py results_report.json --dry-run
+
+# Exportar template JSON do layout (para customização do diagrama)
+uv run python prisma_workflow.py --export-template
+uv run python prisma_workflow.py --export-template meu_layout.json
 ```
 
 Gera `prisma_<stem>_<lang>_<ts>.pdf` — PDF abrível em qualquer leitor de PDF; campos editáveis preenchíveis diretamente no Acrobat Reader, Foxit, Edge, etc.
+
+> **Layout embutido:** o script é auto-suficiente — o layout PRISMA 2020 está embutido internamente. O arquivo `assets/PRISMAdiagram.json` é **opcional**: se presente, sobrepõe o layout padrão. Use `--export-template` para exportar o template e customizá-lo.
 
 > **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. As fases de Triagem e Inclusão requerem curadoria humana após o processamento automático.
 

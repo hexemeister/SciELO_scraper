@@ -25,3 +25,11 @@ sc_*_params.json
 
 # Python version pin (local)
 .python-version
+
+# Ferramentas de sessão (Claude Code, Trae, etc.)
+.agents/
+.trae/
+skills-lock.json
+
+# Assets opcionais (gerados por --export-template; não necessários para execução)
+assets/

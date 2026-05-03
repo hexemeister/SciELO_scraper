@@ -161,9 +161,9 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Validação de CSV:** se colunas esperadas não existirem, exibe quais colunas o arquivo tem e sugere o CSV correto (`resultado.csv` do scraper).
 - **Saída:** `wordcloud_{campo}_{lang}_{ts}.png` + `wordcloud_stats_{ts}.json`.
 
-## Comportamento do prisma_workflow.py (v2.0)
+## Comportamento do prisma_workflow.py (v2.1)
 
-- **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Layout pixel-perfect baseado em `assets/PRISMAdiagram.json`, extraído do template oficial PRISMA 2020.
+- **Propósito:** gera PDF A4 preenchível com diagrama PRISMA 2020. Script auto-suficiente — layout completo embutido internamente (10 caixas, 3 fases, 8 conectores).
 - **Auto-descoberta de JSON:** se `results_report.json` não for passado, busca automaticamente no CWD → `runs/*/results_*/` → `results_*/`, ordenando por data de modificação (mais recente primeiro). Com múltiplos candidatos, lista opções e pede escolha.
 - **Entrada:** `results_report.json` gerado pelo `results_report.py` (path opcional, auto-descoberto se omitido).
 - **Todos os n= são AcroForm editáveis:** campos calculados automaticamente vêm pré-preenchidos; campos humanos ficam em branco. Sem distinção de cor — todos os campos têm o mesmo visual.
@@ -173,8 +173,9 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Flags de campos humanos:** `--duplicates`, `--excluded-screening`, `--sought`, `--not-retrieved`, `--assessed`, `--excluded-eligibility`, `--included`, `--included-reports`.
 - **`--output-dir DIR`:** pasta de saída. Padrão: diretório do JSON.
 - **`--dry-run`:** mostra dados calculados sem gerar PDF.
+- **`--export-template [DEST]`:** exporta o layout interno como JSON editável e sai. Sem argumento salva em `assets/PRISMAdiagram.json`. Se o arquivo existir, é carregado automaticamente nas execuções seguintes (merge: externo prevalece sobre default interno).
 - **Saída:** `prisma_<stem>_<lang>_<ts>.pdf`
-- **Layout:** lê `assets/PRISMAdiagram.json` para posições, cores e geometria. Faixas de fase laterais (#9CC2E5), cabeçalho amarelo (#FFC000), caixas brancas com borda preta 0.5pt, setas block pretas.
+- **Layout:** faixas de fase laterais (#9CC2E5), cabeçalho amarelo (#FFC000), caixas brancas com borda preta 0.5pt, setas block pretas. Customizável via `--export-template`.
 - **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. Triagem e Inclusão requerem curadoria humana após o processamento.
 
 ## Comportamento do scraper (scielo_scraper.py v2.5)
