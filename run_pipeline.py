@@ -72,6 +72,7 @@ __version__ = "2.5"
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -172,20 +173,26 @@ def run(cmd: list, dry_run: bool) -> int:
     log(f"$ {' '.join(str(c) for c in cmd)}", "STEP")
     if dry_run:
         return 0
-    result = subprocess.run(
+    # Streaming em tempo real: Popen + leitura linha a linha
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"  # força flush imediato nos subprocessos
+    proc = subprocess.Popen(
         cmd, cwd=HERE,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         text=True, encoding="utf-8", errors="replace",
+        env=env,
     )
-    # Tee: exibe no terminal e grava no log
-    if result.stdout:
-        for line in result.stdout.splitlines():
-            try:
-                print(line, flush=True)
-            except UnicodeEncodeError:
-                print(line.encode("ascii", errors="replace").decode(), flush=True)
-            _write_log(line)
-    return result.returncode
+    for line in proc.stdout:
+        line = line.rstrip("\n").rstrip("\r")
+        if not line:
+            continue
+        try:
+            print(line, flush=True)
+        except UnicodeEncodeError:
+            print(line.encode("ascii", errors="replace").decode(), flush=True)
+        _write_log(line)
+    proc.wait()
+    return proc.returncode
 
 
 def humanize(seconds: float) -> str:
