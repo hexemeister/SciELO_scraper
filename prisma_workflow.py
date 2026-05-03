@@ -65,22 +65,247 @@ def _verificar_deps():
 
 _verificar_deps()
 
-__version__ = "2.0"
+__version__ = "2.1"
 
 # ---------------------------------------------------------------------------
-# Localização do JSON de layout
+# Layout interno — fonte canônica do diagrama PRISMA 2020
+# Extraído de PRISMA_2020_flow_diagram_new_SRs_v1.docx via extract_prisma3.py
+# O script funciona standalone sem nenhum arquivo externo.
+# Use --export-template para gerar um JSON customizável.
 # ---------------------------------------------------------------------------
 
 _ASSETS_DIR = Path(__file__).parent / "assets"
 _DIAGRAM_JSON = _ASSETS_DIR / "PRISMAdiagram.json"
 
+_DIAGRAM_DEFAULT: dict = {
+  "meta": {
+    "source": "PRISMA_2020_flow_diagram_new_SRs_v1.docx",
+    "version": "PRISMA 2020 - for new systematic reviews",
+    "coordinate_system": "top-left origin, y increases downward, units=pt (1pt=1/72 inch)",
+    "page_width_pt": 595.3,
+    "page_height_pt": 841.9,
+    "margin_left_pt": 36.0,
+    "margin_top_pt": 36.0,
+    "content_width_pt": 523.3,
+    "font_family": "Calibri",
+    "base_font_size_pt": 9.0,
+    "theme_colors": {
+      "tx1": "#000000", "lt1": "#FFFFFF", "dk2": "#44546A", "lt2": "#E7E6E6",
+      "accent1": "#4472C4", "accent2": "#ED7D31", "accent3": "#A5A5A5",
+      "accent4": "#FFC000", "accent5": "#5B9BD5", "accent6": "#70AD47"
+    },
+    "notes": [
+      "Phase bands are rotated -90 degrees and positioned to the LEFT of the main content column.",
+      "All box positions are absolute from page top-left corner.",
+      "fill=none boxes render as white in print.",
+      "Connector arrows have arrowhead at END only (block style).",
+      "Phase band fill=#9CC2E5 is accent5 (#5B9BD5) at ~60% tint as rendered by Word.",
+      "Header fill=#FFC000 is accent4. Header stroke=#7F5F00 (darker gold)."
+    ]
+  },
+  "phases": [
+    {
+      "id": "phase_identification", "label": "Identification",
+      "fill": "#9CC2E5", "stroke": "#000000", "stroke_w_pt": 1.0,
+      "text_bold": True, "font_size_pt": 9.0, "font_color": "#000000",
+      "geometry": "flowChartAlternateProcess", "rotation_deg": -90,
+      "x_pt": 4.2, "y_pt": 125.5, "w_pt": 100.55, "h_pt": 20.7
+    },
+    {
+      "id": "phase_screening", "label": "Screening",
+      "fill": "#9CC2E5", "stroke": "#000000", "stroke_w_pt": 1.0,
+      "text_bold": True, "font_size_pt": 9.0, "font_color": "#000000",
+      "geometry": "flowChartAlternateProcess", "rotation_deg": -90,
+      "x_pt": -55.4, "y_pt": 287.05, "w_pt": 219.5, "h_pt": 20.7
+    },
+    {
+      "id": "phase_included", "label": "Included",
+      "fill": "#9CC2E5", "stroke": "#000000", "stroke_w_pt": 1.0,
+      "text_bold": True, "font_size_pt": 9.0, "font_color": "#000000",
+      "geometry": "flowChartAlternateProcess", "rotation_deg": -90,
+      "x_pt": 25.5, "y_pt": 421.45, "w_pt": 60.2, "h_pt": 20.7
+    }
+  ],
+  "boxes": [
+    {
+      "id": "header", "label": "Identification of studies via databases and registers",
+      "label_bold": True, "type": "header", "geometry": "flowChartAlternateProcess",
+      "fill": "#FFC000", "stroke": "#7F5F00", "stroke_w_pt": 1.0,
+      "x_pt": 80.64, "y_pt": 65.85, "w_pt": 342.14, "h_pt": 20.71,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "center",
+      "n_fields": []
+    },
+    {
+      "id": "box_identified", "label": "Records identified from*:",
+      "label_bold": False, "type": "content", "phase": "identification", "column": "left",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 80.06, "y_pt": 90.07, "w_pt": 148.6, "h_pt": 97.92,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [
+        {"id": "n_databases",  "label": "Databases (n = )",  "human": True},
+        {"id": "n_registers",  "label": "Registers (n = )",  "human": True}
+      ]
+    },
+    {
+      "id": "box_removed_before_screening", "label": "Records removed before screening:",
+      "label_bold": False, "type": "content", "phase": "identification", "column": "right",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 275.33, "y_pt": 90.07, "w_pt": 148.6, "h_pt": 97.87,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [
+        {"id": "n_duplicates",     "label": "Duplicate records removed (n = )",                       "human": True},
+        {"id": "n_automation",     "label": "Records marked as ineligible by automation tools (n = )", "human": True},
+        {"id": "n_other_removed",  "label": "Records removed for other reasons (n = )",               "human": True}
+      ]
+    },
+    {
+      "id": "box_screened", "label": "Records screened",
+      "label_bold": False, "type": "content", "phase": "screening", "column": "left",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 80.05, "y_pt": 197.9, "w_pt": 148.6, "h_pt": 41.45,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [{"id": "n_screened", "label": "(n = )", "human": True}]
+    },
+    {
+      "id": "box_excluded_screening", "label": "Records excluded**",
+      "label_bold": False, "type": "content", "phase": "screening", "column": "right",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 276.0, "y_pt": 197.9, "w_pt": 148.6, "h_pt": 41.45,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [{"id": "n_excluded_screening", "label": "(n = )", "human": True}]
+    },
+    {
+      "id": "box_sought", "label": "Reports sought for retrieval",
+      "label_bold": False, "type": "content", "phase": "screening", "column": "left",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 80.15, "y_pt": 255.75, "w_pt": 148.6, "h_pt": 41.45,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [{"id": "n_sought", "label": "(n = )", "human": True}]
+    },
+    {
+      "id": "box_not_retrieved", "label": "Reports not retrieved",
+      "label_bold": False, "type": "content", "phase": "screening", "column": "right",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 276.1, "y_pt": 257.25, "w_pt": 148.6, "h_pt": 41.45,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [{"id": "n_not_retrieved", "label": "(n = )", "human": True}]
+    },
+    {
+      "id": "box_assessed", "label": "Reports assessed for eligibility",
+      "label_bold": False, "type": "content", "phase": "screening", "column": "left",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 80.25, "y_pt": 313.05, "w_pt": 148.6, "h_pt": 41.45,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [{"id": "n_assessed", "label": "(n = )", "human": True}]
+    },
+    {
+      "id": "box_excluded_eligibility", "label": "Reports excluded:",
+      "label_bold": False, "type": "content", "phase": "screening", "column": "right",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 276.75, "y_pt": 312.85, "w_pt": 148.6, "h_pt": 89.25,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [
+        {"id": "n_excluded_reason1", "label": "Reason 1 (n = )", "human": True},
+        {"id": "n_excluded_reason2", "label": "Reason 2 (n = )", "human": True},
+        {"id": "n_excluded_reason3", "label": "Reason 3 (n = )", "human": True},
+        {"id": "n_excluded_etc",     "label": "etc.",             "human": True}
+      ]
+    },
+    {
+      "id": "box_included", "label": "Studies included in review",
+      "label_bold": False, "type": "content", "phase": "included", "column": "left",
+      "geometry": "rect", "fill": "#FFFFFF", "stroke": "#000000", "stroke_w_pt": 0.5,
+      "x_pt": 78.55, "y_pt": 404.72, "w_pt": 148.6, "h_pt": 57.0,
+      "font_size_pt": 9.0, "font_color": "#000000", "text_align": "left",
+      "n_fields": [
+        {"id": "n_included_studies", "label": "(n = ) studies",                 "human": True},
+        {"id": "n_included_reports", "label": "Reports of included studies (n = )", "human": True}
+      ]
+    }
+  ],
+  "connectors": [
+    {
+      "id": "conn_identified_to_removed", "from_box": "box_identified", "to_box": "box_removed_before_screening",
+      "direction": "horizontal", "x_start_pt": 228.66, "y_pt": 132.75, "x_end_pt": 275.33,
+      "length_pt": 46.67, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_identified_to_screened", "from_box": "box_identified", "to_box": "box_screened",
+      "direction": "vertical", "x_pt": 154.36, "y_start_pt": 178.15, "y_end_pt": 197.9,
+      "length_pt": 19.75, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_screened_to_excluded", "from_box": "box_screened", "to_box": "box_excluded_screening",
+      "direction": "horizontal", "x_start_pt": 228.65, "y_pt": 217.85, "x_end_pt": 276.0,
+      "length_pt": 47.35, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_screened_to_sought", "from_box": "box_screened", "to_box": "box_sought",
+      "direction": "vertical", "x_pt": 154.25, "y_start_pt": 235.85, "y_end_pt": 255.75,
+      "length_pt": 19.9, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_sought_to_not_retrieved", "from_box": "box_sought", "to_box": "box_not_retrieved",
+      "direction": "horizontal", "x_start_pt": 228.75, "y_pt": 277.25, "x_end_pt": 276.1,
+      "length_pt": 47.35, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_sought_to_assessed", "from_box": "box_sought", "to_box": "box_assessed",
+      "direction": "vertical", "x_pt": 154.3, "y_start_pt": 292.45, "y_end_pt": 313.05,
+      "length_pt": 20.6, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_assessed_to_excluded_elig", "from_box": "box_assessed", "to_box": "box_excluded_eligibility",
+      "direction": "horizontal", "x_start_pt": 228.85, "y_pt": 335.2, "x_end_pt": 276.75,
+      "length_pt": 47.9, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    },
+    {
+      "id": "conn_assessed_to_included", "from_box": "box_assessed", "to_box": "box_included",
+      "direction": "vertical", "x_pt": 154.3, "y_start_pt": 350.34, "y_end_pt": 404.72,
+      "length_pt": 54.38, "arrow_start": "", "arrow_end": "block", "stroke": "#000000", "stroke_w_pt": 0.5
+    }
+  ],
+  "footnotes": [
+    {
+      "id": "footnote_1", "symbol": "*",
+      "text": "Consider, if feasible to do so, reporting the number of records identified from each database or register searched (rather than the total number across all databases/registers). If other methods were used to identify records, such as contacting authors or reviewing reference lists, include these and label appropriately.",
+      "font_size_pt": 7.0, "font_color": "#000000"
+    },
+    {
+      "id": "footnote_2", "symbol": "**",
+      "text": "If automation tools were used, indicate how many records were excluded by a human and how many were excluded solely based on automation tools.",
+      "font_size_pt": 7.0, "font_color": "#000000"
+    },
+    {
+      "id": "source_credit", "symbol": "",
+      "text": "Source: Page MJ, et al. BMJ 2021;372:n71. doi: 10.1136/bmj.n71",
+      "font_size_pt": 7.0, "font_color": "#000000"
+    },
+    {
+      "id": "license", "symbol": "",
+      "text": "This work is licensed under CC BY 4.0.",
+      "font_size_pt": 7.0, "font_color": "#000000"
+    }
+  ]
+}
+
 
 def _carregar_diagrama() -> dict:
+    """
+    Retorna o layout do diagrama PRISMA.
+    - Se assets/PRISMAdiagram.json existir, faz merge com o default interno
+      (o JSON externo prevalece chave a chave no nível raiz).
+    - Caso contrário, usa o default interno — o script é auto-suficiente.
+    """
     if not _DIAGRAM_JSON.exists():
-        print(f"❌  Layout não encontrado: {_DIAGRAM_JSON}", file=sys.stderr)
-        sys.exit(1)
+        return _DIAGRAM_DEFAULT
+
     with open(_DIAGRAM_JSON, encoding="utf-8") as f:
-        return json.load(f)
+        externo = json.load(f)
+
+    # Merge superficial: chaves do JSON externo sobrescrevem o default
+    merged = {**_DIAGRAM_DEFAULT, **externo}
+    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -1047,10 +1272,29 @@ def main():
                         help="Idioma do PDF: pt (default) | en.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Mostra os dados que seriam usados sem gerar o PDF.")
+    parser.add_argument("--export-template", metavar="DEST", nargs="?",
+                        const=str(_DIAGRAM_JSON), default=None,
+                        help=(
+                            "Exporta o layout interno como JSON editável e sai. "
+                            f"Sem argumento, salva em {_DIAGRAM_JSON}. "
+                            "Se o arquivo existir, é sobrescrito. "
+                            "Edite-o para customizar labels, cores ou geometria; "
+                            "o script o carregará automaticamente nas próximas execuções."
+                        ))
     parser.add_argument("--version", action="version",
                         version=f"prisma_workflow.py v{__version__}")
 
     args = parser.parse_args()
+
+    # ── --export-template: salva JSON interno e sai ───────────────────────────
+    if args.export_template is not None:
+        dest_template = Path(args.export_template)
+        dest_template.parent.mkdir(parents=True, exist_ok=True)
+        with open(dest_template, "w", encoding="utf-8") as f:
+            json.dump(_DIAGRAM_DEFAULT, f, ensure_ascii=False, indent=2)
+        print(f"Template exportado: {dest_template.resolve()}")
+        print("Edite o arquivo e execute o script normalmente — ele será carregado automaticamente.")
+        sys.exit(0)
 
     json_path = _descobrir_json(args.input, args.interactive)
 
