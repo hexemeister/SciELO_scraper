@@ -1360,6 +1360,7 @@ _PRESERVAR = {
     # pastas protegidas (checadas pelo nome, sem extensão)
 }
 _PRESERVAR_DIRS = {".git", ".venv", ".claude", "docs", "temp"}
+_PRESERVAR_NOMES = {"__pycache__", "skills-lock.json"}
 
 
 def _reset_working_tree(dry: bool = False) -> None:
@@ -1376,6 +1377,10 @@ def _reset_working_tree(dry: bool = False) -> None:
             if nome in _PRESERVAR_DIRS or any(nome.startswith(d) for d in _PRESERVAR_DIRS):
                 continue
             # outros dotfiles/dotdirs também são preservados por precaução
+            continue
+
+        # Preservar por nome exato (arquivos e dirs)
+        if nome in _PRESERVAR_NOMES:
             continue
 
         if item.is_dir():
