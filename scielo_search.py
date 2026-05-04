@@ -255,7 +255,7 @@ def build_url(query: str, collection: str) -> str:
 # ── Download ──────────────────────────────────────────────────────────────────
 def fetch_csv(url: str, session: requests.Session, logger: logging.Logger,
               timeout: float = 120) -> pd.DataFrame:
-    logger.info(f"  🌐 Requisitando: {url[:120]}{'...' if len(url) > 120 else ''}")
+    logger.info(f"  🌐 Requisitando: {url}")
     t0 = time.time()
     try:
         r = session.get(url, timeout=timeout)
@@ -491,7 +491,7 @@ def main():
     }
 
     logger.debug(f"  Query: {query}")
-    logger.info(f"  URL  : {url[:120]}{'...' if len(url) > 120 else ''}")
+    logger.info(f"  URL  : {url}")
     logger.info("─" * 62)
 
     if args.dry_run:

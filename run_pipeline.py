@@ -149,11 +149,19 @@ def close_log_file() -> None:
         _log_fh = None
 
 
+_RE_ANSI = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove códigos de escape ANSI de uma string."""
+    return _RE_ANSI.sub("", text)
+
+
 def _write_log(line: str) -> None:
-    """Escreve linha no arquivo de log se estiver aberto."""
+    """Escreve linha no arquivo de log se estiver aberto (sem códigos ANSI)."""
     if _log_fh:
         try:
-            _log_fh.write(line + "\n")
+            _log_fh.write(_strip_ansi(line) + "\n")
         except Exception:
             pass
 
