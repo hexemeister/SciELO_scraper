@@ -201,12 +201,12 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 ## Dependências
 
 ```bash
-uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli matplotlib
-# Para results_report.py (Venn/UpSet):
-uv pip install matplotlib-venn upsetplot
-# Para scielo_wordcloud.py:
+# Núcleo (scraping)
+uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
+
+# Scripts de análise
+uv pip install matplotlib matplotlib-venn upsetplot
 uv pip install wordcloud nltk pillow
-# Para prisma_workflow.py:
 uv pip install reportlab
 ```
 
