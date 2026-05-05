@@ -105,6 +105,7 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 | Pergunta / Objetivo                                                        | Comando                                                                      | O que cria                                                      | Onde salva                                     |
 | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------- |
 | Gerar todos os artefatos (default: api+html, PT, todos os anos em `runs/`) | `uv run python results_report.py`                                            | 5 gráficos, 3 CSVs, `results_text_pt.md`, `results_report.json` | `results_<stem>/` ao lado da pasta de scraping |
+| Consolidado multi-ano (série temporal completa)                            | `uv run python results_report.py --base runs/`                               | Idem, com funil por ano lado a lado e trend de evolução         | `runs/results_<ano_min>-<ano_max>/`            |
 | Anos específicos                                                           | `uv run python results_report.py --years 2022 2024`                          | Idem                                                            | Idem                                           |
 | Estratégia alternativa                                                     | `uv run python results_report.py --mode api`                                 | Idem                                                            | Idem                                           |
 | Artefatos em inglês                                                        | `uv run python results_report.py --lang en`                                  | Idem com `results_text_en.md`                                   | Idem                                           |
@@ -777,11 +778,14 @@ Contexto: ferramenta do projeto *Estado da Arte da Avaliação* (e-Aval), grupo 
 ### Uso básico
 
 ```bash
-# Todos os anos em runs/, estratégia api+html (padrão)
+# Todos os anos em runs/, estratégia api+html (padrão) — um conjunto por ano
 uv run python results_report.py
 
 # Anos específicos
 uv run python results_report.py --years 2022 2023 2024 2025
+
+# Consolidado multi-ano → runs/results_2021-2025/
+uv run python results_report.py --base runs/
 
 # Pasta de saída explícita
 uv run python results_report.py --output-dir meus_relatorios/
@@ -792,6 +796,16 @@ uv run python results_report.py --lang en
 # Todos os idiomas (gera um conjunto por idioma)
 uv run python results_report.py --lang all
 ```
+
+### Modo consolidado (`--base runs/`)
+
+Quando `--base` aponta para uma pasta com múltiplos anos, o script agrega todos os dados num único conjunto de artefatos com visão de série temporal completa:
+
+- **Funil:** painéis lado a lado por ano
+- **Trend:** evolução de criterio_ok (n e %) ao longo dos anos
+- **Heatmap e periódicos:** calculados sobre o corpus total agregado
+
+A pasta de saída segue o padrão `runs/results_<ano_min>-<ano_max>/` (ex: `runs/results_2021-2025/`). Para uma pasta personalizada, use `--output-dir`.
 
 ### Artefatos gerados em `results_<stem>/`
 
@@ -1200,6 +1214,7 @@ uv run python scielo_scraper.py lista.csv
 | `terms_<ts>.log`                 | `terms_20260415_161055.log`                              | terms_matcher.py  |
 | `terms_<ts>_stats.json`          | `terms_20260415_161055_stats.json`                       | terms_matcher.py  |
 | `results_<stem>/`                | `results_sc_20260418_132349_s_20260418_132356_api+html/` | results_report.py |
+| `results_<ano_min>-<ano_max>/`   | `results_2021-2025/` (dentro de `runs/`)                 | results_report.py (multi-ano) |
 | `results_text_<lang>.md`         | `results_text_pt.md`, `results_text_en.md`               | results_report.py |
 | `results_report.json`            | `results_report.json`                                    | results_report.py |
 | `wordcloud_<campo>_<lang>_<ts>.png` | `wordcloud_title_ptbr_20260501_120000.png`            | scielo_wordcloud.py |

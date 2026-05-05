@@ -298,6 +298,7 @@ Gera o arcabouço completo de artefatos científicos publication-ready a partir 
 ```bash
 uv run python results_report.py                       # api+html, PT, todos os anos em runs/
 uv run python results_report.py --years 2022 2024     # anos específicos
+uv run python results_report.py --base runs/          # consolidado multi-ano → runs/results_2021-2025/
 uv run python results_report.py --lang en             # artefatos em inglês
 uv run python results_report.py --lang all            # todos os idiomas (PT + EN)
 uv run python results_report.py --style grayscale     # estilo dos gráficos (default: default)
@@ -306,6 +307,8 @@ uv run python results_report.py --colormap plasma     # colormap do heatmap (def
 uv run python results_report.py --list-colormaps      # listar colormaps disponíveis
 uv run python results_report.py -?                    # ajuda
 ```
+
+**Modo consolidado (`--base runs/`):** quando múltiplos anos estão presentes, gera artefatos com visão de série temporal completa — funil por ano lado a lado, trend de evolução, heatmap e ranking de periódicos agregados. A pasta de saída segue o padrão `runs/results_<ano_min>-<ano_max>/` (ex: `runs/results_2021-2025/`).
 
 Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos, diagrama Venn/UpSet), tabelas CSV, texto Markdown publication-ready (`results_text_pt.md` / `results_text_en.md`) com Metodologia enriquecida, Nota técnica com URL da busca, e descrição textual de cada figura — e JSON de metadados.
 

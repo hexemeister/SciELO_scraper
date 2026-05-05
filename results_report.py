@@ -88,7 +88,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
-__version__ = "1.8"
+__version__ = "1.9"
 
 # ---------------------------------------------------------------------------
 # Internacionalização
@@ -2902,9 +2902,15 @@ def main():
         pasta_sd = Path(args.scrape_dir)
         output = pasta_sd.parent / f"results_{pasta_sd.name}"
     else:
-        ultimo_ano = sorted(rows_por_ano)[-1]
-        stem = stem_por_ano[ultimo_ano]
-        output = base / str(ultimo_ano) / f"results_{stem}"
+        anos_ordenados = sorted(rows_por_ano)
+        if len(anos_ordenados) > 1:
+            # Múltiplos anos via --base: results_<ano_min>-<ano_max>/ dentro de base/
+            label = f"{anos_ordenados[0]}-{anos_ordenados[-1]}"
+            output = base / f"results_{label}"
+        else:
+            ultimo_ano = anos_ordenados[-1]
+            stem = stem_por_ano[ultimo_ano]
+            output = base / str(ultimo_ano) / f"results_{stem}"
 
     print(f"Pasta de saída   : {output.resolve()}")
 

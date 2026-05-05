@@ -115,7 +115,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
 - **Lê:** `terms_<ts>.csv` gerado pelo `terms_matcher.py` dentro de cada pasta de scraping.
 - **`--base DIR`:** pasta raiz com subpastas por ano (padrão: `runs/`). Descobre automaticamente os anos.
 - **`--scrape-dir DIR`:** aponta diretamente para uma pasta de scraping (ex: `sc_<ts>_s_<ts>_api+html/`). Usado pelo pipeline antes da cópia para `runs/`.
-- **`--output-dir DIR`:** pasta de saída explícita. Sem esta flag, cria `results_<stem>/` ao lado da pasta de scraping.
+- **`--output-dir DIR`:** pasta de saída explícita. Sem esta flag: com 1 ano → `runs/<ano>/results_<stem>/`; com múltiplos anos via `--base` → `runs/results_<ano_min>-<ano_max>/`.
 - **`--lang pt|en|all`:** idioma dos artefatos. Gráficos e textos Markdown são gerados por idioma.
 - **`--artifacts LISTA`:** gera apenas os artefatos listados (aliases curtos separados por vírgula ou espaço). Ex: `--artifacts funnel,trend,heatmap`.
 - **`--skip-artifacts LISTA`:** pula os artefatos listados.
