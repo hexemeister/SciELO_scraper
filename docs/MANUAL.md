@@ -284,13 +284,19 @@ uv run python scielo_scraper.py sc_20260411_143022.csv
 
 ### Pré-requisitos
 
-- Python 3.9 ou superior
+- Python 3.10 ou superior
 - [uv](https://github.com/astral-sh/uv) instalado
 
 ### Instalar dependências
 
 ```bash
+# Dependências do scraper (núcleo)
 uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
+
+# Dependências opcionais (necessárias para os scripts de análise)
+uv pip install matplotlib matplotlib-venn upsetplot  # gráficos e diagramas de Venn
+uv pip install wordcloud nltk pillow                 # nuvem de palavras
+uv pip install reportlab                             # diagrama PRISMA (PDF)
 ```
 
 > **Por que `brotli`?** O servidor do SciELO comprime as páginas com o algoritmo Brotli. Sem este pacote, o conteúdo chega corrompido e o scraping falha — mesmo sem mensagem de erro visível.

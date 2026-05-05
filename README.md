@@ -23,17 +23,19 @@ Quando a API retorna dados parciais (ex: só resumo), o fallback HTML é ativado
 
 ## Requisitos
 
-- Python 3.9+
+- Python 3.10+
 - [uv](https://github.com/astral-sh/uv) (recomendado) ou pip
 
 ## Instalação
 
 ```bash
-# Com uv (recomendado)
+# Dependências do scraper (núcleo)
 uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
 
-# Com pip
-pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
+# Dependências opcionais (necessárias para os scripts de análise)
+uv pip install matplotlib matplotlib-venn upsetplot  # gráficos e diagramas de Venn
+uv pip install wordcloud nltk pillow                 # nuvem de palavras
+uv pip install reportlab                             # diagrama PRISMA (PDF)
 ```
 
 > **Atenção:** o pacote `brotli` é obrigatório. O CDN do SciELO serve páginas com compressão Brotli (`Content-Encoding: br`); sem ele o body chega corrompido e o scraping falha silenciosamente.
@@ -41,7 +43,7 @@ pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
 ## Uso básico
 
 ```bash
-python scielo_scraper.py lista.csv
+uv run python scielo_scraper.py lista.csv
 ```
 
 ## Opções
@@ -73,7 +75,7 @@ Script para pesquisar artigos no SciELO Search e baixar os resultados como CSV, 
 ### Uso básico
 
 ```bash
-python scielo_search.py --terms avalia educa --years 2022-2025
+uv run python scielo_search.py --terms avalia educa --years 2022-2025
 ```
 
 Gera dois arquivos no diretório atual:
@@ -85,14 +87,16 @@ Gera dois arquivos no diretório atual:
 
 | Opção                      | Descrição                                                        |
 | -------------------------- | ---------------------------------------------------------------- |
-| `--terms TERMO...`         | Termos de busca (um ou mais)                                     |
-| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos de publicação                           |
-| `--collection COD`         | Coleção SciELO (default: `scl` = Brasil)                         |
-| `--fields CAMPO...`        | Campos onde pesquisar os termos                                  |
-| `--no-truncate`            | Desativar truncamento automático de termos                       |
-| `--show-params [ARQ]`      | Exibir parâmetros da última busca (ou de `ARQ` explícito) e sair |
-| `--output ARQUIVO`         | Nome do arquivo de saída (default: `sc_<timestamp>.csv`)         |
-| `-h`, `--help`, `-?`       | Mostrar ajuda                                                    |
+| `--terms TERMO...`         | Termos de busca (um ou mais)                                                       |
+| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos de publicação                                             |
+| `--collection COD`         | Coleção SciELO (default: `scl` = Brasil)                                           |
+| `--fields CAMPO`           | Campos de busca: `ti` (título), `ab` (resumo), `ti+ab` (ambos, default)            |
+| `--no-truncate`            | Desativar truncamento automático de termos (`$`)                                   |
+| `--show-params [ARQ]`      | Exibir parâmetros da última busca (ou de `ARQ` explícito) e sair                   |
+| `--output ARQUIVO`         | Nome do arquivo de saída (default: `sc_<timestamp>.csv`)                           |
+| `--list-collections`       | Listar as 36 coleções SciELO disponíveis e sair                                    |
+| `--dry-run`                | Mostrar a query gerada sem executar a busca                                        |
+| `-h`, `--help`, `-?`       | Mostrar ajuda                                                                      |
 
 > O CSV gerado contém uma coluna `ID` com os PIDs SciELO e é diretamente compatível com o `scielo_scraper.py`.
 
@@ -137,30 +141,30 @@ Mantém todas as colunas do CSV de entrada e adiciona:
 
 Resultados em cinco anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
-| Ano  | n   | Estratégia        | ok_completo | ok_parcial | erro     | Tempo       |
-| ---- | --- | ----------------- | ----------- | ---------- | -------- | ----------- |
-| 2021 | 561 | `--only-api`      | 99.1%       | 0.9%       | 0.0%     | ~25 min          |          |
-| 2021 | 561 | `--only-html`     | 96.8%       | 0.2%       | 3.0%     | ~33 min          |          |
-| 2021 | 561 | padrão (api+html) | **99.5%**   | 0.5%       | **0.0%** | **~28 min**      | **−15%** |
-| 2022 | 564 | `--only-api`      | 98.6%       | 1.1%       | 0.4%     | ~25 min          |          |
-| 2022 | 564 | `--only-html`     | 98.9%       | 0.2%       | 0.9%     | ~50 min          |          |
-| 2022 | 564 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~26 min**      | **−48%** |
-| 2023 | 468 | `--only-api`      | 98.9%       | 1.1%       | 0.0%     | ~24 min          |          |
-| 2023 | 468 | `--only-html`     | 98.3%       | 0.6%       | 1.1%     | ~57 min          |          |
-| 2023 | 468 | padrão (api+html) | **99.4%**   | 0.6%       | **0.0%** | **~24 min**      | **−58%** |
-| 2024 | 553 | `--only-api`      | 98.9%       | 0.9%       | 0.2%     | ~27 min          |          |
-| 2024 | 553 | `--only-html`     | 98.2%       | 0.2%       | 1.6%     | ~71 min          |          |
-| 2024 | 553 | padrão (api+html) | **99.6%**   | 0.2%       | **0.2%** | **~27 min**      | **−62%** |
-| 2025 | 603 | `--only-api`      | 99.2%       | 0.8%       | 0.0%     | ~28 min          |          |
-| 2025 | 603 | `--only-html`     | 98.2%       | 0.5%       | 1.3%     | ~57 min          |          |
-| 2025 | 603 | padrão (api+html) | **99.7%**   | 0.3%       | **0.0%** | **~32 min**      | **−45%** |
+| Ano  | n   | Estratégia        | ok_completo | ok_parcial | erro     | Tempo       | −% vs html |
+| ---- | --- | ----------------- | ----------- | ---------- | -------- | ----------- | ---------- |
+| 2021 | 561 | `--only-api`      | 99.1%       | 0.9%       | 0.0%     | ~25 min     | —          |
+| 2021 | 561 | `--only-html`     | 96.8%       | 0.2%       | 3.0%     | ~33 min     | —          |
+| 2021 | 561 | padrão (api+html) | **99.5%**   | 0.5%       | **0.0%** | **~28 min** | **−15%**   |
+| 2022 | 564 | `--only-api`      | 98.6%       | 1.1%       | 0.4%     | ~25 min     | —          |
+| 2022 | 564 | `--only-html`     | 98.9%       | 0.2%       | 0.9%     | ~50 min     | —          |
+| 2022 | 564 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~26 min** | **−48%**   |
+| 2023 | 468 | `--only-api`      | 98.9%       | 1.1%       | 0.0%     | ~24 min     | —          |
+| 2023 | 468 | `--only-html`     | 98.3%       | 0.6%       | 1.1%     | ~57 min     | —          |
+| 2023 | 468 | padrão (api+html) | **99.4%**   | 0.6%       | **0.0%** | **~24 min** | **−58%**   |
+| 2024 | 553 | `--only-api`      | 98.9%       | 0.9%       | 0.2%     | ~27 min     | —          |
+| 2024 | 553 | `--only-html`     | 98.2%       | 0.2%       | 1.6%     | ~71 min     | —          |
+| 2024 | 553 | padrão (api+html) | **99.6%**   | 0.2%       | **0.2%** | **~27 min** | **−62%**   |
+| 2025 | 603 | `--only-api`      | 99.2%       | 0.8%       | 0.0%     | ~28 min     | —          |
+| 2025 | 603 | `--only-html`     | 98.2%       | 0.5%       | 1.3%     | ~57 min     | —          |
+| 2025 | 603 | padrão (api+html) | **99.7%**   | 0.3%       | **0.0%** | **~32 min** | **−45%**   |
 
 A coluna **−%** indica a economia de tempo do modo padrão em relação ao `--only-html`. A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~99% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo entre 15% e 62% menor que o modo apenas-html.
 
 ## Coleções disponíveis
 
 ```bash
-python scielo_scraper.py --list-collections
+uv run python scielo_search.py --list-collections
 ```
 
 Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use `--collection COD` para selecionar (default: `scl` = Brasil).
@@ -186,21 +190,38 @@ Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use
 ## Workflow típico
 
 ```bash
+# Opção A — pipeline completo automático (recomendado)
+uv run python run_pipeline.py --year 2024
+# → busca + 3×scraping + análise + termos + gráficos + relatório + wordcloud + PRISMA
+# → tudo em runs/2024/
+
+# Para vários anos de uma vez:
+uv run python run_pipeline.py --per-year --year 2021-2025
+
+# Opção B — passo a passo manual
 # 1. Buscar artigos
-uv run python scielo_search.py --terms avalia educa --years 2022-2025
-# → gera sc_20260411_143022.csv + sc_20260411_143022_params.json
+uv run python scielo_search.py --terms avalia educa --years 2024
+# → sc_20260411_143022.csv + sc_20260411_143022_params.json
 
 # 2. Extrair metadados
 uv run python scielo_scraper.py sc_20260411_143022.csv
-# → gera sc_20260411_143022_s_20260411_150312_api+html/
+# → sc_20260411_143022_s_20260411_150312_api+html/resultado.csv
 
-# 3. (Opcional) Gerar gráficos comparativos de processo entre anos
-uv run python process_charts.py
-# → gera chart_status.png, chart_sources.png, chart_time.png
+# 3. Detectar termos e gerar CSV auditável
+uv run python terms_matcher.py --years 2024
+# → terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
 
-# 4. (Opcional) Detectar termos por campo e gerar CSV auditável
-uv run python terms_matcher.py --years 2022 2023 2024 2025
-# → gera terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
+# 4. Gerar artefatos científicos (gráficos, tabelas, texto, JSON)
+uv run python results_report.py --years 2024
+# → results_<stem>/results_text_pt.md, results_funnel.png, results_report.json, ...
+
+# 5. Nuvem de palavras
+uv run python scielo_wordcloud.py sc_*/resultado.csv
+# → wordcloud_keywords_ptbr_<ts>.png
+
+# 6. Diagrama PRISMA 2020
+uv run python prisma_workflow.py results_<stem>/results_report.json
+# → prisma_<stem>_pt_<ts>.pdf
 ```
 
 ## Exemplos de artefatos gerados
