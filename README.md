@@ -252,6 +252,13 @@ Top periódicos por número de artigos no corpus filtrado, com percentuais. Em 2
 
 ![Periódicos](docs/exemplos/results_journals_pt.png)
 
+**Modo consolidado (`--base runs/`):** com 5 anos agregados (2021–2025, n=370), o ranking muda: a *Revista Brasileira de Educação Médica* sobe para 1º lugar com 50 artigos (13,5% do total) — presença distribuída que não se destaca em nenhum ano isolado mas domina na visão longitudinal. A taxa `criterio_ok` mantém-se estável ao longo do período (11,3%–15,4%), sem tendência clara de crescimento, o que valida a consistência da estratégia de busca. Gere o consolidado com:
+
+```bash
+uv run python results_report.py --base runs/
+# → runs/results_2021-2025/ com funil por ano lado a lado, trend de evolução e ranking agregado
+```
+
 ### Nuvem de palavras (`scielo_wordcloud.py`)
 
 Gerada a partir das palavras-chave dos artigos `criterio_ok`. Revela os termos mais frequentes do corpus de forma visual — domínio claro de *saúde*, *educação* e *enfermagem*.

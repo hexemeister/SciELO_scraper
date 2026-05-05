@@ -109,7 +109,7 @@ Gráficos e terms são gerados diretamente em `runs/<ano>/` (sem passar pelo rai
   - *Fallback HTML* — API não retornou nada; extração inteiramente via HTML
   - *Falha de acesso* — erro HTTP (ex: 404)
 
-## Comportamento do results_report.py (v1.8)
+## Comportamento do results_report.py (v1.9)
 
 - **Propósito:** artefatos científicos publication-ready sobre os resultados — O QUE foi encontrado, não como o processo correu.
 - **Lê:** `terms_<ts>.csv` gerado pelo `terms_matcher.py` dentro de cada pasta de scraping.
