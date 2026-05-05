@@ -137,14 +137,38 @@ def _nltk_stopwords(lang: str) -> set[str]:
     nltk_lang = _NLTK_LANG.get(lang, "portuguese")
     try:
         import nltk
+        # Remove paths de sandboxes (ex: UWP/Claude) que causam SecurityViolation
+        # no validate_path do NLTK quando o path "escapa" da raiz esperada.
+        nltk.data.path = [
+            p for p in nltk.data.path
+            if "LocalCache" not in p and "Packages" not in p
+        ]
         try:
-            from nltk.corpus import stopwords
-            return set(stopwords.words(nltk_lang))
-        except LookupError:
+            # Força recarregamento do corpus com o path limpo
+            import nltk.corpus
+            sw_corpus = nltk.corpus.stopwords
+            sw_corpus._root = None  # força re-localização
+            sw_corpus.__init__(sw_corpus.root if hasattr(sw_corpus, '_root') else None)
+        except Exception:
+            pass
+        try:
+            words_fn = nltk.corpus.stopwords.words
+            return set(words_fn(nltk_lang))
+        except (LookupError, ValueError):
             print("  Baixando corpus de stopwords NLTK...")
             nltk.download("stopwords", quiet=True)
-            from nltk.corpus import stopwords
-            return set(stopwords.words(nltk_lang))
+            try:
+                return set(nltk.corpus.stopwords.words(nltk_lang))
+            except ValueError:
+                pass
+        # Fallback: lê o arquivo diretamente do path válido
+        import os
+        for base in nltk.data.path:
+            candidate = os.path.join(base, "corpora", "stopwords", nltk_lang)
+            if os.path.isfile(candidate):
+                with open(candidate, encoding="utf-8") as f:
+                    return {line.strip() for line in f if line.strip()}
+        return set()
     except ImportError:
         print("  ⚠  nltk não instalado. Usando apenas stopwords embutidas.")
         print("     Para melhor cobertura: uv pip install nltk")
@@ -310,6 +334,8 @@ def gerar_wordcloud(
     wc.generate_from_frequencies(freq)
 
     # Salva via matplotlib (para adicionar título)
+    import matplotlib.pyplot as plt
+
     dpi = 150
     fig_w = width  / dpi
     fig_h = height / dpi + 0.5   # espaço para título

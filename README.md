@@ -203,6 +203,54 @@ uv run python terms_matcher.py --years 2022 2023 2024 2025
 # → gera terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
 ```
 
+## Exemplos de artefatos gerados
+
+> Todos os exemplos abaixo foram gerados com `run_pipeline.py --per-year --year 2021-2025`, termos `avalia educa`, coleção SciELO Brasil.
+
+### Diagnóstico do processo de extração (`process_charts.py`)
+
+Compara as três estratégias de extração lado a lado — útil para validar a qualidade do scraping antes de analisar os resultados.
+
+![Distribuição de status por modo de extração](docs/exemplos/chart_status.png)
+
+### Funil de seleção (`results_report.py`)
+
+Mostra quantos artigos foram buscados, scrapeados e aprovaram o critério automático de filtragem — ponto de partida para o PRISMA.
+
+![Funil de seleção](docs/exemplos/results_funnel_pt.png)
+
+### Distribuição de termos por campo (`results_report.py`)
+
+Heatmap com a frequência de cada termo nos campos detectados, calculada sobre os artigos `criterio_ok`. Mostra onde cada termo aparece mais — *educa* concentra 94,1% nas palavras-chave, enquanto *avalia* está mais distribuído.
+
+![Heatmap de termos](docs/exemplos/results_terms_heatmap_pt.png)
+
+### Periódicos com maior representação (`results_report.py`)
+
+Top periódicos por número de artigos no corpus filtrado, com percentuais. Em 2024: *Educar em Revista* (11,8%), *Ensaio: Avaliação e Políticas Públicas em Educação* (9,4%) e *Revista Brasileira de Educação Médica* (9,4%) concentraram 30,6% do corpus.
+
+![Periódicos](docs/exemplos/results_journals_pt.png)
+
+### Nuvem de palavras (`scielo_wordcloud.py`)
+
+Gerada a partir das palavras-chave dos artigos `criterio_ok`. Revela os termos mais frequentes do corpus de forma visual — domínio claro de *saúde*, *educação* e *enfermagem*.
+
+![Wordcloud de palavras-chave](docs/exemplos/wordcloud_keywords.png)
+
+### Diagrama PRISMA 2020 (`prisma_workflow.py`)
+
+PDF A4 preenchível gerado automaticamente. A fase de Identificação (n=553, triagem=552, incluídos sugeridos=85) é auto-preenchida; as fases de Triagem e Inclusão ficam como campos editáveis para curadoria humana.
+
+![Diagrama PRISMA](docs/exemplos/prisma_preview.png)
+
+### Texto publication-ready (`results_report.py`)
+
+Além dos gráficos, o `results_report.py` gera um `results_text_pt.md` com seções prontas para publicação. Exemplo de trecho da seção de Metodologia (2024):
+
+> *"A busca bibliográfica, conduzida em 5 de maio de 2026, foi realizada na plataforma SciELO Brasil por meio do SciELO Search, utilizando os termos "avalia" e "educa" com truncamento automático (operador $), nos campos de título e resumo, abrangendo o ano de 2024. Foram recuperados 553 registros. [...] A etapa de filtragem automática verificou a presença simultânea de todos os termos em pelo menos um dos campos requeridos (título e palavras-chave), identificando 85 artigos (15,4%) como potencialmente relevantes para curadoria humana."*
+
+---
+
 ## run_pipeline.py — Pipeline completo
 
 Executa o fluxo completo em um único comando: busca → 3×scraping → análise de discrepância → detecção de termos → gráficos → relatório científico → nuvem de palavras → diagrama PRISMA → arquivamento em `runs/<ano>/`.

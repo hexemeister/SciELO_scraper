@@ -149,6 +149,56 @@ Use esta tabela para encontrar o comando certo sem precisar ler o manual inteiro
 
 ---
 
+## Exemplos de artefatos gerados
+
+> Todos os exemplos abaixo foram gerados com `run_pipeline.py --per-year --year 2021-2025`, termos `avalia educa`, coleção SciELO Brasil.
+
+### Diagnóstico do processo — `process_charts.py`
+
+Compara as três estratégias de extração por ano. O modo `api+html` domina com >99% de extração completa; o modo `apenas-html` apresenta mais erros e tempo até 2,6× maior.
+
+![Distribuição de status por modo de extração](exemplos/chart_status.png)
+
+### Funil de seleção — `results_report.py`
+
+Do total buscado ao corpus para curadoria: 553 buscados → 553 scrapeados (100%) → 85 criterio_ok (15,4%). Ponto de partida direto para preencher o PRISMA.
+
+![Funil de seleção](exemplos/results_funnel_pt.png)
+
+### Distribuição de termos por campo — `results_report.py`
+
+Frequência de cada termo nos campos detectados, base: artigos `criterio_ok`. *educa* concentra 94,1% nas palavras-chave; *avalia* distribui-se mais uniformemente entre título (76,5%) e resumo (88,2%).
+
+![Heatmap de termos](exemplos/results_terms_heatmap_pt.png)
+
+### Periódicos com maior representação — `results_report.py`
+
+Top periódicos no corpus filtrado com percentuais. Em 2024, três periódicos concentraram 30,6% do total: *Educar em Revista* (n=10, 11,8%), *Ensaio: Avaliação e Políticas Públicas em Educação* (n=8, 9,4%) e *Revista Brasileira de Educação Médica* (n=8, 9,4%).
+
+![Periódicos](exemplos/results_journals_pt.png)
+
+### Nuvem de palavras — `scielo_wordcloud.py`
+
+Gerada a partir das palavras-chave do corpus `criterio_ok`. Domínio de *saúde*, *educação* e *enfermagem* — revela o perfil temático do corpus de forma imediata.
+
+![Wordcloud de palavras-chave](exemplos/wordcloud_keywords.png)
+
+### Diagrama PRISMA 2020 — `prisma_workflow.py`
+
+PDF A4 preenchível com a fase de Identificação auto-preenchida (n=553, triagem=552, incluídos sugeridos=85). As fases de Triagem e Inclusão ficam como campos AcroForm editáveis para curadoria humana no Acrobat Reader, Edge ou Foxit.
+
+![Diagrama PRISMA](exemplos/prisma_preview.png)
+
+### Texto publication-ready — `results_report.py`
+
+O `results_text_pt.md` entrega seções prontas para submissão. Exemplo de trecho automático da seção de Metodologia (2024):
+
+> *"A busca bibliográfica, conduzida em 5 de maio de 2026, foi realizada na plataforma SciELO Brasil por meio do SciELO Search, utilizando os termos "avalia" e "educa" com truncamento automático (operador $), nos campos de título e resumo, abrangendo o ano de 2024. Foram recuperados 553 registros. [...] A etapa de filtragem automática verificou a presença simultânea de todos os termos em pelo menos um dos campos requeridos (título e palavras-chave), identificando 85 artigos (15,4%) como potencialmente relevantes para curadoria humana."*
+
+O arquivo inclui ainda: nota técnica com URL da busca, seção de Resultados, Limitações, e descrição textual de cada figura em versão curta (legenda) e longa (substituto textual para publicações sem imagens).
+
+---
+
 ## 0. Buscando artigos com scielo_search.py
 
 Antes de extrair dados com o scraper, é preciso ter uma lista de PIDs. O `scielo_search.py` faz isso automaticamente: ele consulta o SciELO Search e gera um CSV pronto para usar como entrada do scraper.
