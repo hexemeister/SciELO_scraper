@@ -139,23 +139,23 @@ Resultados em cinco anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
 | Ano  | n   | Estratégia        | ok_completo | ok_parcial | erro     | Tempo       |
 | ---- | --- | ----------------- | ----------- | ---------- | -------- | ----------- |
-| 2021 | 561 | `--only-api`      | 99.1%       | 0.9%       | 0.0%     | ~25 min     |
-| 2021 | 561 | `--only-html`     | 96.8%       | 0.2%       | 3.0%     | ~33 min     |
-| 2021 | 561 | padrão (api+html) | **99.5%**   | 0.5%       | **0.0%** | **~28 min** |
-| 2022 | 564 | `--only-api`      | 98.6%       | 1.1%       | 0.4%     | ~25 min     |
-| 2022 | 564 | `--only-html`     | 98.9%       | 0.2%       | 0.9%     | ~50 min     |
-| 2022 | 564 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~26 min** |
-| 2023 | 468 | `--only-api`      | 98.9%       | 1.1%       | 0.0%     | ~24 min     |
-| 2023 | 468 | `--only-html`     | 98.3%       | 0.6%       | 1.1%     | ~57 min     |
-| 2023 | 468 | padrão (api+html) | **99.4%**   | 0.6%       | **0.0%** | **~24 min** |
-| 2024 | 553 | `--only-api`      | 98.9%       | 0.9%       | 0.2%     | ~27 min     |
-| 2024 | 553 | `--only-html`     | 98.2%       | 0.2%       | 1.6%     | ~71 min     |
-| 2024 | 553 | padrão (api+html) | **99.6%**   | 0.2%       | **0.2%** | **~27 min** |
-| 2025 | 603 | `--only-api`      | 99.2%       | 0.8%       | 0.0%     | ~28 min     |
-| 2025 | 603 | `--only-html`     | 98.2%       | 0.5%       | 1.3%     | ~57 min     |
-| 2025 | 603 | padrão (api+html) | **99.7%**   | 0.3%       | **0.0%** | **~32 min** |
+| 2021 | 561 | `--only-api`      | 99.1%       | 0.9%       | 0.0%     | ~25 min          |          |
+| 2021 | 561 | `--only-html`     | 96.8%       | 0.2%       | 3.0%     | ~33 min          |          |
+| 2021 | 561 | padrão (api+html) | **99.5%**   | 0.5%       | **0.0%** | **~28 min**      | **−15%** |
+| 2022 | 564 | `--only-api`      | 98.6%       | 1.1%       | 0.4%     | ~25 min          |          |
+| 2022 | 564 | `--only-html`     | 98.9%       | 0.2%       | 0.9%     | ~50 min          |          |
+| 2022 | 564 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~26 min**      | **−48%** |
+| 2023 | 468 | `--only-api`      | 98.9%       | 1.1%       | 0.0%     | ~24 min          |          |
+| 2023 | 468 | `--only-html`     | 98.3%       | 0.6%       | 1.1%     | ~57 min          |          |
+| 2023 | 468 | padrão (api+html) | **99.4%**   | 0.6%       | **0.0%** | **~24 min**      | **−58%** |
+| 2024 | 553 | `--only-api`      | 98.9%       | 0.9%       | 0.2%     | ~27 min          |          |
+| 2024 | 553 | `--only-html`     | 98.2%       | 0.2%       | 1.6%     | ~71 min          |          |
+| 2024 | 553 | padrão (api+html) | **99.6%**   | 0.2%       | **0.2%** | **~27 min**      | **−62%** |
+| 2025 | 603 | `--only-api`      | 99.2%       | 0.8%       | 0.0%     | ~28 min          |          |
+| 2025 | 603 | `--only-html`     | 98.2%       | 0.5%       | 1.3%     | ~57 min          |          |
+| 2025 | 603 | padrão (api+html) | **99.7%**   | 0.3%       | **0.0%** | **~32 min**      | **−45%** |
 
-A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~99% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo equivalente ao modo apenas-api — e significativamente inferior ao modo apenas-html (que levou até 71 min em 2024).
+A coluna **−%** indica a economia de tempo do modo padrão em relação ao `--only-html`. A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~99% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo entre 15% e 62% menor que o modo apenas-html.
 
 ## Coleções disponíveis
 
