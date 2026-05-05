@@ -1,4 +1,4 @@
-# Manual do Usuário — SciELO Scraper v2.6
+# Manual do Usuário — SciELO Scraper v2.5
 
 > **Projeto e-Aval — Estado da Arte da Avaliação**
 > Grupo de pesquisa do Mestrado Profissional em Avaliação da Fundação Cesgranrio.
@@ -440,15 +440,35 @@ Mais lento (~10 min a mais para 564 artigos), mas útil quando a API estiver for
 
 ### Comparativo
 
-Resultados observados em três anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
+Resultados observados em cinco anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 
 | Estratégia        | ok_completo | Tempo médio | Pasta gerada       | Quando usar                     |
 | ----------------- | ----------- | ----------- | ------------------ | ------------------------------- |
-| Padrão (api+html) | 99.6–99.8%  | ~26–27 min  | `_s_..._api+html/` | Sempre — melhor custo-benefício |
-| Apenas HTML       | 99.0–99.5%  | ~30–36 min  | `_s_..._html/`     | API fora do ar                  |
-| Apenas API        | 93.8–99.2%  | ~26–27 min  | `_s_..._api/`      | Testes rápidos sem AoPs         |
+| Padrão (api+html) | 99.4–99.8%  | ~24–32 min  | `_s_..._api+html/` | Sempre — melhor custo-benefício |
+| Apenas API        | 98.6–99.2%  | ~24–28 min  | `_s_..._api/`      | Testes rápidos sem AoPs         |
+| Apenas HTML       | 96.8–98.9%  | ~33–71 min  | `_s_..._html/`     | API fora do ar                  |
 
-> O modo apenas-api é significativamente mais limitado em anos com muitos artigos AoP: em 2022 apresentou 5.1% de erros (vs. 0.2% do padrão), pois artigos Ahead of Print não estão indexados na API.
+Dados detalhados por ano (2021–2025):
+
+| Ano  | n   | Estratégia        | ok_completo | ok_parcial | erro     | Tempo       |
+| ---- | --- | ----------------- | ----------- | ---------- | -------- | ----------- |
+| 2021 | 561 | `--only-api`      | 99.1%       | 0.9%       | 0.0%     | ~25 min     |
+| 2021 | 561 | `--only-html`     | 96.8%       | 0.2%       | 3.0%     | ~33 min     |
+| 2021 | 561 | padrão (api+html) | **99.5%**   | 0.5%       | **0.0%** | **~28 min** |
+| 2022 | 564 | `--only-api`      | 98.6%       | 1.1%       | 0.4%     | ~25 min     |
+| 2022 | 564 | `--only-html`     | 98.9%       | 0.2%       | 0.9%     | ~50 min     |
+| 2022 | 564 | padrão (api+html) | **99.8%**   | 0.2%       | **0.0%** | **~26 min** |
+| 2023 | 468 | `--only-api`      | 98.9%       | 1.1%       | 0.0%     | ~24 min     |
+| 2023 | 468 | `--only-html`     | 98.3%       | 0.6%       | 1.1%     | ~57 min     |
+| 2023 | 468 | padrão (api+html) | **99.4%**   | 0.6%       | **0.0%** | **~24 min** |
+| 2024 | 553 | `--only-api`      | 98.9%       | 0.9%       | 0.2%     | ~27 min     |
+| 2024 | 553 | `--only-html`     | 98.2%       | 0.2%       | 1.6%     | ~71 min     |
+| 2024 | 553 | padrão (api+html) | **99.6%**   | 0.2%       | **0.2%** | **~27 min** |
+| 2025 | 603 | `--only-api`      | 99.2%       | 0.8%       | 0.0%     | ~28 min     |
+| 2025 | 603 | `--only-html`     | 98.2%       | 0.5%       | 1.3%     | ~57 min     |
+| 2025 | 603 | padrão (api+html) | **99.7%**   | 0.3%       | **0.0%** | **~32 min** |
+
+> O modo `--only-html` é o mais lento e o de menor cobertura: chegou a 71 min em 2024 (vs. ~27 min do padrão) e apresentou até 3.0% de erros (2021). O modo `--only-api` é mais rápido mas perde artigos Ahead of Print (AoP), que não estão indexados na API.
 
 ---
 
