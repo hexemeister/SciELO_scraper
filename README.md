@@ -1,145 +1,130 @@
 # SciELO Scraper
 
-Extrai **título**, **resumo** e **palavras-chave em português** de artigos SciELO a partir de um CSV com PIDs (identificadores SciELO).
+Extrai **título**, **resumo** e **palavras-chave em português** de artigos SciELO a partir de um CSV com PIDs. Inclui pipeline completo de busca → scraping → detecção de termos → artefatos científicos (gráficos, texto publication-ready, diagrama PRISMA).
 
-Desenvolvido para o projeto **e-Aval** — *Estado da Arte da Avaliação* — do grupo de pesquisa do [Mestrado Profissional em Avaliação da Fundação Cesgranrio](https://eavaleducacao1.websiteseguro.com/). O banco de dados público recebe os artigos curados após o processo de filtragem e verificação humana realizado com este conjunto de ferramentas.
-
-- 🌐 Banco de dados: https://eavaleducacao1.websiteseguro.com/
-- 💻 Repositório do banco de dados: https://github.com/hexemeister/eaval
-- 📧 Contato: eaval.bd@gmail.com
+Desenvolvido para o projeto **[e-Aval](https://eavaleducacao1.websiteseguro.com/)** — Estado da Arte da Avaliação (Fundação Cesgranrio). | 📧 eaval.bd@gmail.com | [Banco de dados](https://github.com/hexemeister/eaval)
 
 ## Como funciona
 
-O script usa duas fontes de dados por ordem de prioridade:
+O scraper usa duas fontes de dados por ordem de prioridade:
 
-1. **ArticleMeta REST API** (`articlemeta.scielo.org`) — extração direta e estruturada via ISIS-JSON. Rápida e confiável para a maioria dos artigos.
-2. **Fallback HTML** (`scielo.br`) — ativado automaticamente quando a API não retorna dados completos. Estratégia multi-etapa:
-   - Acessa a URL legacy e segue redirects automáticos para a URL canônica
-   - Extrai meta tags (`citation_*`, `og:*`) e corpo HTML (`h1.article-title`, `div[data-anchor=Resumo]`)
-   - Se a língua da página não for PT, segue o link "Texto (Português)"
-   - Para artigos Ahead of Print (AoP), tenta a `og:url` da página
+1. **ArticleMeta REST API** — extração direta via ISIS-JSON. Rápida e confiável para a maioria dos artigos.
+2. **Fallback HTML** — ativado automaticamente quando a API não retorna dados completos. Extrai meta tags (`citation_*`, `og:*`) e corpo HTML. Para artigos Ahead of Print (AoP), tenta a `og:url`.
 
-Quando a API retorna dados parciais (ex: só resumo), o fallback HTML é ativado para preencher os campos restantes.
-
-## Requisitos
-
-- Python 3.10+
-- [uv](https://github.com/astral-sh/uv) (recomendado) ou pip
+Quando a API retorna dados parciais, o fallback preenche apenas os campos que faltam.
 
 ## Instalação
 
+- Python 3.10+
+- [uv](https://github.com/astral-sh/uv)
+
 ```bash
-# Dependências do scraper (núcleo)
+# Núcleo (scraping)
 uv pip install requests beautifulsoup4 lxml pandas tqdm wakepy brotli
 
-# Dependências opcionais (necessárias para os scripts de análise)
-uv pip install matplotlib matplotlib-venn upsetplot  # gráficos e diagramas de Venn
+# Scripts de análise
+uv pip install matplotlib matplotlib-venn upsetplot  # gráficos e Venn
 uv pip install wordcloud nltk pillow                 # nuvem de palavras
-uv pip install reportlab                             # diagrama PRISMA (PDF)
+uv pip install reportlab                             # diagrama PRISMA
 ```
 
-> **Atenção:** o pacote `brotli` é obrigatório. O CDN do SciELO serve páginas com compressão Brotli (`Content-Encoding: br`); sem ele o body chega corrompido e o scraping falha silenciosamente.
+> `brotli` é obrigatório — o CDN do SciELO usa compressão Brotli; sem ele o scraping falha silenciosamente.
 
-## Uso básico
+## run_pipeline.py — Pipeline completo
+
+Para uso regular, este é o ponto de entrada. Executa tudo em sequência: busca → 3×scraping → análise de discrepância → detecção de termos → gráficos → relatório científico → wordcloud → diagrama PRISMA.
 
 ```bash
-uv run python scielo_scraper.py lista.csv
+uv run python run_pipeline.py --year 2024                     # pipeline completo para 2024
+uv run python run_pipeline.py --per-year --year 2021-2025     # um destino por ano
+uv run python run_pipeline.py --year 2024 --dry-run           # simula sem executar
+uv run python run_pipeline.py --year 2024 --skip-scrape       # reutiliza scraping existente
+uv run python run_pipeline.py --stats-report                  # relatório de todas as runs
+uv run python run_pipeline.py --versions                      # versão de todos os scripts
+uv run python run_pipeline.py --reset-working-tree            # remove tudo gerado (pede confirmação)
 ```
 
-## Opções
+Gera em `runs/<ano>/`: CSV de busca, 3 pastas de scraping, análise de discrepância, gráficos de processo, relatório científico, wordclouds, PDFs PRISMA (pt + en), `pipeline_<ts>.log` e `pipeline_stats.json`.
 
-| Opção                | Default                       | Descrição                                                  |
-| -------------------- | ----------------------------- | ---------------------------------------------------------- |
-| `--output-dir DIR`   | `<csv>_s_<timestamp>_<modo>/` | Pasta de saída                                             |
-| `--delay SEG`        | `1.5`                         | Delay mínimo entre requests                                |
-| `--jitter SEG`       | `0.5`                         | Variação aleatória máxima do delay                         |
-| `--retries N`        | `3`                           | Tentativas em erro transitório                             |
-| `--timeout SEG`      | `20`                          | Timeout HTTP em segundos                                   |
-| `--workers N`        | `1`                           | Threads paralelas (máx: 4)                                 |
-| `--resume`           | —                             | Retomar execução anterior                                  |
-| `--no-resume`        | —                             | Ignorar resultados anteriores                              |
-| `--only-api`         | —                             | Usar apenas ArticleMeta API                                |
-| `--only-html`        | —                             | Usar apenas scraping HTML                                  |
-| `--stats-report`     | —                             | Imprimir relatório de uma execução anterior                |
-| `--list-collections` | —                             | Listar coleções SciELO disponíveis                         |
-| `--log-level LEVEL`  | `INFO`                        | `DEBUG` / `INFO` / `WARNING` / `ERROR`                     |
-| `--collection COD`   | `scl`                         | Coleção SciELO (ex: `scl`=Brasil, `arg`=Argentina)         |
-| `--checkpoint N`     | `25`                          | Salvar CSV a cada N artigos (0=só no final, 1=cada artigo) |
-| `--version`          | —                             | Mostrar versão                                             |
-| `-h`, `--help`, `-?` | —                             | Mostrar ajuda                                              |
+## Workflow manual (passo a passo)
+
+Use os scripts individuais quando precisar repetir uma etapa específica ou ajustar parâmetros.
+
+```bash
+uv run python scielo_search.py --terms avalia educa --years 2024
+# → sc_<ts>.csv + sc_<ts>_params.json
+
+uv run python scielo_scraper.py sc_<ts>.csv
+# → sc_<ts>_s_<ts>_api+html/resultado.csv
+
+uv run python terms_matcher.py --years 2024
+# → terms_<ts>.csv  (booleanas por termo×campo + criterio_ok)
+
+uv run python results_report.py --years 2024
+# → results_<stem>/  (gráficos, CSVs, results_text_pt.md, results_report.json)
+
+uv run python scielo_wordcloud.py sc_*/resultado.csv
+# → wordcloud_keywords_ptbr_<ts>.png
+
+uv run python prisma_workflow.py results_<stem>/results_report.json
+# → prisma_<stem>_pt_<ts>.pdf
+```
 
 ## scielo_search.py — Busca de artigos
 
-Script para pesquisar artigos no SciELO Search e baixar os resultados como CSV, pronto para alimentar o `scielo_scraper.py`.
-
-### Uso básico
+Consulta o SciELO Search e gera um CSV pronto para o scraper.
 
 ```bash
 uv run python scielo_search.py --terms avalia educa --years 2022-2025
+uv run python scielo_search.py --terms avalia educa --years 2022-2025 --collection arg  # Argentina
+uv run python scielo_search.py --show-params        # parâmetros da última busca
+uv run python scielo_search.py --list-collections   # lista as 36 coleções disponíveis
 ```
 
-Gera dois arquivos no diretório atual:
+| Opção | Descrição |
+| ----- | --------- |
+| `--terms TERMO...` | Termos de busca (truncamento automático com `$` — desative com `--no-truncate`) |
+| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos |
+| `--collection COD` | Coleção SciELO (default: `scl` = Brasil) |
+| `--fields CAMPO` | `ti` (título), `ab` (resumo), `ti+ab` (default) |
+| `--output ARQUIVO` | Nome do CSV de saída (default: `sc_<timestamp>.csv`) |
+| `--show-params [ARQ]` | Exibir parâmetros da última busca (ou de `ARQ`) |
+| `--dry-run` | Mostra a query sem executar |
 
-- `sc_<timestamp>.csv` — lista de artigos com PIDs e metadados
-- `sc_<timestamp>_params.json` — parâmetros completos da busca, incluindo `versao_searcher` (a partir de v1.3)
+## scielo_scraper.py — Extração de metadados
 
-### Opções
-
-| Opção                      | Descrição                                                        |
-| -------------------------- | ---------------------------------------------------------------- |
-| `--terms TERMO...`         | Termos de busca (um ou mais)                                                       |
-| `--years ANO` ou `ANO-ANO` | Ano ou intervalo de anos de publicação                                             |
-| `--collection COD`         | Coleção SciELO (default: `scl` = Brasil)                                           |
-| `--fields CAMPO`           | Campos de busca: `ti` (título), `ab` (resumo), `ti+ab` (ambos, default)            |
-| `--no-truncate`            | Desativar truncamento automático de termos (`$`)                                   |
-| `--show-params [ARQ]`      | Exibir parâmetros da última busca (ou de `ARQ` explícito) e sair                   |
-| `--output ARQUIVO`         | Nome do arquivo de saída (default: `sc_<timestamp>.csv`)                           |
-| `--list-collections`       | Listar as 36 coleções SciELO disponíveis e sair                                    |
-| `--dry-run`                | Mostrar a query gerada sem executar a busca                                        |
-| `-h`, `--help`, `-?`       | Mostrar ajuda                                                                      |
-
-> O CSV gerado contém uma coluna `ID` com os PIDs SciELO e é diretamente compatível com o `scielo_scraper.py`.
-
-## Formato do CSV de entrada
-
-O CSV deve ter uma coluna `ID` com os PIDs SciELO:
-
-```
-ID,Title,Author(s),...
-S1982-88372022000300013,Título do artigo,...
-S1984-92302022000400750,Outro artigo,...
+```bash
+uv run python scielo_scraper.py lista.csv            # modo padrão (api+html)
+uv run python scielo_scraper.py lista.csv --only-api  # apenas API (mais rápido, sem AoPs)
+uv run python scielo_scraper.py lista.csv --only-html # apenas HTML (API fora do ar)
+uv run python scielo_scraper.py lista.csv --resume    # retomar execução interrompida
 ```
 
-O PID deve seguir o padrão `[A-Z]\d{4}-\d{3}[\dA-Z]\d{13}` (ex: `S1982-88372022000300013`). Sufixos como `-scl` ou `-oai` são removidos automaticamente.
+| Opção | Default | Descrição |
+| ----- | ------- | --------- |
+| `--output-dir DIR` | `<csv>_s_<ts>_<modo>/` | Pasta de saída |
+| `--delay SEG` | `1.5` | Delay mínimo entre requests |
+| `--jitter SEG` | `0.5` | Variação aleatória do delay |
+| `--retries N` | `3` | Tentativas em erro transitório |
+| `--timeout SEG` | `20` | Timeout HTTP |
+| `--workers N` | `1` | Threads paralelas (máx: 4) |
+| `--checkpoint N` | `25` | Salvar CSV a cada N artigos (0=só no final) |
+| `--collection COD` | `scl` | Coleção SciELO |
+| `--log-level LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 
-## Arquivos gerados
-
-Cada execução cria uma pasta `<nome_csv>_s_<timestamp>_<modo>/` com:
-
-| Arquivo         | Descrição                  |
-| --------------- | -------------------------- |
-| `resultado.csv` | CSV com os dados extraídos |
-| `scraper.log`   | Log completo da execução   |
-| `stats.json`    | Estatísticas em JSON       |
-
-### Colunas do resultado.csv
-
-Mantém todas as colunas do CSV de entrada e adiciona:
-
-| Coluna              | Descrição                                                                                |
-| ------------------- | ---------------------------------------------------------------------------------------- |
-| `PID_limpo`         | PID normalizado                                                                          |
-| `URL_PT`            | URL da versão em português                                                               |
-| `Titulo_PT`         | Título em português                                                                      |
-| `Resumo_PT`         | Resumo em português                                                                      |
-| `Palavras_Chave_PT` | Palavras-chave em português (separadas por `;`)                                          |
-| `status`            | `ok_completo` / `ok_parcial` / `nada_encontrado` / `erro_extracao` / `erro_pid_invalido` |
-| `fonte_extracao`    | Fonte(s) usada(s) para cada campo                                                        |
-| `url_acedida`       | URL(s) acessada(s) durante o scraping                                                    |
+O CSV de entrada precisa de uma coluna `ID` com PIDs SciELO (formato `S1982-88372022000300013`). Sufixos `-scl` ou `-oai` são removidos automaticamente.
 
 ## Comparativo de estratégias
 
 Resultados em cinco anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
+
+| Estratégia | ok_completo | Tempo médio | Quando usar |
+| ---------- | ----------- | ----------- | ----------- |
+| Padrão (api+html) | 99.4–99.8% | ~24–32 min | Sempre — melhor custo-benefício |
+| Apenas API | 98.6–99.2% | ~24–28 min | Testes rápidos sem AoPs |
+| Apenas HTML | 96.8–98.9% | ~33–71 min | API fora do ar |
+
+Dados por ano (2021–2025):
 
 | Ano  | n   | Estratégia        | ok_completo | ok_parcial | erro     | Tempo       | −% vs html |
 | ---- | --- | ----------------- | ----------- | ---------- | -------- | ----------- | ---------- |
@@ -159,337 +144,131 @@ Resultados em cinco anos de coleta (SciELO Brasil, termos: *avalia$*, *educa$*):
 | 2025 | 603 | `--only-html`     | 98.2%       | 0.5%       | 1.3%     | ~57 min     | —          |
 | 2025 | 603 | padrão (api+html) | **99.7%**   | 0.3%       | **0.0%** | **~32 min** | **−45%**   |
 
-A coluna **−%** indica a economia de tempo do modo padrão em relação ao `--only-html`. A estratégia padrão é consistentemente a mais eficiente: usa a ArticleMeta API para ~99% dos artigos e aciona o HTML apenas como fallback, mantendo cobertura máxima com tempo entre 15% e 62% menor que o modo apenas-html.
+A coluna **−% vs html** é a economia de tempo do modo padrão em relação ao `--only-html`. A estratégia padrão usa a API para ~99% dos artigos e aciona o HTML apenas como fallback — cobertura máxima com 15%–62% menos tempo que o modo apenas-html.
 
-## Coleções disponíveis
+## Scripts de análise
 
-```bash
-uv run python scielo_search.py --list-collections
-```
+### process_charts.py — Diagnóstico do processo
 
-Exibe as 36 coleções SciELO com código, domínio e quantidade de artigos. Use `--collection COD` para selecionar (default: `scl` = Brasil).
-
-## Dependências
-
-| Pacote                    | Uso                                                     |
-| ------------------------- | ------------------------------------------------------- |
-| `requests`                | HTTP                                                    |
-| `beautifulsoup4` + `lxml` | Parsing HTML                                            |
-| `pandas`                  | Leitura/escrita CSV                                     |
-| `tqdm`                    | Barra de progresso                                      |
-| `wakepy`                  | Impede sleep do sistema durante execução longa          |
-| `brotli`                  | Descompressão Brotli (obrigatório para o CDN do SciELO) |
-| `matplotlib`              | Gráficos (`process_charts.py`, `results_report.py`)     |
-| `matplotlib-venn`         | Diagramas de Venn (`results_report.py`)                 |
-| `upsetplot`               | UpSet plots para ≥4 termos (`results_report.py`)        |
-| `wordcloud`               | Nuvem de palavras (`scielo_wordcloud.py`)               |
-| `nltk`                    | Stopwords multilíngues (`scielo_wordcloud.py`)          |
-| `pillow`                  | Máscara/shape da wordcloud (`scielo_wordcloud.py`)      |
-| `reportlab`               | Geração de PDF preenchível (`prisma_workflow.py`)       |
-
-## Workflow típico
+Gera três gráficos PNG a partir das pastas `runs/<ano>/`: distribuição de status, fontes de extração e tempo por modo.
 
 ```bash
-# Opção A — pipeline completo automático (recomendado)
-uv run python run_pipeline.py --year 2024
-# → busca + 3×scraping + análise + termos + gráficos + relatório + wordcloud + PRISMA
-# → tudo em runs/2024/
-
-# Para vários anos de uma vez:
-uv run python run_pipeline.py --per-year --year 2021-2025
-
-# Opção B — passo a passo manual
-# 1. Buscar artigos
-uv run python scielo_search.py --terms avalia educa --years 2024
-# → sc_20260411_143022.csv + sc_20260411_143022_params.json
-
-# 2. Extrair metadados
-uv run python scielo_scraper.py sc_20260411_143022.csv
-# → sc_20260411_143022_s_20260411_150312_api+html/resultado.csv
-
-# 3. Detectar termos e gerar CSV auditável
-uv run python terms_matcher.py --years 2024
-# → terms_<ts>.csv com colunas booleanas por termo×campo + criterio_ok
-
-# 4. Gerar artefatos científicos (gráficos, tabelas, texto, JSON)
-uv run python results_report.py --years 2024
-# → results_<stem>/results_text_pt.md, results_funnel.png, results_report.json, ...
-
-# 5. Nuvem de palavras
-uv run python scielo_wordcloud.py sc_*/resultado.csv
-# → wordcloud_keywords_ptbr_<ts>.png
-
-# 6. Diagrama PRISMA 2020
-uv run python prisma_workflow.py results_<stem>/results_report.json
-# → prisma_<stem>_pt_<ts>.pdf
+uv run python process_charts.py                        # todos os anos em runs/
+uv run python process_charts.py --years 2022 2024      # anos específicos
+uv run python process_charts.py --lang en              # em inglês
+uv run python process_charts.py --lang all             # PT + EN
+uv run python process_charts.py --output graficos/     # pasta de saída
 ```
+
+### terms_matcher.py — Detecção de termos
+
+Detecta termos em cada campo PT e gera colunas booleanas auditáveis (`<termo>_titulo`, `<termo>_resumo`, `<termo>_keywords`, `criterio_ok`). Roda offline.
+
+```bash
+uv run python terms_matcher.py                              # todos os anos
+uv run python terms_matcher.py --years 2022 2024            # anos específicos
+uv run python terms_matcher.py --terms avalia educa fisica  # termos personalizados
+uv run python terms_matcher.py --required-fields titulo resumo keywords
+uv run python terms_matcher.py --match-mode any             # qualquer termo satisfaz (default: all)
+```
+
+> T termos × 3 campos = 3T colunas booleanas. Com 2 termos (padrão): 6 colunas. O `criterio_ok` avalia apenas os `--required-fields` (padrão: titulo e keywords).
+
+### results_report.py — Artefatos científicos
+
+Gera gráficos, tabelas CSV e texto Markdown publication-ready a partir do `terms_*.csv`.
+
+```bash
+uv run python results_report.py                        # todos os anos, api+html, PT
+uv run python results_report.py --years 2022 2024      # anos específicos
+uv run python results_report.py --base runs/           # consolidado multi-ano → runs/results_2021-2025/
+uv run python results_report.py --lang all             # PT + EN
+uv run python results_report.py --artifacts funnel,trend,heatmap  # artefatos selecionados
+uv run python results_report.py --show-report          # exibe JSON existente sem regerar
+```
+
+**Modo consolidado (`--base runs/`):** agrega múltiplos anos num único conjunto — funil por ano lado a lado, trend de evolução e ranking de periódicos sobre o corpus total. Com 5 anos (2021–2025, n=370), a *Revista Brasileira de Educação Médica* domina com 50 artigos (13,5%), presença que não se destaca em nenhum ano isolado. A pasta de saída é `runs/results_<ano_min>-<ano_max>/`.
+
+### scielo_wordcloud.py — Nuvem de palavras
+
+```bash
+uv run python scielo_wordcloud.py                             # auto-descobre resultado.csv
+uv run python scielo_wordcloud.py resultado.csv --field abstract
+uv run python scielo_wordcloud.py resultado.csv --corpus all  # todos os artigos, não só criterio_ok
+uv run python scielo_wordcloud.py resultado.csv --mask forma.png
+uv run python scielo_wordcloud.py resultado.csv --colormap plasma
+```
+
+Gera `wordcloud_{campo}_{lang}_{ts}.png` por campo e `wordcloud_stats_{ts}.json`.
+
+### prisma_workflow.py — Diagrama PRISMA 2020
+
+Gera PDF A4 preenchível. A fase de Identificação é auto-preenchida a partir do `results_report.json`; Triagem e Inclusão ficam como campos AcroForm para curadoria humana.
+
+```bash
+uv run python prisma_workflow.py                              # auto-descobre o JSON
+uv run python prisma_workflow.py results_report.json          # JSON explícito
+uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523
+uv run python prisma_workflow.py results_report.json -i       # modo interativo
+uv run python prisma_workflow.py results_report.json --lang en
+uv run python prisma_workflow.py --export-template            # exporta layout para customização
+```
+
+> O layout PRISMA está embutido no script. `assets/PRISMAdiagram.json`, se presente, sobrepõe o padrão.
 
 ## Exemplos de artefatos gerados
 
-> Todos os exemplos abaixo foram gerados com `run_pipeline.py --per-year --year 2021-2025`, termos `avalia educa`, coleção SciELO Brasil.
+> Gerados com `run_pipeline.py --per-year --year 2021-2025`, termos `avalia educa`, coleção SciELO Brasil.
 
-### Diagnóstico do processo de extração (`process_charts.py`)
+### Diagnóstico do processo (`process_charts.py`)
 
-Compara as três estratégias de extração lado a lado — útil para validar a qualidade do scraping antes de analisar os resultados.
+Compara as três estratégias por ano. O modo `api+html` domina com >99% de extração completa; o `--only-html` chegou a 71 min em 2024 com até 3% de erros.
 
 ![Distribuição de status por modo de extração](docs/exemplos/chart_status.png)
 
 ### Funil de seleção (`results_report.py`)
 
-Mostra quantos artigos foram buscados, scrapeados e aprovaram o critério automático de filtragem — ponto de partida para o PRISMA.
+553 buscados → 553 scrapeados (100%) → 85 criterio_ok (15,4%). Ponto de partida para o PRISMA.
 
 ![Funil de seleção](docs/exemplos/results_funnel_pt.png)
 
 ### Distribuição de termos por campo (`results_report.py`)
 
-Heatmap com a frequência de cada termo nos campos detectados, calculada sobre os artigos `criterio_ok`. Mostra onde cada termo aparece mais — *educa* concentra 94,1% nas palavras-chave, enquanto *avalia* está mais distribuído.
+*educa* concentra 94,1% nas palavras-chave; *avalia* distribui-se mais entre título (76,5%) e resumo (88,2%).
 
 ![Heatmap de termos](docs/exemplos/results_terms_heatmap_pt.png)
 
 ### Periódicos com maior representação (`results_report.py`)
 
-Top periódicos por número de artigos no corpus filtrado, com percentuais. Em 2024: *Educar em Revista* (11,8%), *Ensaio: Avaliação e Políticas Públicas em Educação* (9,4%) e *Revista Brasileira de Educação Médica* (9,4%) concentraram 30,6% do corpus.
+Em 2024: *Educar em Revista* (11,8%), *Ensaio* (9,4%) e *RBEM* (9,4%) concentraram 30,6% do corpus. Com 5 anos agregados (n=370), a *Revista Brasileira de Educação Médica* sobe para 1º lugar com 50 artigos (13,5%).
 
 ![Periódicos](docs/exemplos/results_journals_pt.png)
 
-**Modo consolidado (`--base runs/`):** com 5 anos agregados (2021–2025, n=370), o ranking muda: a *Revista Brasileira de Educação Médica* sobe para 1º lugar com 50 artigos (13,5% do total) — presença distribuída que não se destaca em nenhum ano isolado mas domina na visão longitudinal. A taxa `criterio_ok` mantém-se estável ao longo do período (11,3%–15,4%), sem tendência clara de crescimento, o que valida a consistência da estratégia de busca. Gere o consolidado com:
-
-```bash
-uv run python results_report.py --base runs/
-# → runs/results_2021-2025/ com funil por ano lado a lado, trend de evolução e ranking agregado
-```
-
 ### Nuvem de palavras (`scielo_wordcloud.py`)
 
-Gerada a partir das palavras-chave dos artigos `criterio_ok`. Revela os termos mais frequentes do corpus de forma visual — domínio claro de *saúde*, *educação* e *enfermagem*.
+Gerada a partir das palavras-chave do corpus `criterio_ok`. Domínio de *saúde*, *educação* e *enfermagem*.
 
 ![Wordcloud de palavras-chave](docs/exemplos/wordcloud_keywords.png)
 
 ### Diagrama PRISMA 2020 (`prisma_workflow.py`)
 
-PDF A4 preenchível gerado automaticamente. A fase de Identificação (n=553, triagem=552, incluídos sugeridos=85) é auto-preenchida; as fases de Triagem e Inclusão ficam como campos editáveis para curadoria humana.
+Fase de Identificação auto-preenchida (n=553, triagem=552, incluídos sugeridos=85). Triagem e Inclusão ficam editáveis.
 
 ![Diagrama PRISMA](docs/exemplos/prisma_preview.png)
 
 ### Texto publication-ready (`results_report.py`)
 
-Além dos gráficos, o `results_report.py` gera um `results_text_pt.md` com seções prontas para publicação. Exemplo de trecho da seção de Metodologia (2024):
+O `results_text_pt.md` entrega Metodologia, Resultados, Limitações e descrição de figuras prontas para submissão. Exemplo (2024):
 
-> *"A busca bibliográfica, conduzida em 5 de maio de 2026, foi realizada na plataforma SciELO Brasil por meio do SciELO Search, utilizando os termos "avalia" e "educa" com truncamento automático (operador $), nos campos de título e resumo, abrangendo o ano de 2024. Foram recuperados 553 registros. [...] A etapa de filtragem automática verificou a presença simultânea de todos os termos em pelo menos um dos campos requeridos (título e palavras-chave), identificando 85 artigos (15,4%) como potencialmente relevantes para curadoria humana."*
+> *"A busca bibliográfica, conduzida em 5 de maio de 2026, foi realizada na plataforma SciELO Brasil [...] identificando 85 artigos (15,4%) como potencialmente relevantes para curadoria humana."*
 
----
+## Conceitos e terminologia
 
-## run_pipeline.py — Pipeline completo
-
-Executa o fluxo completo em um único comando: busca → 3×scraping → análise de discrepância → detecção de termos → gráficos → relatório científico → nuvem de palavras → diagrama PRISMA → arquivamento em `runs/<ano>/`.
-
-```bash
-uv run python run_pipeline.py --year 2024                        # pipeline completo para 2024
-uv run python run_pipeline.py --year 2021 2022 2023 2024 2025    # múltiplos anos (um destino)
-uv run python run_pipeline.py --per-year --year 2021-2025        # um destino por ano
-uv run python run_pipeline.py --year 2024 --dry-run              # simula sem executar
-uv run python run_pipeline.py --year 2024 --skip-search          # reutiliza CSV existente
-uv run python run_pipeline.py --year 2024 --skip-scrape          # reutiliza scraping existente
-uv run python run_pipeline.py --year 2024 --skip-wordcloud --skip-prisma  # pula etapas finais
-uv run python run_pipeline.py --year 2024 --prisma-lang pt       # PRISMA só em PT (default: pt+en)
-uv run python run_pipeline.py --stats-report                     # relatório consolidado de runs/
-uv run python run_pipeline.py --versions                         # versão de todos os scripts
-uv run python run_pipeline.py --reset-working-tree --dry-run     # preview do que seria removido
-uv run python run_pipeline.py --reset-working-tree               # reset completo (pede confirmação)
-```
-
-Gera em `runs/<ano>/`: CSV de busca, 3 pastas de scraping, análise de discrepância, gráficos de processo, relatório científico, wordclouds, PDFs PRISMA (pt + en), `pipeline_<ts>.log` e `pipeline_stats.json`.
-
-## process_charts.py — Diagnóstico técnico do processo
-
-Gera três gráficos PNG de diagnóstico técnico (como o scraping correu) a partir das pastas `runs/<ano>/`:
-
-- **`chart_status.png`** — distribuição de status (`ok_completo`, `ok_parcial`, `erro_extracao`) por modo e ano
-- **`chart_sources.png`** — fontes de extração no modo `api+html` por ano, com tabela de n exatos
-- **`chart_time.png`** — tempo total de scraping por modo e ano
-- **`chart_stats.json`** — metadados da execução (versão do script, timestamp, labels, idiomas, arquivos gerados)
-
-```bash
-uv run python process_charts.py                       # lê runs/ no diretório atual
-uv run python process_charts.py --years 2022 2024     # apenas esses anos
-uv run python process_charts.py --output graficos/    # pasta de saída personalizada
-uv run python process_charts.py --lang en             # gráficos em inglês
-uv run python process_charts.py --lang all            # gera em todos os idiomas
-uv run python process_charts.py --version             # mostrar versão
-uv run python process_charts.py -?                    # ajuda
-```
-
-## results_report.py — Artefatos científicos
-
-Gera o arcabouço completo de artefatos científicos publication-ready a partir do `terms_*.csv` produzido pelo `terms_matcher.py`. Para o projeto e-Aval (Estado da Arte da Avaliação):
-
-```bash
-uv run python results_report.py                       # api+html, PT, todos os anos em runs/
-uv run python results_report.py --years 2022 2024     # anos específicos
-uv run python results_report.py --base runs/          # consolidado multi-ano → runs/results_2021-2025/
-uv run python results_report.py --lang en             # artefatos em inglês
-uv run python results_report.py --lang all            # todos os idiomas (PT + EN)
-uv run python results_report.py --style grayscale     # estilo dos gráficos (default: default)
-uv run python results_report.py --list-styles         # listar estilos matplotlib disponíveis
-uv run python results_report.py --colormap plasma     # colormap do heatmap (default: viridis)
-uv run python results_report.py --list-colormaps      # listar colormaps disponíveis
-uv run python results_report.py -?                    # ajuda
-```
-
-**Modo consolidado (`--base runs/`):** quando múltiplos anos estão presentes, gera artefatos com visão de série temporal completa — funil por ano lado a lado, trend de evolução, heatmap e ranking de periódicos agregados. A pasta de saída segue o padrão `runs/results_<ano_min>-<ano_max>/` (ex: `runs/results_2021-2025/`).
-
-Artefatos gerados em `results_<stem>/`: gráficos (funil, tendência, heatmap de termos, periódicos, cobertura de campos, diagrama Venn/UpSet), tabelas CSV, texto Markdown publication-ready (`results_text_pt.md` / `results_text_en.md`) com Metodologia enriquecida, Nota técnica com URL da busca, e descrição textual de cada figura — e JSON de metadados.
-
-## scielo_wordcloud.py — Nuvem de palavras
-
-Gera nuvens de palavras a partir do `resultado.csv` do scraping. Suporta filtragem por corpus, stopwords por idioma via NLTK, stopwords de domínio acadêmico e máscara/shape personalizada.
-
-```bash
-uv run python scielo_wordcloud.py sc_ts_s_ts_api+html/resultado.csv   # title + keywords, corpus criterio_ok
-uv run python scielo_wordcloud.py resultado.csv --field abstract        # apenas resumos
-uv run python scielo_wordcloud.py resultado.csv --corpus all            # todos os artigos extraídos
-uv run python scielo_wordcloud.py resultado.csv --lang en               # stopwords em inglês
-uv run python scielo_wordcloud.py resultado.csv --stopwords extras.txt  # stopwords adicionais
-uv run python scielo_wordcloud.py resultado.csv --mask forma.png        # shape personalizada
-uv run python scielo_wordcloud.py resultado.csv --colormap plasma        # colormap
-uv run python scielo_wordcloud.py resultado.csv --max-words 100         # limitar palavras
-uv run python scielo_wordcloud.py resultado.csv --output-dir graficos/  # pasta de saída
-uv run python scielo_wordcloud.py resultado.csv --dry-run               # sem gerar arquivos
-uv run python scielo_wordcloud.py --list-langs                          # listar idiomas NLTK
-uv run python scielo_wordcloud.py --list-colormaps                      # listar colormaps
-uv run python scielo_wordcloud.py -?                                    # ajuda
-```
-
-Gera `wordcloud_{campo}_{lang}_{ts}.png` por campo e `wordcloud_stats_{ts}.json` com metadados.
-
-## prisma_workflow.py — Diagrama PRISMA 2020
-
-Gera um PDF A4 preenchível com o diagrama de fluxo PRISMA 2020. Os campos da fase de Identificação são auto-preenchidos a partir do `results_report.json` (gerado pelo `results_report.py`). Os campos das fases de Triagem e Inclusão ficam como campos editáveis AcroForm para preenchimento humano após curadoria.
-
-```bash
-# Geração básica (campos humanos ficam em branco para preencher no PDF)
-uv run python prisma_workflow.py runs/2025/results_*/results_report.json
-
-# Com campos humanos passados pela linha de comando
-uv run python prisma_workflow.py results_report.json --included 80 --excluded-screening 523
-
-# Modo interativo (terminal pergunta os valores)
-uv run python prisma_workflow.py results_report.json -i
-
-# Campos humanos de um arquivo JSON ou CSV
-uv run python prisma_workflow.py results_report.json --human-data human_fields.json
-
-# Em inglês
-uv run python prisma_workflow.py results_report.json --lang en
-
-# Pasta de saída específica
-uv run python prisma_workflow.py results_report.json --output-dir pdfs/
-
-# Simular sem gerar PDF
-uv run python prisma_workflow.py results_report.json --dry-run
-
-# Exportar template JSON do layout (para customização do diagrama)
-uv run python prisma_workflow.py --export-template
-uv run python prisma_workflow.py --export-template meu_layout.json
-```
-
-Gera `prisma_<stem>_<lang>_<ts>.pdf` — PDF abrível em qualquer leitor de PDF; campos editáveis preenchíveis diretamente no Acrobat Reader, Foxit, Edge, etc.
-
-> **Layout embutido:** o script é auto-suficiente — o layout PRISMA 2020 está embutido internamente. O arquivo `assets/PRISMAdiagram.json` é **opcional**: se presente, sobrepõe o layout padrão. Use `--export-template` para exportar o template e customizá-lo.
-
-> **Nota PRISMA:** o pipeline cobre apenas a fase de Identificação. As fases de Triagem e Inclusão requerem curadoria humana após o processamento automático.
-
-## terms_matcher.py — Detecção de termos por campo
-
-Consolida os `resultado.csv` de um ou mais anos e detecta termos de busca em cada campo PT, gerando colunas booleanas auditáveis em planilha eletrônica:
-
-| Coluna                                                   | Descrição                                                      |
-| -------------------------------------------------------- | -------------------------------------------------------------- |
-| `n_palavras_titulo`                                      | Nº de palavras no Titulo_PT                                    |
-| `n_palavras_resumo`                                      | Nº de palavras no Resumo_PT                                    |
-| `n_keywords_pt`                                          | Nº de keywords separadas por ";"                               |
-| `<termo>_titulo` / `<termo>_resumo` / `<termo>_keywords` | Bool: termo encontrado no campo                                |
-| `criterio_ok`                                            | Bool: todos os termos em pelo menos um dos `--required-fields` |
-
-> ⚠ **Atenção:** T termos × 3 campos = 3T colunas booleanas. Padrão (2 termos): 6 colunas.
-> As colunas booleanas cobrem os 3 campos (titulo, resumo, keywords); o `criterio_ok` avalia apenas os `--required-fields` (padrão: titulo e keywords).
-
-```bash
-uv run python terms_matcher.py                             # todos os anos, termos padrão
-uv run python terms_matcher.py --years 2022 2024           # apenas esses anos
-uv run python terms_matcher.py --terms avalia educa        # termos personalizados
-uv run python terms_matcher.py --required-fields titulo resumo keywords  # todos os campos
-uv run python terms_matcher.py --stats-report              # relatório do último run
-uv run python terms_matcher.py -?                          # ajuda
-```
-
-Gera também `terms_<ts>.log` e `terms_<ts>_stats.json` com estatísticas por ano e globais.
-
-## Dicionário de dados e termos
-
-### Termos e conceitos
-
-| Termo              | Definição                                                                                                                                                                                                                                                                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **PID**            | Identificador único SciELO. Formato: `S` + ISSN (com hífen) + ano (4 dígitos) + volume/fascículo (3 dígitos) + sequência (5 dígitos). Ex: `S1982-88372022000300013`. Total: 23 caracteres.                                                                                         |
-| **ISSN**           | International Standard Serial Number — identificador de periódico. Embutido no PID nas posições 1–9 (ex: `1982-8837`).                                                                                                                                                             |
-| **AoP**            | Ahead of Print — artigo publicado online antes de receber volume/fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na ArticleMeta API; extraído apenas via HTML.                                                                                |
-| **Coleção**        | Conjunto de periódicos de um país ou região na plataforma SciELO. Identificada por código de 3 letras (ex: `scl` = Brasil, `arg` = Argentina).                                                                                                                                     |
-| **ISIS-JSON**      | Formato de resposta da ArticleMeta API, derivado do formato de banco de dados CDS/ISIS usado pelo SciELO internamente.                                                                                                                                                             |
-| **Truncamento**    | Adição de `$` ao final de um termo de busca, para casar com variações morfológicas. Ex: `avalia$` casa com "avalia", "avaliação", "avaliativo", "avaliações". Ativo por padrão no `scielo_search.py` e removido automaticamente no `terms_matcher.py` para detecção por substring. |
-| **criterio_ok**    | Coluna booleana do `terms_matcher.py`: `True` se todos os termos buscados forem encontrados em pelo menos um dos campos `--required-fields` (padrão: titulo ou keywords).                                                                                                          |
-| **campo required** | Campo(s) considerados no cálculo de `criterio_ok`. Por padrão: `titulo` e `keywords` (basta que cada termo apareça em pelo menos um deles).                                                                                                                                        |
-
-### Colunas do resultado.csv (scraper)
-
-| Coluna              | Tipo | Origem      | Descrição                                             |
-| ------------------- | ---- | ----------- | ----------------------------------------------------- |
-| `ID`                | str  | CSV entrada | PID bruto conforme fornecido                          |
-| `Title`             | str  | CSV entrada | Título conforme indexado no SciELO Search             |
-| `Author(s)`         | str  | CSV entrada | Autores                                               |
-| `Source`            | str  | CSV entrada | Fonte/periódico                                       |
-| `Journal`           | str  | CSV entrada | Periódico                                             |
-| `Language(s)`       | str  | CSV entrada | Idioma(s) do artigo                                   |
-| `Publication year`  | int  | CSV entrada | Ano de publicação                                     |
-| `PID_limpo`         | str  | scraper     | PID normalizado (sufixos removidos, validado)         |
-| `URL_PT`            | str  | scraper     | URL da versão em português consultada                 |
-| `Titulo_PT`         | str  | scraper     | Título em português extraído                          |
-| `Resumo_PT`         | str  | scraper     | Resumo em português extraído                          |
-| `Palavras_Chave_PT` | str  | scraper     | Palavras-chave em português, separadas por `;`        |
-| `status`            | str  | scraper     | Status da extração (ver tabela abaixo)                |
-| `fonte_extracao`    | str  | scraper     | Fonte(s) usadas por campo (ex: `articlemeta_isis[T]`) |
-| `url_acedida`       | str  | scraper     | URL(s) acessadas durante o scraping                   |
-
-### Colunas adicionadas pelo terms_matcher.py
-
-| Coluna              | Tipo | Descrição                                                          |
-| ------------------- | ---- | ------------------------------------------------------------------ |
-| `n_palavras_titulo` | int  | Nº de palavras em Titulo_PT                                        |
-| `n_palavras_resumo` | int  | Nº de palavras em Resumo_PT                                        |
-| `n_keywords_pt`     | int  | Nº de keywords em Palavras_Chave_PT (separador `;`)                |
-| `<termo>_titulo`    | bool | Termo detectado em Titulo_PT (case-insensitive, substring)         |
-| `<termo>_resumo`    | bool | Termo detectado em Resumo_PT (case-insensitive, substring)         |
-| `<termo>_keywords`  | bool | Termo detectado em Palavras_Chave_PT (case-insensitive, substring) |
-| `criterio_ok`       | bool | Todos os termos presentes em ≥1 campo required                     |
-
-### Status de extração
-
-| Status              | Significado                                 |
-| ------------------- | ------------------------------------------- |
-| `ok_completo`       | Título + resumo + palavras-chave extraídos  |
-| `ok_parcial`        | Pelo menos um campo extraído, mas não todos |
-| `nada_encontrado`   | Página acessada, nenhum dado encontrado     |
-| `erro_extracao`     | Falha de acesso (ex: HTTP 404, timeout)     |
-| `erro_pid_invalido` | PID fora do padrão esperado                 |
-
-### Fontes de extração (`fonte_extracao`)
-
-| Valor                                       | Significado                            |
-| ------------------------------------------- | -------------------------------------- |
-| `articlemeta_isis[T]`                       | Título via ArticleMeta API (ISIS-JSON) |
-| `articlemeta_isis[R]`                       | Resumo via ArticleMeta API             |
-| `articlemeta_isis[K]`                       | Palavras-chave via ArticleMeta API     |
-| `Titulo_PT←pag1_meta_tags`                  | Título via meta tags da URL legacy     |
-| `Titulo_PT←pag1_html_body`                  | Título via corpo HTML da URL legacy    |
-| `Resumo_PT←pag_pt_meta_tags`                | Resumo via meta tags da versão PT      |
-| `Palavras_Chave_PT←pag_aop_ogurl_meta_tags` | Keywords via og:url (AoP)              |
+| Termo | Definição |
+| ----- | --------- |
+| **PID** | Identificador único SciELO (23 caracteres). Formato: `S` + ISSN + ano + volume/fascículo + sequência. Ex: `S1982-88372022000300013`. |
+| **AoP** | Ahead of Print — publicado online antes de receber fascículo definitivo. Identificado por `005` nas posições 14–16 do PID. Não indexado na API; extraído apenas via HTML. |
+| **Coleção** | Conjunto de periódicos de um país. Código de 3 letras: `scl` = Brasil, `arg` = Argentina, `prt` = Portugal. |
+| **Truncamento** | `$` ao final do termo casa com variações morfológicas: `avalia$` → "avaliação", "avaliativo". Ativo por padrão no `scielo_search.py`. |
+| **criterio_ok** | `True` se todos os termos aparecerem em pelo menos um dos `--required-fields` (padrão: titulo ou keywords). |
+| **fallback HTML** | Estratégia secundária: quando a API não retorna um campo, o scraper extrai via meta tags ou corpo HTML da página. |
